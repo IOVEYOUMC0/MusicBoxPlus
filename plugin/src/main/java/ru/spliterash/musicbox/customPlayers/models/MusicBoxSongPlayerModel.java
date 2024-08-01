@@ -1,5 +1,6 @@
 package ru.spliterash.musicbox.customPlayers.models;
 
+import com.xxmicloxx.NoteBlockAPI.model.SoundCategory;
 import com.xxmicloxx.NoteBlockAPI.songplayer.SongPlayer;
 import lombok.Getter;
 import ru.spliterash.musicbox.MusicBox;
@@ -20,6 +21,7 @@ public class MusicBoxSongPlayerModel {
     private final IPlayList playList;
     private final Function<IPlayList, ? extends MusicBoxSongPlayer> nextSongRunnable;
     private boolean run = false;
+    //private SoundCategory soundCategory = SoundCategory.RECORDS;
 
     /**
      * @param songPlayer       плеер который связан с этой моделью
@@ -48,6 +50,7 @@ public class MusicBoxSongPlayerModel {
             if (MusicBox.getInstance().getConfigObject().isEnable10octave()) {
                 songPlayer.setEnable10Octave(true);
             }
+            songPlayer.setCategory(SoundCategory.RECORDS); // Forces the songs to always play on the "RECORDS" category.
             songPlayer.setPlaying(true);
             run = true;
         }

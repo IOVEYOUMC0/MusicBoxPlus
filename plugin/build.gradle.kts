@@ -5,7 +5,7 @@ java {
 dependencies {
     compileOnly("org.spigotmc:spigot-api:1.13.2-R0.1-SNAPSHOT")
     compileOnly("com.github.MilkBowl:VaultAPI:1.7")
-    compileOnly("com.github.koca2000:NoteBlockAPI:1.6.1")
+    compileOnly("com.github.koca2000:NoteBlockAPI:2.0-SNAPSHOT")
 
     api("com.github.cryptomorin:XSeries:11.0.0")
     api("io.github.bananapuncher714:nbteditor:7.19.0")
