@@ -1,8 +1,8 @@
 # MusicBox
-Этот плагин добавляет на сервер новые пластинки, таблички, и много чего другого. Полное описание можно посмотреть на spigot
+> Original plugin: [https://github.com/Spliterash/MusicBox](https://github.com/Spliterash/MusicBox)
 
-Сюда добавлю лишь видео обзор
+This Spigot plugin adds in the ability to play [NBS songs](https://opennbs.org/) through records, signs, and/or through a GUI menu on server! A full and proper description can be found on the original author's [Spigot page](https://www.spigotmc.org/resources/musicbox-custom-noteblockmusic-on-discs.67949/).
+
+A video tutorial can be found below:
 
 [![](http://img.youtube.com/vi/uwygwHRrvkA/0.jpg)](http://www.youtube.com/watch?v=uwygwHRrvkA "")
-
-[Ссылка на spigot](https://www.spigotmc.org/resources/musicbox-music-on-discs.67949/)
