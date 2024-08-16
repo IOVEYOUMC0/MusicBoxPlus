@@ -38,7 +38,7 @@ public class MusicBoxExecutor implements TabExecutor {
         }
 
         if (!sender.hasPermission("musicbox.use")) {
-            sender.sendMessage(Lang.NO_PEX.toString());
+            sender.sendMessage(Lang.NO_PERMISSIONS.toString());
             return true;
         }
 
@@ -57,7 +57,7 @@ public class MusicBoxExecutor implements TabExecutor {
         if (executor.canExecute(sender)) {
             executor.execute(sender, ArrayUtils.removeFirst(String.class, args));
         } else {
-            sender.sendMessage(Lang.NO_PEX.toString());
+            sender.sendMessage(Lang.NO_PERMISSIONS.toString());
         }
         return true;
     }

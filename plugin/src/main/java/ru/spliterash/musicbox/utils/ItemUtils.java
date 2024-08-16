@@ -19,12 +19,13 @@ import java.util.stream.Collectors;
 
 @UtilityClass
 public class ItemUtils {
-    private final Enchantment enchantment = XEnchantment.BLAST_PROTECTION.getEnchant();
+    private final Enchantment enchantment = XEnchantment.UNBREAKING.getEnchant();
 
     public ItemStack glow(ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
-        meta.addEnchant(enchantment, 9999, true);
+        meta.addEnchant(enchantment, 1, true);
         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+        meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         stack.setItemMeta(meta);
         return stack;
     }

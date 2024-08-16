@@ -32,7 +32,6 @@ import ru.spliterash.musicbox.utils.StringUtils;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -178,7 +177,7 @@ public class Handler implements Listener {
             if (player.hasPermission("musicbox.sign")) {
                 GUIActions.openSignSetupInventory(PlayerWrapper.getInstance(player), sign);
             } else {
-                player.sendMessage(Lang.NO_PEX.toString());
+                player.sendMessage(Lang.NO_PERMISSIONS.toString());
             }
             e.setCancelled(true);
         } else if (songId.startsWith(ChatColor.AQUA.toString())) {

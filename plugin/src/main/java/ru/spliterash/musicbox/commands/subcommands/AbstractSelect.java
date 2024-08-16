@@ -36,7 +36,7 @@ public abstract class AbstractSelect implements SubCommand {
             return;
         } else if (args.length == 1) {
             if (!sender.hasPermission("musicbox.admin")) {
-                sender.sendMessage(Lang.NO_PEX.toString());
+                sender.sendMessage(Lang.NO_PERMISSIONS.toString());
                 return;
             }
             Player target = Bukkit.getPlayer(args[0]);
@@ -57,7 +57,7 @@ public abstract class AbstractSelect implements SubCommand {
         }
         Player target;
         if (!sender.hasPermission("musicbox.admin")) {
-            sender.sendMessage(Lang.NO_PEX.toString());
+            sender.sendMessage(Lang.NO_PERMISSIONS.toString());
             return;
         }
 

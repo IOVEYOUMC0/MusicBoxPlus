@@ -18,18 +18,25 @@ import java.util.stream.Collectors;
 
 @SuppressWarnings({"ArraysAsListWithZeroOrOneArgument", "SpellCheckingInspection", "unused", "RedundantSuppression"})
 public enum Lang {
-    NO_PEX(
-            "&6Sry no perms",
-            "&6Похоже у тебя нет разрешения на это действие"),
+    NO_PERMISSIONS(
+            "&cSorry, but you don't have permission to do that!",
+            "&6Похоже у тебя нет разрешения на это действие"
+    ),
     // В консоли русский вариант будет смотреться... да никак не будет, UTF-8 👍👍👍
-    ONLY_PLAYERS("Sry, but only players can execute this command"),
-    SPECIFY_PLAYER("Sry, but command can be executed only at players. Specify player to execute at"),
-    SONG_NAME("&6{song}"),
+    ONLY_PLAYERS(
+            "&cOnly players can execute this command!"
+    ),
+    SPECIFY_PLAYER(
+            "&cThis command can only be executed if you give a specific player's username."
+    ),
+    SONG_NAME(
+            "&6{song}"
+    ),
     SONG_LORE(
             Arrays.asList(
-                    "&7Duration: &b{length}",
-                    "&7Author: &b{author}",
-                    "&7Original author: &b{original_author}"
+                    "&6Duration&8: &e{length}",
+                    "&6Author&8: &e{author}",
+                    "&6Original author&8: &e{original_author}"
             ),
             Arrays.asList(
                     "&7Продолжительность: &b{length}",
@@ -37,17 +44,20 @@ public enum Lang {
                     "&7Оригинальный автор: &b{original_author}"
             )
     ),
-    GUI_TITLE("&l&3MusicBox &8{container} &0{page}&7/&0{last_page}"),
-    FOLDER_FORMAT("&e{folder}"),
-    CURRENT_PLAYNING(
-            "&eNow playing &b{song}",
-            "&eСейчас играет &b{song}"),
-
+    GUI_TITLE(
+            "&l&3MusicBox &8{container} &0{page}&7/&0{last_page}"
+    ),
+    FOLDER_FORMAT(
+            "&e{folder}"
+    ),
+    CURRENTLY_PLAYING(
+            "&e6Now playing &e{song}"
+    ),
     ADD_CONTAINER_TO_PLAYLIST(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&bRight click&7 to add in your playlist"
+                    "&6Right click&e to add to your playlist"
             ),
             Arrays.asList(
                     "",
@@ -59,20 +69,20 @@ public enum Lang {
             "&aIn playlist",
             "&aВ плейлисте"
     ),
-    SONG_PANEL_NOW_PLAY(
+    SONG_PANEL_NOW_PLAYING(
             Arrays.asList(
                     "",
-                    "&aNow playning"
+                    "&aɴᴏᴡ ᴘʟᴀʏɪɴɢ"
             ),
             Arrays.asList(
                     "",
                     "&aСейчас играет"
             )
     ),
-    SONG_PANEL_SWITH_TO(
+    SONG_PANEL_SWITCH_TO(
             Arrays.asList(
                     "",
-                    "&7Click to play"
+                    "&7ᴄʟɪᴄᴋ ᴛᴏ ᴘʟᴀʏ"
             ),
             Arrays.asList(
                     "",
@@ -80,20 +90,20 @@ public enum Lang {
             )
     ),
     ADD_MUSIC_TO_PLAYLIST(
-            Arrays.asList("&bLeft click&7 to add this song to playlist"),
+            Arrays.asList("&6Left click&7 to add this song to playlist"),
             Arrays.asList("&bЛевый клик&7 чтобы добавить эту мелодию в плейлист")
     ),
     COMMAND_HELP_SHOP(
-            "&b/musicbox shop&6 - Open disc shop",
+            "&6/musicbox shop &8- &eOpen disc shop",
             "&b/musicbox shop&6 - Открыть магазин дисков"
     ),
     COMMAND_HELP_GIVE(
-            "&b/musicbox give&6 - Give disc",
+            "&6/musicbox give &8- &eGive disc",
             "&b/musicbox give&6 - Выдать диск"
     ),
     COMMAND_HELP(
             Arrays.asList(
-                    "&b/musicbox &6- Open music gui"
+                    "&6/musicbox &8- &eOpen music GUI"
             ),
             Arrays.asList(
                     "&b/musicbox &6- Открыть инвентарь с музыкой"
@@ -101,13 +111,13 @@ public enum Lang {
     ),
     ADMIN_HELP(
             Arrays.asList(
-                    "&b/musicbox shop [player] (name)&6 - Open disc shop or buy disc with name for player",
-                    "&b/musicbox give [player] (name)&6 - Open give disc gui or give song with name to the player",
-                    "&b/musicbox give_single [player]&6 - Open give GUI to player, but he can only select 1 disc",
-                    "&b/musicbox play [player] [name]&6 - Play sound to player",
-                    "&b/musicbox silent [on,off,switch] (player) &6- Change player silent mode",
-                    "&b/musicbox shutup [player] &6- off player SongPlayer",
-                    "&b/musicbox reload &6- reload plugin with all music"
+                    "&6/musicbox shop [player] (name) &8-&e Open disc shop or buy disc with name for player",
+                    "&6/musicbox give [player] (name) &8-&e Open give disc gui or give song with name to the player",
+                    "&6/musicbox give_single [player] &8-&e Open give GUI to player, but he can only select 1 disc",
+                    "&6/musicbox play [player] [name] &8-&e Play sound to player",
+                    "&6/musicbox silent [on,off,switch] (player) &8-&e Change player silent mode",
+                    "&6/musicbox shutup [player] &8-&e off player SongPlayer",
+                    "&6/musicbox reload &8-&e Reload plugin & all music"
             ),
             Arrays.asList(
                     "&b/musicbox shop [player] (name)&6 - Открыть магазин дисков или купить пластинку с именем для игрока",
@@ -124,7 +134,7 @@ public enum Lang {
                     "",
                     "&7==========================",
                     "&eClick to buy this disc",
-                    "&7Price: &6{price} $"
+                    "&7Price&8: &6{price} $"
             ),
             Arrays.asList(
                     "",
@@ -135,91 +145,107 @@ public enum Lang {
     ),
     CANT_SWITCH(
             "You cant switch play mode",
-            "&6Вы не можете поменять режим проигрывания"),
+            "&6Вы не можете поменять режим проигрывания"
+    ),
     NEXT(
             "&6Next",
-            "&6Вперёд"),
+            "&6Вперёд"
+    ),
     BACK(
             "&6Back",
-            "&6Назад"),
+            "&6Назад"
+    ),
     BUY_CONTAINER_LORE(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&ePress &cright&e to buy this box",
-                    "&7Price: &6{price} $"
+                    "&6Right click&e to buy this category",
+                    "&7Price&8: &6{price} $"
             ),
             Arrays.asList(
                     "",
                     "&7==========================",
                     "&eНажми &cправой кнопкой&e чтобы купить весь этот сундук",
                     "&7Цена: &6{price} $"
-            )),
+            )
+    ),
     NO_HAS_MONEY(
-            "&6You don't have enough &b{amount}&6 to buy this",
-            "&6Вам не хватает &b{amount}&6 чтобы купить это"),
+            "&6You don't have enough &e{amount}&6 to buy this!",
+            "&6Вам не хватает &b{amount}&6 чтобы купить это"
+    ),
     NO_INVENTORY_SPACE(
-            "&6You dont have space in your inventory",
-            "&6У вас нет места в инвентаре"),
-    DISC_BUYED(
-            "&6You have successfully purchased a disc &b{disc}",
-            "&6Вы успешно купили диск &b{disc}"),
+            "&cYou dont have space in your inventory, sorry!",
+            "&6У вас нет места в инвентаре"
+    ),
+    DISC_PURCHASED(
+            "&6You have successfully purchased the &e{disc}&6 disc!",
+            "&6Вы успешно купили диск &b{disc}"
+    ),
     PARENT_CONTAINER(
             "&6Return to parent folder",
-            "&6Вернуться на уровень выше"),
+            "&6Вернуться на уровень выше"
+    ),
     HUMAN_TIME_MINUTE(
             "{value}m.",
             "{value}м."
     ),
     HUMAN_TIME_SECOND(
             "{value}s.",
-            "{value}с."),
+            "{value}с."
+    ),
     SONG_STOP(
-            "&cStop",
-            "&cСтоп"),
+            "&cStop the music?",
+            "&cСтоп"
+    ),
     REWIND_BUTTON(
             "&6Rewind",
-            "&6Перемотка"),
+            "&6Перемотка"
+    ),
     NOT_PLAY(
-            "&6Music currently does not play",
-            "&6В данный момент вы не слушаете музыку"),
+            "&6Music currently isn't playing",
+            "&6В данный момент вы не слушаете музыку"
+    ),
     BLOCK_NOT_PLAY(
-            "&6This block currently don't play music",
+            "&6This block doesn't currently play music",
             "&6Этот блок в данный момент не проигрывает музыку"
     ),
     CONTROL_GUI_TITLE(
-            "Song panel - now play &0&n{song}",
-            "Музыкальная панель - играет &0&n{song}"),
+            "&6ɴᴏᴡ ᴘʟᴀʏɪɴɢ &8- &e&n{song}",
+            "Музыкальная панель - играет &0&n{song}"
+    ),
     REWIND_TO(
-            "&6Rewind to &b{time}&e({percent}%)",
-            "&6Перемотать на &b{time}&e({percent}%)"),
-    REWINDED(
-            "&6You are rewind song to &b{time}&e({percent}%)",
-            "&6Вы перемотали проигрыватель на &b{time}&e({percent}%)"),
+            "&6Rewind to &e{time} &8({percent}%)",
+            "&6Перемотать на &b{time}&e({percent}%)"
+    ),
+    REWOUND(
+            "&6Song rewound to &e{time} &8({percent}%)",
+            "&6Вы перемотали проигрыватель на &b{time}&e({percent}%)"
+    ),
     CLOSE(
             "&cClose",
-            "&cЗакрыть"),
+            "&cЗакрыть"
+    ),
     ENABLE(
             "&aEnable",
-            "&aВключено"),
+            "&aВключено"
+    ),
     DISABLE(
             "&cDisable",
-            "&cВыключено"),
-
-    SWITH_MODE_LORE(
+            "&cВыключено"
+    ),
+    SWITCH_MODE_LORE(
             Arrays.asList(
-                    "&7Status: {status}",
-                    "&7Speaker mode allow nearby players hear you music"
+                    "&7Status&8: {status}",
+                    "&7Speaker mode allows &6nearby players&7 hear your music"
             ),
             Arrays.asList(
                     "&7Статус: {status}",
                     "&7Режим колонки позволит игрокам рядом с вами слышать вашу музыку"
             )
     ),
-
-    SWITH_MODE_NO_PEX_LORE(
+    SWITCH_MODE_NO_PERMISSIONS_LORE(
             Arrays.asList(
-                    "&7You need &bmusicbox.speaker to change mode"
+                    "&cYou don't have permission to do that! You'll need &4musicbox.speaker&c to change modes!"
             ),
             Arrays.asList(
                     "&7Вам необходимо иметь &bmusicbox.speaker чтобы включить колонку"
@@ -227,19 +253,23 @@ public enum Lang {
     ),
     SPEAKER_MODE(
             "&6Speaker mode",
-            "&6Режим колонки"),
+            "&6Режим колонки"
+    ),
     PLAYLIST_EDITOR(
             "&6Playlist list",
-            "&6Список плейлистов"),
-    PLAYLIST_NAME("&6{name}"),
+            "&6Список плейлистов"
+    ),
+    PLAYLIST_NAME(
+            "&6{name}"
+    ),
     GO_BACK_TO_PLAYLIST(
-            "&6Go back to playlist",
+            "&6Return to playlist",
             "&6Вернуться к плейлисту"
     ),
     PLAYLIST_LORE(
             Arrays.asList(
-                    "&7Track count: &b{count}",
-                    "&7Duration: &b{duration}"
+                    "&6Track count&8: &e{count}",
+                    "&6Duration&8: &e{duration}"
             ),
             Arrays.asList(
                     "&7Количество треков: &b{count}",
@@ -250,8 +280,8 @@ public enum Lang {
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&7Press &bthe left mouse button&7 to listen",
-                    "&7To delete, press &bthe right mouse button"
+                    "&ePress the &6left mouse button&e to listen",
+                    "&eTo delete, press the &6right mouse button&e!"
             ),
             Arrays.asList(
                     "",
@@ -270,11 +300,12 @@ public enum Lang {
     ),
     MASTER_PLAYLIST(
             "&6Master playlist",
-            "&6Главный плейлист"),
+            "&6Главный плейлист"
+    ),
     MASTER_PLAYLIST_LORE(
             Arrays.asList(
-                    "&7Include &cALL&7 tracks",
-                    "&aAlways&7 random"
+                    "&7Include &6ALL&7 tracks",
+                    "&6Always&7 random"
             ),
             Arrays.asList(
                     "&7Включает в себя &aВСЕ&7 треки",
@@ -282,33 +313,39 @@ public enum Lang {
             )
     ),
     CREATE_NEW_PLAYLIST(
-            "&6Create new playlist",
-            "&6Создать новый плейлист"),
+            "&6Create a new playlist",
+            "&6Создать новый плейлист"
+    ),
     NEW_PLAYLIST_MESSAGE(
-            "&6To create a new playlist write &b/musicbox playlist Playlist name ",
+            "&6To create a new playlist type &e/musicbox playlist <name>&6!",
             "&6Чтобы создать новый плейлист напиши &b/musicbox playlist Имя плейлиста"),
     SAVE_PLAYLIST_CHANGE(
             "&6Save changes",
-            "&6Сохранить изменения"),
+            "&6Сохранить изменения"
+    ),
     PLAYLIST_SAVED(
-            "&6Playlist &b{playlist}&6 saved",
-            "&6Плейлист &b{playlist}&6 успешно сохранён"),
+            "&6Playlist &e{playlist}&6 saved",
+            "&6Плейлист &b{playlist}&6 успешно сохранён"
+    ),
     DELETE_PLAYLIST(
             "&6Delete playlist",
-            "&6Удалить плейлист"),
+            "&6Удалить плейлист"
+    ),
     PLAYLIST_DELETED(
-            "&6You delete playlist &b{playlist}",
+            "&6You deleted your playlist named \"&e{playlist}\"&6!",
             "&6Вы удалили плейлист &b{playlist}"
     ),
     SHUFFLE_PLAYLIST(
             "&6Shuffle playlist",
-            "&6Перемешать плейлист"),
+            "&6Перемешать плейлист"
+    ),
     RENAME_PLAYLIST(
             "&6Rename playlist",
-            "&6Переименовать плейлист"),
+            "&6Переименовать плейлист"
+    ),
     DONT_FORGET_TO_SAVE(
             Arrays.asList(
-                    "&cDO NOT FORGET&7 to save"
+                    "&cDON'T FORGET TO SAVE!"
             ),
             Arrays.asList(
                     "&cНЕ ЗАБУДЬ&7 сохранить"
@@ -316,25 +353,35 @@ public enum Lang {
     ),
     ADD_MUSIC_TO_PLAYLIST_ITEM(
             "&6Add music to this playlist",
-            "&6Добавить музыку в этот плейлист"),
+            "&6Добавить музыку в этот плейлист"
+    ),
     PLAYLIST_ZERO_SIZE(
-            "&cYou can't save empty playlist",
-            "&cВы не можете сохранить пустой плейлист"),
+            "&cYou can't save empty playlist!",
+            "&cВы не можете сохранить пустой плейлист"
+    ),
     CHILL_CHILL_MAN(
-            "&cChill man, chill, save in progress",
-            "&cОстынь чел, сохранение в процессе"),
+            "&cA save is currently in progress. Have a little patience, please!",
+            "&cОстынь чел, сохранение в процессе"
+    ),
     NEXT_PLAYLIST_SONG_TITLE(
             "&6Play next playlist song",
-            "&6Следующая мелодия"),
-    PLAYLIST_SONG_NUM("&9{num}) "),
-    CURRENT_PLAYLIST_SONG("{num}&a{song}"),
-    ANOTHER_PLAYLIST_SONG("{num}&8{song}"),
+            "&6Следующая мелодия"
+    ),
+    PLAYLIST_SONG_NUM(
+            "&9{num}) "
+    ),
+    CURRENT_PLAYLIST_SONG(
+            "{num}&6&l{song}"
+    ),
+    ANOTHER_PLAYLIST_SONG(
+            "{num}&e{song}"
+    ),
     DEFAULT_PLAYLIST_LORE(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&bLeft click&7 to play",
-                    "&bRight click&7 to edit"
+                    "&6Left click&e to play",
+                    "&6Right click&e to edit"
             ),
             Arrays.asList(
                     "",
@@ -344,16 +391,18 @@ public enum Lang {
             )
     ),
     SONG_NOT_FOUND(
-            "&cSong not found",
-            "&Мелодия не найдена"),
+            "&cSong not found. Are you sure you typed it in correctly?",
+            "&Мелодия не найдена"
+    ),
     YOU_GET_DISC(
-            "&6You get disc &b{disc}",
-            "&6Вы получили диск &b{disc}"),
+            "&6You got the &e{disc} &6 disc!",
+            "&6Вы получили диск &b{disc}"
+    ),
     GET_DISC_LORE(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&7Click to get this disc"
+                    "&6Left click&e to get this disc"
             ),
             Arrays.asList(
                     "",
@@ -365,27 +414,31 @@ public enum Lang {
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&7Click right to get all container"
+                    "&6Right click&e to get all discs"
             ),
             Arrays.asList(
                     "",
                     "&7==========================",
                     "&7Нажми правой кнопкой чтобы получить всё из этого сундука"
-            )),
+            )
+    ),
     INPUT_NAME(
-            "&6Input name &b/musicbox playlist name",
-            "&6Введи имя &b/musicbox playlist имя"),
+            "&6Input a name &e/musicbox playlist <name>",
+            "&6Введи имя &b/musicbox playlist имя"
+    ),
     PLAYER_OFLLINE(
-            "&6Player &b{player}&6 offline",
-            "&6Игрок &b{player}&6 не в сети"),
+            "&6Player &e{player}&6 is currently offline!",
+            "&6Игрок &b{player}&6 не в сети"
+    ),
     SHUT_UPPED(
-            "&6Player &b{player}&6 has ben muted",
-            "&6Игрок &b{player}&6 больше не воспроизводит музыку"),
+            "&6Player &e{player}&6 has been muted.",
+            "&6Игрок &b{player}&6 больше не воспроизводит музыку"
+    ),
     SIGN_PLAYLIST_LORE(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&eClick to setup sign playlist"
+                    "&6Click to setup a sign playlist"
             ),
             Arrays.asList(
                     "",
@@ -396,7 +449,7 @@ public enum Lang {
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&eClick to setup sign song"
+                    "&6Click to setup a sign song"
 
             ),
             Arrays.asList(
@@ -408,13 +461,13 @@ public enum Lang {
     ),
     RANDOM_MODE_BUTTON(
             "&6Random mode {status}",
-            "&6Рандомный режим {status}"),
-
+            "&6Рандомный режим {status}"
+    ),
     SIGN_CONTAINER_LORE(
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&eRight click&7 to setup this container on sign"
+                    "&eRight click&e to setup this container on sign"
 
             ),
             Arrays.asList(
@@ -424,13 +477,13 @@ public enum Lang {
 
             )
     ), WRONG_SIGN_FACE(
-            "&cWrong side of the plate, but nothing, now we'll fix it",
+            "&cThe sign is backwards. &6Don't worry, we've fixed it for you!",
             "&cНеправильная сторона таблички, но ничего, сейчас мы это исправим"),
     SEARCH_INFO_SIGN_HOVER(
             Arrays.asList(
                     "&7If enabled, it will display the current playlist",
-                    "&7on the sign above or below",
-                    "&7Looks for it from below and from above at a length of &e5&7 blocks from the current sign"
+                    "&7on the sign above or below. This searches for it from below and",
+                    "&7from above at a length of &e5&7 blocks from the current sign."
 
             ),
             Arrays.asList(
@@ -445,13 +498,14 @@ public enum Lang {
     ),
     SEARCH_INFO_SIGN_TITLE(
             "&6Search info sign {status}",
-            "&6Искать информационную табличку {status}"),
+            "&6Искать информационную табличку {status}"
+    ),
     INFO_SIGN_OFF(
             Arrays.asList(
-                    "It info sign",
-                    "for songplayer",
-                    "Currently SongPlayer",
-                    "&cOFF"
+                    "&8[&6&lᴊᴜᴋᴇʙᴏx ɪɴꜰᴏ&8]",
+                    "&e-=[||]=-",
+                    "&7Current Status&8:",
+                    "&cᴏꜰꜰʟɪɴᴇ"
             ),
             Arrays.asList(
                     "Это табличка нужна",
@@ -462,18 +516,19 @@ public enum Lang {
     ),
     CONTROL_PANEL_BUTTON(
             "&6Songplayer panel",
-            "&6Панель проигрывателя"),
+            "&6Панель проигрывателя"
+    ),
     PREVENT_DESTROY_TITLE(
             "&6Prevent sign destroy {status}",
             "&6Предотвратить автоуничтожение проигрывателя {status}"
     ),
     PREVENT_DESTROY_LORE(
             Arrays.asList(
-                    "&7If enabled, the plugin will not destroy the sign",
-                    "&7if no one hears it for more than &b60&7 seconds (configurable in the config)",
-                    "&7also protects the songplayer to restart the server",
+                    "&7If enabled, the plugin will not destroy the sign if no one hears",
+                    "&7it for more than &e60&7 seconds. &8(Configurable in the config!)",
+                    "&7Also protects the songplayer between server restarts!",
                     "",
-                    "&7This button is visible only to those who have &cmusicbox.admin"
+                    "&cThis button is visible only to those who have &4musicbox.admin&c!"
             ),
             Arrays.asList(
                     "&7Если включено, плагин не будет уничтожать проигрыватель таблички",
@@ -487,7 +542,7 @@ public enum Lang {
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&eRight click&7 to play this chest"
+                    "&7Right click&e to play this chest"
             ),
             Arrays.asList(
                     "",
@@ -496,19 +551,19 @@ public enum Lang {
             )
     ),
     LEGACY_DISC_NOT_FOUND(
-            "&6Sorry, i can find sound with name &b{song}",
+            "&cSorry, but we can't find any song matching &4{song}&c!",
             "&6Извини, но я не могу найти звук для &b{song}"),
     LEGACY_DISC_REPLACE(
-            "&6It looks like this is a disc from an old version of the plugin, " +
-                    "but don't worry, we'll convert it to the new one. Click again, but now with a new disc",
+            "&6It looks like this is a disc from an older version of the plugin. " +
+                    "Don't worry, we'll convert it to a new one! &eTry again with the new disc!",
             "&6Похоже это диск от старой версии плагина, но не волнуйся, " +
                     "мы переделаем его в новый. Кликни ещё раз, но теперь новым диском, он должен быть где то у тебя в инвентаре"
     ),
     SILENT_MODE_LORE(
             Arrays.asList(
-                    "&7In silent mode you can hear &bonly self songs&7.",
-                    "&7No any other songplayers from player speakers, jukeboxs or signs",
-                    "&7Status: {status}"
+                    "&7In silent mode you can hear only hear songs played by &6yourself&7.",
+                    "&7Songs from player speakers, jukeboxes, or signs will NOT play!",
+                    "&7Status&8: {status}"
             ),
             Arrays.asList(
                     "&7В тихом режиме вы можете слышать &bтолько свою музыку&7.",
@@ -521,7 +576,7 @@ public enum Lang {
             "&6Тихий режим"
     ),
     SILENT_MODE_RESPONSE(
-            "&6Set &b{player}&6 silent mode to {state}",
+            "&6Set &e{player}&6's silent mode to {state}",
             "&6Тихий режим установлен в состояние {state}&6 для игрока &b{player}"
     );
     /**

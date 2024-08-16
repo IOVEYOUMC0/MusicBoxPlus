@@ -198,9 +198,9 @@ public class GUIActions {
                 List<String> lore;
                 if (wrapper.canSwitch()) {
                     String status = wrapper.isSpeaker() ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
-                    lore = Lang.SWITH_MODE_LORE.toList("{status}", status);
+                    lore = Lang.SWITCH_MODE_LORE.toList("{status}", status);
                 } else
-                    lore = Lang.SWITH_MODE_NO_PEX_LORE.toList();
+                    lore = Lang.SWITCH_MODE_NO_PERMISSIONS_LORE.toList();
                 return ItemUtils.createStack(XMaterial.NOTE_BLOCK, Lang.SPEAKER_MODE.toString(), lore);
             }
 
@@ -305,7 +305,7 @@ public class GUIActions {
                 player.sendMessage(Lang.NO_INVENTORY_SPACE.toString());
             } else {
                 EconomyUtils.buyNoMessage(player, price);
-                player.sendMessage(Lang.DISC_BUYED.toString("{disc}", musicBoxSong.getName()));
+                player.sendMessage(Lang.DISC_PURCHASED.toString("{disc}", musicBoxSong.getName()));
             }
         }
     }

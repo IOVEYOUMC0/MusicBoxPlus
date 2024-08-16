@@ -20,7 +20,7 @@ public class PlayerPlayerModel {
         this.model = model;
         wrapper.setBarProgress(0);
         wrapper.setBarVisible(true);
-        wrapper.setBarTitle(Lang.CURRENT_PLAYNING.toString("{song}", model.getCurrentSong().getName()));
+        wrapper.setBarTitle(Lang.CURRENTLY_PLAYING.toString("{song}", model.getCurrentSong().getName()));
         SongPlayer songPlay = model.getMusicBoxSongPlayer().getApiPlayer();
         songPlay.addPlayer(wrapper.getPlayer());
     }

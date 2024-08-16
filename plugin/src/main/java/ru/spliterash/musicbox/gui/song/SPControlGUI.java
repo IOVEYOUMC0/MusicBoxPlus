@@ -78,7 +78,7 @@ public class SPControlGUI {
     private void addDiscItem(int index, MusicBoxSong song, PeekList<XMaterial> peekList, boolean playNow, int songNum) {
         gui.addItem(index, song.getSongStack(peekList.getAndNext(),
                 SongUtils.getSongName(songNum, song, playNow),
-                playNow ? Lang.SONG_PANEL_NOW_PLAY.toList() : Lang.SONG_PANEL_SWITH_TO.toList(),
+                playNow ? Lang.SONG_PANEL_NOW_PLAYING.toList() : Lang.SONG_PANEL_SWITCH_TO.toList(),
                 playNow
         ), new ClickAction(() -> {
             spModel.getPlayList().setSong(song);
@@ -126,7 +126,7 @@ public class SPControlGUI {
                     new PlayerClickAction(
                             p -> {
                                 musicPlayer.getApiPlayer().setTick(chunkStart);
-                                p.sendMessage(Lang.REWINDED.toString(rewindReplaceArray));
+                                p.sendMessage(Lang.REWOUND.toString(rewindReplaceArray));
                                 updateRewind();
                             }
                     )

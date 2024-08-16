@@ -19,7 +19,7 @@ public class SilentExecutor implements SubCommand {
         Player target;
         if (args.length >= 2) {
             if (!sender.hasPermission("musicbox.admin")) {
-                sender.sendMessage(Lang.NO_PEX.toString());
+                sender.sendMessage(Lang.NO_PERMISSIONS.toString());
                 return;
             }
             target = Bukkit.getPlayer(args[1]);
