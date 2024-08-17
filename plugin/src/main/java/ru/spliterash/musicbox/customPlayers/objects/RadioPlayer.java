@@ -45,7 +45,7 @@ public class RadioPlayer extends RadioSongPlayer implements PlayerSongPlayer {
 
     @Override
     public boolean isDestroyed() {
-        return true;
+        return false;
     }
 
     @Override
