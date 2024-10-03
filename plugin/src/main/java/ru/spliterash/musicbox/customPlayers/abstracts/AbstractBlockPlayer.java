@@ -23,9 +23,12 @@ public abstract class AbstractBlockPlayer extends PositionSongPlayer implements 
     private final static Map<Location, AbstractBlockPlayer> players = new HashMap<>();
     @Getter
     private final static Collection<AbstractBlockPlayer> all = Collections.unmodifiableCollection(players.values());
+
     private final MusicBoxSongPlayerModel musicBoxModel;
     private final RangePlayerModel rangePlayerModel;
     private final Location location;
+
+    private boolean destroyed = false;
 
     public AbstractBlockPlayer(IPlayList list, Location location, int range) {
         super(list.getCurrent().getSong());
@@ -103,7 +106,7 @@ public abstract class AbstractBlockPlayer extends PositionSongPlayer implements 
 
     @Override
     public boolean isDestroyed() {
-        return false;
+        return destroyed;
     }
 
     @Override
@@ -127,6 +130,7 @@ public abstract class AbstractBlockPlayer extends PositionSongPlayer implements 
             }
             rangePlayerModel.destroy();
             musicBoxModel.destroy();
+            destroyed = true;
         }
     }
 
@@ -135,3 +139,4 @@ public abstract class AbstractBlockPlayer extends PositionSongPlayer implements 
      */
     protected abstract void songEnd();
 }
+

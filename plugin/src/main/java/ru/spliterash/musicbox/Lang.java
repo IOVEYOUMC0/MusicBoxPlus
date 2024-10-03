@@ -51,7 +51,7 @@ public enum Lang {
             "&e{folder}"
     ),
     CURRENTLY_PLAYING(
-            "&e6Now playing &e{song}"
+            "&6Now playing &7- &e{song}"
     ),
     ADD_CONTAINER_TO_PLAYLIST(
             Arrays.asList(
@@ -206,7 +206,7 @@ public enum Lang {
             "&6В данный момент вы не слушаете музыку"
     ),
     BLOCK_NOT_PLAY(
-            "&6This block doesn't currently play music",
+            "&6This isn't playing music at the moment. Try playing the music, first, to access the controls!",
             "&6Этот блок в данный момент не проигрывает музыку"
     ),
     CONTROL_GUI_TITLE(
@@ -226,11 +226,11 @@ public enum Lang {
             "&cЗакрыть"
     ),
     ENABLE(
-            "&aEnable",
+            "&aEnabled",
             "&aВключено"
     ),
     DISABLE(
-            "&cDisable",
+            "&cDisabled",
             "&cВыключено"
     ),
     SWITCH_MODE_LORE(
@@ -395,7 +395,7 @@ public enum Lang {
             "&Мелодия не найдена"
     ),
     YOU_GET_DISC(
-            "&6You got the &e{disc} &6 disc!",
+            "&6You got the &e{disc} &6disc!",
             "&6Вы получили диск &b{disc}"
     ),
     GET_DISC_LORE(
@@ -542,7 +542,7 @@ public enum Lang {
             Arrays.asList(
                     "",
                     "&7==========================",
-                    "&7Right click&e to play this chest"
+                    "&7Right click to play the songs &ein this chest"
             ),
             Arrays.asList(
                     "",

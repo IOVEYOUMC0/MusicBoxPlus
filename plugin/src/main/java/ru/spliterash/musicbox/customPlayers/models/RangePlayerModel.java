@@ -64,7 +64,7 @@ public class RangePlayerModel {
                         .filter(p -> p.getLocation().distanceSquared(getSongPlayer().getLocation()) < Math.pow(getSongPlayer().getRange() + 10, 2))
                         .map(Entity::getUniqueId), ownerStream)
                 .collect(Collectors.toSet());
-        if (destroyMillis > 0 && canHear.size() == 0) {
+        if (destroyMillis > 0 && canHear.isEmpty()) {
             if (emptyMillis >= destroyMillis) {
                 getSongPlayer().destroy();
                 return;

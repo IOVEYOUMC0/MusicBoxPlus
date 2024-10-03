@@ -301,7 +301,7 @@ public class GUIActions {
         Player player = wrapper.getPlayer();
         if (EconomyUtils.canBuy(player, price)) {
             HashMap<Integer, ItemStack> result = player.getInventory().addItem(musicBoxSong.getSongStack());
-            if (result.size() > 0) {
+            if (!result.isEmpty()) {
                 player.sendMessage(Lang.NO_INVENTORY_SPACE.toString());
             } else {
                 EconomyUtils.buyNoMessage(player, price);

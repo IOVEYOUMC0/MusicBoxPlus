@@ -18,7 +18,6 @@ public class GiveSingleExecutor extends AbstractSelect {
 
     @Override
     protected void processSong(CommandSender sender, Player target, MusicBoxSong song, String[] args) {
-        // Who cares.......
         GUIActions.giveDisc(PlayerWrapper.getInstance(target), song);
     }
 }

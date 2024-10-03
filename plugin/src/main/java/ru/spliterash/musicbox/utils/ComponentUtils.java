@@ -28,7 +28,7 @@ public class ComponentUtils {
             if (text.getText() != null && !text.getText().isEmpty())
                 return false;
         }
-        return component.getExtra() == null || component.getExtra().size() == 0;
+        return component.getExtra() == null || component.getExtra().isEmpty();
     }
 
     public List<BaseComponent> removeEmpty(List<BaseComponent> list) {
@@ -37,7 +37,7 @@ public class ComponentUtils {
             if (needToDelete(baseComponent)) {
                 list.remove(i);
                 i--;
-            } else if (baseComponent.getExtra() != null && baseComponent.getExtra().size() > 0) {
+            } else if (baseComponent.getExtra() != null && !baseComponent.getExtra().isEmpty()) {
                 baseComponent.setExtra(removeEmpty(baseComponent.getExtra()));
             }
         }

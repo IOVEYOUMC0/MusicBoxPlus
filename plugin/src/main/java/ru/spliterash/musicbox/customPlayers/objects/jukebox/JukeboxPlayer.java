@@ -18,6 +18,8 @@ import ru.spliterash.musicbox.song.MusicBoxSongManager;
 import ru.spliterash.musicbox.utils.BukkitUtils;
 import ru.spliterash.musicbox.utils.SignUtils;
 
+import java.util.Objects;
+
 @Getter
 public class JukeboxPlayer extends AbstractBlockPlayer {
     private Location infoSign;
@@ -92,7 +94,7 @@ public class JukeboxPlayer extends AbstractBlockPlayer {
     @Override
     protected void every100MillisAsync() {
         BukkitUtils.runSyncTask(() -> {
-            Block b = getTargetLocation().getBlock();
+            Block b = Objects.requireNonNull(getTargetLocation()).getBlock();
             if (!(b.getState() instanceof Jukebox))
                 destroy();
         });
@@ -100,7 +102,7 @@ public class JukeboxPlayer extends AbstractBlockPlayer {
 
     @Override
     protected JukeboxPlayer runNextSong(IPlayList list) {
-        @NotNull BlockState state = getTargetLocation().getBlock().getState();
+        @NotNull BlockState state = Objects.requireNonNull(getTargetLocation()).getBlock().getState();
         if (state instanceof Jukebox) {
             return new JukeboxPlayer(list, getRange(), (Jukebox) state);
         } else

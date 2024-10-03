@@ -69,7 +69,7 @@ public class PlayListEditorGUI {
                 )
         );
         List<String> lore = null;
-        if (model.getSongs().size() == 0) {
+        if (model.getSongs().isEmpty()) {
             lore = Lang.PLAYLIST_ZERO_SIZE.toList();
         }
         gui.addItem(
@@ -77,7 +77,7 @@ public class PlayListEditorGUI {
                 ItemUtils.createStack(XMaterial.PAPER, Lang.SAVE_PLAYLIST_CHANGE.toString(), lore),
                 new ClickAction(
                         () -> {
-                            if (model.getSongs().size() > 0) {
+                            if (!model.getSongs().isEmpty()) {
                                 if (saveInProgress) {
                                     wrapper.getPlayer().sendMessage(Lang.CHILL_CHILL_MAN.toString());
                                 } else {

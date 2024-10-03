@@ -13,10 +13,7 @@ import org.bukkit.metadata.Metadatable;
 import org.jetbrains.annotations.Nullable;
 import ru.spliterash.musicbox.MusicBox;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @UtilityClass
@@ -121,7 +118,7 @@ public class BukkitUtils {
      * Проверяет принадлежит ли данная локация к этому чанку
      */
     public static boolean inChunk(Location location, World chunkWorld, int chunkX, int chunkZ) {
-        if (!location.getWorld().equals(chunkWorld))
+        if (!Objects.requireNonNull(location.getWorld()).equals(chunkWorld))
             return false;
         int xp = chunkX * 16; // must multiple by 16 to get the blocks location
         int zp = chunkZ * 16; // must multiple by 16 to get the blocks location

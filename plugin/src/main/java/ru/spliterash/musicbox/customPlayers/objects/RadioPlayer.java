@@ -4,6 +4,7 @@ import com.xxmicloxx.NoteBlockAPI.songplayer.RadioSongPlayer;
 import lombok.Getter;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.IllegalPluginAccessException;
+import org.jetbrains.annotations.NotNull;
 import ru.spliterash.musicbox.customPlayers.interfaces.IPlayList;
 import ru.spliterash.musicbox.customPlayers.interfaces.PlayerSongPlayer;
 import ru.spliterash.musicbox.customPlayers.models.MusicBoxSongPlayerModel;
@@ -20,6 +21,7 @@ public class RadioPlayer extends RadioSongPlayer implements PlayerSongPlayer {
     private final PlayerPlayerModel model;
     private final MusicBoxSongPlayerModel musicBoxModel;
 
+    private boolean destroyed = false;
 
     public RadioPlayer(IPlayList list, PlayerWrapper wrapper) {
         super(list.getCurrent().getSong());
@@ -40,16 +42,17 @@ public class RadioPlayer extends RadioSongPlayer implements PlayerSongPlayer {
             }
             model.destroy();
             musicBoxModel.destroy();
+            destroyed = true;
         }
     }
 
     @Override
     public boolean isDestroyed() {
-        return false;
+        return destroyed;
     }
 
     @Override
-    public void playTick(Player player, int tick) {
+    public void playTick(@NotNull Player player, int tick) {
         super.playTick(player, tick);
         if (player.equals(model.getWrapper().getPlayer())) {
             model.nextTick(getSong().getLength(), tick);

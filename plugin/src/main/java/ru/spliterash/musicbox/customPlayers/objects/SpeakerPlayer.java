@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.IllegalPluginAccessException;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
+import org.jetbrains.annotations.NotNull;
 import ru.spliterash.musicbox.MusicBox;
 import ru.spliterash.musicbox.customPlayers.interfaces.IPlayList;
 import ru.spliterash.musicbox.customPlayers.interfaces.PlayerSongPlayer;
@@ -30,6 +31,8 @@ public class SpeakerPlayer extends EntitySongPlayer implements PlayerSongPlayer,
     private final RangePlayerModel rangeModel;
     private final BukkitTask task;
     private final PlayerWrapper owner;
+
+    private boolean destroyed = false;
 
     public SpeakerPlayer(IPlayList list, PlayerWrapper wrapper) {
         super(list.getCurrent().getSong());
@@ -69,16 +72,17 @@ public class SpeakerPlayer extends EntitySongPlayer implements PlayerSongPlayer,
             rangeModel.destroy();
             model.destroy();
             musicBoxModel.destroy();
+            destroyed = true;
         }
     }
 
     @Override
     public boolean isDestroyed() {
-        return false;
+        return destroyed;
     }
 
     @Override
-    public void playTick(Player player, int tick) {
+    public void playTick(@NotNull Player player, int tick) {
         super.playTick(player, tick);
         if (player.equals(model.getWrapper().getPlayer())) {
             model.nextTick(getSong().getLength(), tick);

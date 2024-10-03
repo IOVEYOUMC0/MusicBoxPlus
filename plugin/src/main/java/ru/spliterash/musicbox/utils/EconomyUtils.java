@@ -3,10 +3,11 @@ package ru.spliterash.musicbox.utils;
 import lombok.experimental.UtilityClass;
 import net.milkbowl.vault.economy.Economy;
 import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import ru.spliterash.musicbox.Lang;
 import ru.spliterash.musicbox.MusicBox;
+
+import java.util.Objects;
 
 @UtilityClass
 public class EconomyUtils {
@@ -14,7 +15,7 @@ public class EconomyUtils {
 
     static {
         if (Bukkit.getPluginManager().isPluginEnabled("Vault"))
-            eco = Bukkit.getServicesManager().getRegistration(Economy.class).getProvider();
+            eco = Objects.requireNonNull(Bukkit.getServicesManager().getRegistration(Economy.class)).getProvider();
         else
             eco = null;
     }
@@ -36,8 +37,8 @@ public class EconomyUtils {
         return (currentMoney - money) >= 0;
     }
 
-    public boolean buyNoMessage(Player player, double price) {
-        return eco.withdrawPlayer(player, price).transactionSuccess();
+    public void buyNoMessage(Player player, double price) {
+        eco.withdrawPlayer(player, price).transactionSuccess();
     }
 
 

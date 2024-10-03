@@ -33,7 +33,7 @@ public class NamedParamStatement {
             String key = matcher.group().substring(1);
             Collection<?> set = map.get(key);
             StringBuilder replaceTo = new StringBuilder();
-            if (set != null && set.size() > 0) {
+            if (set != null && !set.isEmpty()) {
                 result.addAll(set);
                 for (int i = 0; i < set.size(); i++) {
                     replaceTo.append('?');

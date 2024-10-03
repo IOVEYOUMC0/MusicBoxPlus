@@ -13,10 +13,7 @@ import ru.spliterash.musicbox.utils.nbt.NbtConstants;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 @Getter
 public class MusicBoxSong {
@@ -63,8 +60,8 @@ public class MusicBoxSong {
      */
     public ItemStack getSongStack(XMaterial material, String itemName, List<String> extraLines, boolean glow) {
         ItemStack stack = material.parseItem();
-        ItemMeta meta = stack.getItemMeta();
-        meta.setDisplayName(itemName);
+        ItemMeta meta = Objects.requireNonNull(stack).getItemMeta();
+        Objects.requireNonNull(meta).setDisplayName(itemName);
         List<String> list = ArrayUtils.replaceOrRemove(Lang.SONG_LORE.toList(), hoverMap);
         list.addAll(extraLines);
         meta.setLore(list);

@@ -21,6 +21,7 @@ import ru.spliterash.musicbox.utils.FaceUtils;
 import ru.spliterash.musicbox.utils.SignUtils;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -122,7 +123,7 @@ public class SignPlayer extends AbstractBlockPlayer {
 
     private void pingLever() {
         BukkitUtils.runSyncTask(() -> {
-            @NotNull Block block = getTargetLocation().getBlock();
+            @NotNull Block block = Objects.requireNonNull(getTargetLocation()).getBlock();
             BlockFace face = VersionUtilsFactory.getInstance().getRotation(block);
             face = FaceUtils.invertFace(face);
             @NotNull Block leverBlock = block.getRelative(face, 2);
@@ -149,7 +150,7 @@ public class SignPlayer extends AbstractBlockPlayer {
     @Override
     protected void every100MillisAsync() {
         BukkitUtils.runSyncTask(() -> {
-            Block b = getTargetLocation().getBlock();
+            Block b = Objects.requireNonNull(getTargetLocation()).getBlock();
             if (!(b.getState() instanceof Sign) || !b.isBlockIndirectlyPowered())
                 destroy();
         });

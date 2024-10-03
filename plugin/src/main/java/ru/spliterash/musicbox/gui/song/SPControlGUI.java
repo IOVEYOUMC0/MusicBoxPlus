@@ -88,7 +88,7 @@ public class SPControlGUI {
 
     public void openNext(MusicBoxSongPlayerModel nextModel) {
         Set<Player> set = BukkitUtils.findOpenPlayers(gui);
-        if (set.size() > 0) {
+        if (!set.isEmpty()) {
             SPControlGUI g = nextModel.getControlGUI();
             set.forEach(g::open);
         }

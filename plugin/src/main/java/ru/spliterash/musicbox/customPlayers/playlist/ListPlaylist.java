@@ -21,7 +21,7 @@ public class ListPlaylist implements IPlayList {
      * @param hasEnd Если false то лист крутится без остановки
      */
     public ListPlaylist(List<MusicBoxSong> songs, boolean hasEnd) {
-        if (songs.size() == 0)
+        if (songs.isEmpty())
             throw new RuntimeException("List can't be 0 size");
         this.peekList = new PeekList<>(songs, hasEnd);
     }

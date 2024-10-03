@@ -19,6 +19,7 @@ package ru.spliterash.musicbox.events;
 import org.bukkit.block.Block;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.block.BlockRedstoneEvent;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * A variation of the redstone event with a source block.
@@ -60,11 +61,11 @@ public class SourcedBlockRedstoneEvent extends BlockRedstoneEvent {
     }
 
     @Override
-    public HandlerList getHandlers() {
+    public @NotNull HandlerList getHandlers() {
         return handlers;
     }
 
-    public static HandlerList getHandlerList() {
+    public static @NotNull HandlerList getHandlerList() {
         return handlers;
     }
 }

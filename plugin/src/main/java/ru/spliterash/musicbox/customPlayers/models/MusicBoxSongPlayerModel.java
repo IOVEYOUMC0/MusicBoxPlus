@@ -21,7 +21,6 @@ public class MusicBoxSongPlayerModel {
     private final IPlayList playList;
     private final Function<IPlayList, ? extends MusicBoxSongPlayer> nextSongRunnable;
     private boolean run = false;
-    //private SoundCategory soundCategory = SoundCategory.RECORDS;
 
     /**
      * @param songPlayer       плеер который связан с этой моделью

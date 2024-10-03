@@ -22,7 +22,7 @@ bossbar:
   # Enable or disable bossbar
   # Включает или выключает боссбар
   enable: true
-  color: GREEN
+  color: BLUE
   style: SEGMENTED_20
 # Language setting
 # Настройки языка, есть ru и en
@@ -36,9 +36,9 @@ autoDestroy: 60
 # Нужно ли проверять пекс musicbox.hear. По дефолту он не проверяется и все могут слышать музыку,
 # но вдруг вам сильно приспичило и надо прям, тогда ставим true и теперь никто без этого пекса слышать музыку не может
 # ----
-# Whether it is necessary to check the pex of musicbox.hear. By default, it is not checked and everyone can hear music
-# but if you need it, then set to true and now no one can hear music without this pex
+# Whether it is necessary to check the permissions of musicbox.hear. By default, it is not checked and everyone can hear music
+# but if you need it, then set to true and now no one can hear music without this permission
 hearPermissionsCheck: false
 # Enables support for octaves outside minecraft's default 2, which requires a resource pack to hear.
-# If false, notes outisde of the octave range are automatically transposed into it
+# If false, notes outside the octave range are automatically transposed into it
 enable10octave: false

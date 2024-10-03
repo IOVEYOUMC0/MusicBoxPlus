@@ -108,7 +108,7 @@ public final class MusicBox extends JavaPlugin {
                 .stream()
                 .map(AbstractBlockPlayer::getLocation)
                 .collect(Collectors.toList());
-        if (signLocations.size() > 0)
+        if (!signLocations.isEmpty())
             DatabaseLoader.getBase().savePreventedSigns(signLocations);
         destroyAllPlayers();
     }

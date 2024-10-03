@@ -14,6 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -23,7 +24,7 @@ public class ItemUtils {
 
     public ItemStack glow(ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
-        meta.addEnchant(enchantment, 1, true);
+        Objects.requireNonNull(meta).addEnchant(Objects.requireNonNull(enchantment), 1, true);
         meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
         meta.addItemFlags(ItemFlag.HIDE_ADDITIONAL_TOOLTIP);
         stack.setItemMeta(meta);
@@ -32,8 +33,8 @@ public class ItemUtils {
 
     public ItemStack createStack(XMaterial material, String name, @Nullable List<String> lore) {
         ItemStack stack = material.parseItem();
-        ItemMeta meta = stack.getItemMeta();
-        meta.setDisplayName(name);
+        ItemMeta meta = Objects.requireNonNull(stack).getItemMeta();
+        Objects.requireNonNull(meta).setDisplayName(name);
         if (lore != null)
             meta.setLore(lore);
         stack.setItemMeta(meta);
@@ -46,7 +47,7 @@ public class ItemUtils {
 
     public ItemStack unGlow(ItemStack item) {
         ItemMeta meta = item.getItemMeta();
-        meta.removeEnchant(enchantment);
+        Objects.requireNonNull(meta).removeEnchant(Objects.requireNonNull(enchantment));
         item.setItemMeta(meta);
         return item;
     }
