@@ -656,6 +656,9 @@ public enum Lang {
 
     @Override
     public String toString() {
+        if (selected == null) {
+            return "";
+        }
         if (isString()) {
             return selected.toString();
         } else {

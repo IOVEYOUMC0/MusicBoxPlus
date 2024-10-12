@@ -39,6 +39,7 @@ public final class MusicBox extends JavaPlugin {
     public void onEnable() {
         instance = this;
         saveDefaultValues();
+        MusicBoxSongManager.reload(new File(getDataFolder(), "songs"));
         registerCommand("musicbox", new MusicBoxExecutor());
         Bukkit.getPluginManager().registerEvents(new Handler(), this);
         Bukkit.getScheduler().runTaskAsynchronously(this, this::reloadPlugin);
