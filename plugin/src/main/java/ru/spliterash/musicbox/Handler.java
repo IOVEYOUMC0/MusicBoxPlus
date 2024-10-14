@@ -102,8 +102,7 @@ public class Handler implements Listener {
         @NotNull Chunk chunk = e.getChunk();
         Set<? extends AbstractBlockPlayer> playersInChunk = AbstractBlockPlayer.findByChunk(chunk.getWorld(), chunk.getX(), chunk.getZ());
         for (AbstractBlockPlayer player : playersInChunk) {
-            if (player instanceof SignPlayer) {
-                SignPlayer signPlayer = (SignPlayer) player;
+            if (player instanceof SignPlayer signPlayer) {
                 if (signPlayer.isPreventDestroy()) {
                     chunkCanceller.accept(e);
                     return;
@@ -122,8 +121,7 @@ public class Handler implements Listener {
                 int pin = RedstoneUtils.getPin(s.getBlock(), e.getSource());
                 SignPlayer.redstoneSign(s, pin, e.getNewCurrent());
             }
-        } else if (state instanceof Jukebox) {
-            Jukebox box = (Jukebox) state;
+        } else if (state instanceof Jukebox box) {
             JukeboxPlayer.onRedstone(box, e.getSource(), e.getNewCurrent());
         }
     }
@@ -140,11 +138,9 @@ public class Handler implements Listener {
         if (e.getHand() != EquipmentSlot.HAND)
             return;
         Block b = e.getClickedBlock();
-        if (b.getState() instanceof Sign) {
-            Sign sign = (Sign) b.getState();
+        if (b.getState() instanceof Sign sign) {
             processSignClick(e.getPlayer(), sign, e);
-        } else if (b.getState() instanceof Jukebox) {
-            Jukebox jukebox = (Jukebox) b.getState();
+        } else if (b.getState() instanceof Jukebox jukebox) {
             ItemStack item = e.getItem();
             if (e.getPlayer().isSneaking()) {
                 if (item == null) {

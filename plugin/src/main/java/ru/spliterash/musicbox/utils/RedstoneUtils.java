@@ -133,7 +133,6 @@ public class RedstoneUtils {
                 // Can be triggered from above
                 handleDirectWireInput(x, y - 1, z, block, oldLevel, newLevel);
                 return;
-            case REPEATER:
             case COMPARATOR:
                 BlockFace f = VersionUtilsFactory.getInstance().getRotation(block);
                 handleDirectWireInput(x + f.getModX(), y, z + f.getModZ(), block, oldLevel, newLevel);
@@ -146,14 +145,7 @@ public class RedstoneUtils {
                     handleDirectWireInput(x + f.getModX() - 1, y - 1, z + f.getModZ() - 1, block, oldLevel, newLevel);
                 }
                 return;
-            case ACACIA_BUTTON:
-            case BIRCH_BUTTON:
-            case DARK_OAK_BUTTON:
-            case JUNGLE_BUTTON:
-            case OAK_BUTTON:
-            case SPRUCE_BUTTON:
-            case STONE_BUTTON:
-            case LEVER:
+            case REPEATER, ACACIA_BUTTON, BIRCH_BUTTON, DARK_OAK_BUTTON, JUNGLE_BUTTON, OAK_BUTTON, SPRUCE_BUTTON, STONE_BUTTON, LEVER, REDSTONE_TORCH:
                 BlockFace face = VersionUtilsFactory.getInstance().getRotation(block);
                 if (face != null) {
                     face = face.getOppositeFace();
