@@ -1,5 +1,0 @@
-rootProject.name = 'MusicBox'
-
-include "plugin"
-include "nms:shared"
-include "nms:versions:21"

@@ -1,0 +1,12 @@
+name: MusicBox
+version: 3.0
+main: ru.spliterash.musicbox.MusicBox
+authors:
+  - Spliterash
+depend:
+  - NoteBlockAPI
+commands:
+  musicbox: {}
+api-version: "1.21"
+softdepend:
+  - Vault
