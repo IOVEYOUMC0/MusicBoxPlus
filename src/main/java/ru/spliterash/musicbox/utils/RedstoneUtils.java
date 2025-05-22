@@ -1,8 +1,8 @@
 package ru.spliterash.musicbox.utils;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.experimental.UtilityClass;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -17,36 +17,36 @@ import java.util.Set;
 @SuppressWarnings({"unused"})
 @UtilityClass
 public class RedstoneUtils {
-    private final Set<XMaterial> isRedstoneBlock = new HashSet<>();
+    private final Set<Material> isRedstoneBlock = new HashSet<>();
 
     static {
-        isRedstoneBlock.add(XMaterial.POWERED_RAIL);
-        isRedstoneBlock.add(XMaterial.DETECTOR_RAIL);
-        isRedstoneBlock.add(XMaterial.STICKY_PISTON);
-        isRedstoneBlock.add(XMaterial.PISTON);
-        isRedstoneBlock.add(XMaterial.LEVER);
-        isRedstoneBlock.add(XMaterial.STONE_PRESSURE_PLATE);
+        isRedstoneBlock.add(Material.POWERED_RAIL);
+        isRedstoneBlock.add(Material.DETECTOR_RAIL);
+        isRedstoneBlock.add(Material.STICKY_PISTON);
+        isRedstoneBlock.add(Material.PISTON);
+        isRedstoneBlock.add(Material.LEVER);
+        isRedstoneBlock.add(Material.STONE_PRESSURE_PLATE);
         isRedstoneBlock.addAll(ItemUtils.getEndWith("_PRESSURE_PLATE"));
-        isRedstoneBlock.add(XMaterial.REDSTONE_TORCH);
-        isRedstoneBlock.add(XMaterial.REDSTONE_WALL_TORCH);
-        isRedstoneBlock.add(XMaterial.REDSTONE_WIRE);
+        isRedstoneBlock.add(Material.REDSTONE_TORCH);
+        isRedstoneBlock.add(Material.REDSTONE_WALL_TORCH);
+        isRedstoneBlock.add(Material.REDSTONE_WIRE);
         isRedstoneBlock.addAll(ItemUtils.getEndWith("DOOR"));
-        isRedstoneBlock.add(XMaterial.TNT);
-        isRedstoneBlock.add(XMaterial.DISPENSER);
-        isRedstoneBlock.add(XMaterial.NOTE_BLOCK);
-        isRedstoneBlock.add(XMaterial.REPEATER);
-        isRedstoneBlock.add(XMaterial.TRIPWIRE_HOOK);
-        isRedstoneBlock.add(XMaterial.COMMAND_BLOCK);
+        isRedstoneBlock.add(Material.TNT);
+        isRedstoneBlock.add(Material.DISPENSER);
+        isRedstoneBlock.add(Material.NOTE_BLOCK);
+        isRedstoneBlock.add(Material.REPEATER);
+        isRedstoneBlock.add(Material.TRIPWIRE_HOOK);
+        isRedstoneBlock.add(Material.COMMAND_BLOCK);
         isRedstoneBlock.addAll(ItemUtils.getEndWith("_BUTTON"));
-        isRedstoneBlock.add(XMaterial.TRAPPED_CHEST);
-        isRedstoneBlock.add(XMaterial.HEAVY_WEIGHTED_PRESSURE_PLATE);
-        isRedstoneBlock.add(XMaterial.LIGHT_WEIGHTED_PRESSURE_PLATE);
-        isRedstoneBlock.add(XMaterial.COMPARATOR);
-        isRedstoneBlock.add(XMaterial.REDSTONE_BLOCK);
-        isRedstoneBlock.add(XMaterial.HOPPER);
-        isRedstoneBlock.add(XMaterial.ACTIVATOR_RAIL);
-        isRedstoneBlock.add(XMaterial.DROPPER);
-        isRedstoneBlock.add(XMaterial.DAYLIGHT_DETECTOR);
+        isRedstoneBlock.add(Material.TRAPPED_CHEST);
+        isRedstoneBlock.add(Material.HEAVY_WEIGHTED_PRESSURE_PLATE);
+        isRedstoneBlock.add(Material.LIGHT_WEIGHTED_PRESSURE_PLATE);
+        isRedstoneBlock.add(Material.COMPARATOR);
+        isRedstoneBlock.add(Material.REDSTONE_BLOCK);
+        isRedstoneBlock.add(Material.HOPPER);
+        isRedstoneBlock.add(Material.ACTIVATOR_RAIL);
+        isRedstoneBlock.add(Material.DROPPER);
+        isRedstoneBlock.add(Material.DAYLIGHT_DETECTOR);
     }
 
 
@@ -57,7 +57,7 @@ public class RedstoneUtils {
      * @return true if the block uses Redstone
      */
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
-    public boolean isRedstoneBlock(XMaterial id) {
+    public boolean isRedstoneBlock(Material id) {
         return isRedstoneBlock.contains(id);
     }
 
@@ -83,30 +83,30 @@ public class RedstoneUtils {
         // yet been updated, so we're going to do this very ugly thing of
         // faking the value with the new one whenever the data value of this
         // block is requested -- it is quite ugly
-        switch (XMaterial.matchXMaterial(block.getType())) {
+        switch (Material.matchMaterial(String.valueOf(block.getType()))) {
             case REDSTONE_WIRE:
-                XMaterial above = XMaterial.matchXMaterial(world.getBlockAt(x, y + 1, z).getType());
+                Material above = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y + 1, z).getType()));
 
-                XMaterial westSide = XMaterial.matchXMaterial(world.getBlockAt(x, y, z + 1).getType());
-                XMaterial westSideAbove = XMaterial.matchXMaterial(world.getBlockAt(x, y + 1, z + 1).getType());
-                XMaterial westSideBelow = XMaterial.matchXMaterial(world.getBlockAt(x, y - 1, z + 1).getType());
-                XMaterial eastSide = XMaterial.matchXMaterial(world.getBlockAt(x, y, z - 1).getType());
-                XMaterial eastSideAbove = XMaterial.matchXMaterial(world.getBlockAt(x, y + 1, z - 1).getType());
-                XMaterial eastSideBelow = XMaterial.matchXMaterial(world.getBlockAt(x, y - 1, z - 1).getType());
+                Material westSide = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y, z + 1).getType()));
+                Material westSideAbove = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y + 1, z + 1).getType()));
+                Material westSideBelow = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y - 1, z + 1).getType()));
+                Material eastSide = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y, z - 1).getType()));
+                Material eastSideAbove = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y + 1, z - 1).getType()));
+                Material eastSideBelow = Material.matchMaterial(String.valueOf(world.getBlockAt(x, y - 1, z - 1).getType()));
 
-                XMaterial northSide = XMaterial.matchXMaterial(world.getBlockAt(x - 1, y, z).getType());
-                XMaterial northSideAbove = XMaterial.matchXMaterial(world.getBlockAt(x - 1, y + 1, z).getType());
-                XMaterial northSideBelow = XMaterial.matchXMaterial(world.getBlockAt(x - 1, y - 1, z).getType());
-                XMaterial southSide = XMaterial.matchXMaterial(world.getBlockAt(x + 1, y, z).getType());
-                XMaterial southSideAbove = XMaterial.matchXMaterial(world.getBlockAt(x + 1, y + 1, z).getType());
-                XMaterial southSideBelow = XMaterial.matchXMaterial(world.getBlockAt(x + 1, y - 1, z).getType());
+                Material northSide = Material.matchMaterial(String.valueOf(world.getBlockAt(x - 1, y, z).getType()));
+                Material northSideAbove = Material.matchMaterial(String.valueOf(world.getBlockAt(x - 1, y + 1, z).getType()));
+                Material northSideBelow = Material.matchMaterial(String.valueOf(world.getBlockAt(x - 1, y - 1, z).getType()));
+                Material southSide = Material.matchMaterial(String.valueOf(world.getBlockAt(x + 1, y, z).getType()));
+                Material southSideAbove = Material.matchMaterial(String.valueOf(world.getBlockAt(x + 1, y + 1, z).getType()));
+                Material southSideBelow = Material.matchMaterial(String.valueOf(world.getBlockAt(x + 1, y - 1, z).getType()));
 
                 // Make sure that the wire points to only this block
                 if (!isRedstoneBlock(westSide) && !isRedstoneBlock(eastSide)
-                        && (!isRedstoneBlock(westSideAbove) || westSide == XMaterial.AIR || above != XMaterial.AIR)
-                        && (!isRedstoneBlock(eastSideAbove) || eastSide == XMaterial.AIR || above != XMaterial.AIR)
-                        && (!isRedstoneBlock(westSideBelow) || westSide != XMaterial.AIR)
-                        && (!isRedstoneBlock(eastSideBelow) || eastSide != XMaterial.AIR)) {
+                        && (!isRedstoneBlock(westSideAbove) || westSide == Material.AIR || above != Material.AIR)
+                        && (!isRedstoneBlock(eastSideAbove) || eastSide == Material.AIR || above != Material.AIR)
+                        && (!isRedstoneBlock(westSideBelow) || westSide != Material.AIR)
+                        && (!isRedstoneBlock(eastSideBelow) || eastSide != Material.AIR)) {
                     // Possible blocks north / south
                     handleDirectWireInput(x - 1, y, z, block, oldLevel, newLevel);
                     handleDirectWireInput(x + 1, y, z, block, oldLevel, newLevel);
@@ -115,10 +115,10 @@ public class RedstoneUtils {
                 }
 
                 if (!isRedstoneBlock(northSide) && !isRedstoneBlock(southSide)
-                        && (!isRedstoneBlock(northSideAbove) || northSide == XMaterial.AIR || above != XMaterial.AIR)
-                        && (!isRedstoneBlock(southSideAbove) || southSide == XMaterial.AIR || above != XMaterial.AIR)
-                        && (!isRedstoneBlock(northSideBelow) || northSide != XMaterial.AIR)
-                        && (!isRedstoneBlock(southSideBelow) || southSide != XMaterial.AIR)) {
+                        && (!isRedstoneBlock(northSideAbove) || northSide == Material.AIR || above != Material.AIR)
+                        && (!isRedstoneBlock(southSideAbove) || southSide == Material.AIR || above != Material.AIR)
+                        && (!isRedstoneBlock(northSideBelow) || northSide != Material.AIR)
+                        && (!isRedstoneBlock(southSideBelow) || southSide != Material.AIR)) {
                     // Possible blocks west / east
                     handleDirectWireInput(x, y, z - 1, block, oldLevel, newLevel);
                     handleDirectWireInput(x, y, z + 1, block, oldLevel, newLevel);
@@ -135,7 +135,7 @@ public class RedstoneUtils {
             case COMPARATOR:
                 BlockFace f = VersionUtils.getRotation(block);
                 handleDirectWireInput(x + f.getModX(), y, z + f.getModZ(), block, oldLevel, newLevel);
-                if (XMaterial.matchXMaterial(block.getRelative(f).getType()) != XMaterial.AIR) {
+                if (Material.matchMaterial(String.valueOf(block.getRelative(f).getType())) != Material.AIR) {
                     handleDirectWireInput(x + f.getModX(), y - 1, z + f.getModZ(), block, oldLevel, newLevel);
                     handleDirectWireInput(x + f.getModX(), y + 1, z + f.getModZ(), block, oldLevel, newLevel);
                     handleDirectWireInput(x + f.getModX() + 1, y - 1, z + f.getModZ(), block, oldLevel, newLevel);

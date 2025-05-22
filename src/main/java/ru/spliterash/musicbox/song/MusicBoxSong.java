@@ -1,9 +1,9 @@
 package ru.spliterash.musicbox.song;
 
-import com.cryptomorin.xseries.XMaterial;
 import com.xxmicloxx.NoteBlockAPI.model.Song;
 import com.xxmicloxx.NoteBlockAPI.utils.NBSDecoder;
 import lombok.Getter;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.spliterash.musicbox.Lang;
@@ -46,11 +46,11 @@ public class MusicBoxSong {
         return (int) Math.floor(length / speed);
     }
 
-    public ItemStack getSongStack(XMaterial material) {
+    public ItemStack getSongStack(Material material) {
         return getSongStack(material, Collections.emptyList(), false);
     }
 
-    public ItemStack getSongStack(XMaterial material, List<String> extraLines, boolean glow) {
+    public ItemStack getSongStack(Material material, List<String> extraLines, boolean glow) {
         return getSongStack(material, Lang.SONG_NAME.toString("{song}", getName()), extraLines, glow);
     }
 
@@ -58,8 +58,8 @@ public class MusicBoxSong {
      * @param material Какой материал использовать
      * @return Айтем с этим материалом
      */
-    public ItemStack getSongStack(XMaterial material, String itemName, List<String> extraLines, boolean glow) {
-        ItemStack stack = material.parseItem();
+    public ItemStack getSongStack(Material material, String itemName, List<String> extraLines, boolean glow) {
+        ItemStack stack = new ItemStack(material);
         ItemMeta meta = Objects.requireNonNull(stack).getItemMeta();
         Objects.requireNonNull(meta).setDisplayName(itemName);
         List<String> list = ArrayUtils.replaceOrRemove(Lang.SONG_LORE.toList(), hoverMap);

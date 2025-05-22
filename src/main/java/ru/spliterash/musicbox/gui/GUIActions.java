@@ -1,8 +1,8 @@
 package ru.spliterash.musicbox.gui;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.experimental.UtilityClass;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -107,7 +107,7 @@ public class GUIActions {
             @Override
             public ItemStack getItemStack(PlayerWrapper wrapper) {
                 String status = wrapper.isSilent() ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
-                return ItemUtils.createStack(XMaterial.FIREWORK_STAR, Lang.SILENT_MODE.toString(), Lang.SILENT_MODE_LORE.toList("{status}", status));
+                return ItemUtils.createStack(Material.FIREWORK_STAR, Lang.SILENT_MODE.toString(), Lang.SILENT_MODE_LORE.toList("{status}", status));
             }
 
             @Override
@@ -151,7 +151,7 @@ public class GUIActions {
 
     private BarButton playListEditor() {
         return new BarButton() {
-            private final ItemStack item = ItemUtils.createStack(XMaterial.PAPER, Lang.PLAYLIST_EDITOR.toString(), null);
+            private final ItemStack item = ItemUtils.createStack(Material.PAPER, Lang.PLAYLIST_EDITOR.toString(), null);
 
             @Override
             public ItemStack getItemStack(PlayerWrapper wrapper) {
@@ -201,7 +201,7 @@ public class GUIActions {
                     lore = Lang.SWITCH_MODE_LORE.toList("{status}", status);
                 } else
                     lore = Lang.SWITCH_MODE_NO_PERMISSIONS_LORE.toList();
-                return ItemUtils.createStack(XMaterial.NOTE_BLOCK, Lang.SPEAKER_MODE.toString(), lore);
+                return ItemUtils.createStack(Material.NOTE_BLOCK, Lang.SPEAKER_MODE.toString(), lore);
             }
 
             @Override
@@ -217,7 +217,7 @@ public class GUIActions {
 
     private BarButton controlPanelButton() {
         return new BarButton() {
-            private final ItemStack rewindItem = ItemUtils.createStack(XMaterial.REPEATER, Lang.CONTROL_PANEL_BUTTON.toString(), null);
+            private final ItemStack rewindItem = ItemUtils.createStack(Material.REPEATER, Lang.CONTROL_PANEL_BUTTON.toString(), null);
 
             @Override
             public ItemStack getItemStack(PlayerWrapper wrapper) {
@@ -241,7 +241,7 @@ public class GUIActions {
     }
 
     public ItemStack getStopStack() {
-        return ItemUtils.createStack(XMaterial.BARRIER, Lang.SONG_STOP.toString(), null);
+        return ItemUtils.createStack(Material.BARRIER, Lang.SONG_STOP.toString(), null);
     }
 
     public BarButton stopButton() {
@@ -329,7 +329,7 @@ public class GUIActions {
     public void openPlayListAdder(PlayerWrapper wrapper, PlayListEditorGUI editorGUI) {
         @Nullable BarButton[] bar = new BarButton[3];
         bar[2] = new BarButton() {
-            private final ItemStack stack = ItemUtils.createStack(XMaterial.BEACON, Lang.GO_BACK_TO_PLAYLIST.toString(), null);
+            private final ItemStack stack = ItemUtils.createStack(Material.BEACON, Lang.GO_BACK_TO_PLAYLIST.toString(), null);
 
             @Override
             public ItemStack getItemStack(PlayerWrapper wrapper) {
@@ -433,7 +433,7 @@ public class GUIActions {
             public ItemStack getItemStack(PlayerWrapper wrapper) {
                 String status = super.value ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
                 return ItemUtils.createStack(
-                        XMaterial.REDSTONE,
+                        Material.REDSTONE,
                         Lang.RANDOM_MODE_BUTTON.toString("{status}", status),
                         null);
             }
@@ -443,7 +443,7 @@ public class GUIActions {
             public ItemStack getItemStack(PlayerWrapper wrapper) {
                 String status = super.value ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
                 return ItemUtils.createStack(
-                        XMaterial.OAK_SIGN,
+                        Material.OAK_SIGN,
                         Lang.SEARCH_INFO_SIGN_TITLE.toString("{status}", status),
                         Lang.SEARCH_INFO_SIGN_HOVER.toList());
             }
@@ -453,7 +453,7 @@ public class GUIActions {
             public ItemStack getItemStack(PlayerWrapper wrapper) {
                 String status = super.value ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
                 return ItemUtils.createStack(
-                        XMaterial.GHAST_TEAR,
+                        Material.GHAST_TEAR,
                         Lang.ENDLESS_SIGN_MODE.toString("{status}", status),
                         null);
             }
@@ -465,7 +465,7 @@ public class GUIActions {
             public ItemStack getItemStack(PlayerWrapper wrapper) {
                 String status = super.value ? Lang.ENABLE.toString() : Lang.DISABLE.toString();
                 return ItemUtils.createStack(
-                        XMaterial.CLOCK,
+                        Material.CLOCK,
                         Lang.PREVENT_DESTROY_TITLE.toString("{status}", status),
                         Lang.PREVENT_DESTROY_LORE.toList()
                 );
@@ -483,7 +483,7 @@ public class GUIActions {
                         .filter(Objects::nonNull)
                         .collect(Collectors.joining("|"));
         buttons[4] = new BarButton() {
-            private final ItemStack item = ItemUtils.createStack(XMaterial.PAPER, Lang.PLAYLIST_EDITOR.toString(), null);
+            private final ItemStack item = ItemUtils.createStack(Material.PAPER, Lang.PLAYLIST_EDITOR.toString(), null);
 
             @Override
             public ItemStack getItemStack(PlayerWrapper wrapper) {

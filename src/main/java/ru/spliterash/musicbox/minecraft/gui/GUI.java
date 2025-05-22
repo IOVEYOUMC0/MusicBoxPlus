@@ -1,9 +1,9 @@
 package ru.spliterash.musicbox.minecraft.gui;
 
 
-import com.cryptomorin.xseries.XSound;
 import lombok.Getter;
 import org.bukkit.Bukkit;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -88,7 +88,12 @@ public class GUI implements InventoryHolder {
         InventoryAction action = runnableMap.get(e.getSlot());
         if (action == null)
             return;
-        XSound.UI_BUTTON_CLICK.play(e.getWhoClicked());
+
+        if (e.getWhoClicked() instanceof Player) {
+            Player player = (Player) e.getWhoClicked();
+            player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 1.0f, 1.0f);
+        }
+
         action.onEvent(e);
     }
 

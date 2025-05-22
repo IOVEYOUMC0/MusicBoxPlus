@@ -1,5 +1,7 @@
 package ru.spliterash.musicbox.customPlayers.objects;
 
+import com.xxmicloxx.NoteBlockAPI.model.playmode.MonoStereoMode;
+import com.xxmicloxx.NoteBlockAPI.model.playmode.StereoMode;
 import com.xxmicloxx.NoteBlockAPI.songplayer.RadioSongPlayer;
 import lombok.Getter;
 import org.bukkit.entity.Player;
@@ -20,6 +22,7 @@ import ru.spliterash.musicbox.utils.SongUtils;
 public class RadioPlayer extends RadioSongPlayer implements PlayerSongPlayer {
     private final PlayerPlayerModel model;
     private final MusicBoxSongPlayerModel musicBoxModel;
+    StereoMode stereoMode = new StereoMode();
 
     private boolean destroyed = false;
 
@@ -27,8 +30,9 @@ public class RadioPlayer extends RadioSongPlayer implements PlayerSongPlayer {
         super(list.getCurrent().getSong());
         this.musicBoxModel = new MusicBoxSongPlayerModel(this, list, SongUtils.nextPlayerSong(wrapper));
         this.model = new PlayerPlayerModel(wrapper, musicBoxModel);
+        stereoMode.setFallbackChannelMode(new MonoStereoMode());
+        this.setChannelMode(stereoMode);
         musicBoxModel.runPlayer();
-
     }
 
 

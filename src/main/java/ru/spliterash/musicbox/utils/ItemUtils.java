@@ -1,7 +1,5 @@
 package ru.spliterash.musicbox.utils;
 
-import com.cryptomorin.xseries.XEnchantment;
-import com.cryptomorin.xseries.XMaterial;
 import lombok.experimental.UtilityClass;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -20,7 +18,7 @@ import java.util.stream.Collectors;
 
 @UtilityClass
 public class ItemUtils {
-    private final Enchantment enchantment = XEnchantment.UNBREAKING.getEnchant();
+    private final Enchantment enchantment = Enchantment.UNBREAKING;
 
     public ItemStack glow(ItemStack stack) {
         ItemMeta meta = stack.getItemMeta();
@@ -31,8 +29,8 @@ public class ItemUtils {
         return stack;
     }
 
-    public ItemStack createStack(XMaterial material, String name, @Nullable List<String> lore) {
-        ItemStack stack = material.parseItem();
+    public ItemStack createStack(Material material, String name, @Nullable List<String> lore) {
+        ItemStack stack = new ItemStack(material);
         ItemMeta meta = Objects.requireNonNull(stack).getItemMeta();
         Objects.requireNonNull(meta).setDisplayName(name);
         if (lore != null)
@@ -52,10 +50,10 @@ public class ItemUtils {
         return item;
     }
 
-    public List<XMaterial> getEndWith(String endWith) {
-        return Arrays.stream(XMaterial.values())
+    public List<Material> getEndWith(String endWith) {
+        return Arrays.stream(Material.values())
                 .filter(s -> s.name().endsWith(endWith))
-                .filter(XMaterial::isSupported)
+                .filter(Material::isItem)
                 .collect(Collectors.toList());
     }
 

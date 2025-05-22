@@ -1,8 +1,8 @@
 package ru.spliterash.musicbox.song;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.Getter;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import ru.spliterash.musicbox.Lang;
@@ -106,7 +106,7 @@ public class MusicBoxSongContainer implements SubSongContainer, FullSongContaine
     }
 
     public ItemStack getItemStack(List<String> extraLines) {
-        ItemStack chest = XMaterial.CHEST.parseItem();
+        ItemStack chest = new ItemStack(Material.CHEST);
         ItemMeta meta = chest.getItemMeta();
         meta.setDisplayName(Lang.FOLDER_FORMAT.toString("{folder}", getName()));
         List<String> tempLore;

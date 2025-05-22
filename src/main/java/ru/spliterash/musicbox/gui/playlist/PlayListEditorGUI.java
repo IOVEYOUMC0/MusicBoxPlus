@@ -1,7 +1,7 @@
 package ru.spliterash.musicbox.gui.playlist;
 
-import com.cryptomorin.xseries.XMaterial;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import ru.spliterash.musicbox.Lang;
 import ru.spliterash.musicbox.MusicBox;
@@ -38,7 +38,7 @@ public class PlayListEditorGUI {
         gui.open(wrapper.getPlayer());
         List<MusicBoxSong> songs = model.getSongs();
         int start = 45 * page;
-        PeekList<XMaterial> list = new PeekList<>(BukkitUtils.DISCS);
+        PeekList<Material> list = new PeekList<>(BukkitUtils.DISCS);
         for (int i = 0; i + start < songs.size() && i < 45; i++) {
             int arrayIndex = i + start;
             MusicBoxSong song = songs.get(arrayIndex);
@@ -53,7 +53,7 @@ public class PlayListEditorGUI {
         }
         gui.addItem(
                 47,
-                ItemUtils.createStack(XMaterial.PISTON, Lang.SHUFFLE_PLAYLIST.toString(), null),
+                ItemUtils.createStack(Material.PISTON, Lang.SHUFFLE_PLAYLIST.toString(), null),
                 new ClickAction(
                         () -> {
                             Collections.shuffle(model.getSongs());
@@ -63,7 +63,7 @@ public class PlayListEditorGUI {
         );
         gui.addItem(
                 48,
-                ItemUtils.createStack(XMaterial.SUNFLOWER, Lang.ADD_MUSIC_TO_PLAYLIST_ITEM.toString(), Lang.DONT_FORGET_TO_SAVE.toList()),
+                ItemUtils.createStack(Material.SUNFLOWER, Lang.ADD_MUSIC_TO_PLAYLIST_ITEM.toString(), Lang.DONT_FORGET_TO_SAVE.toList()),
                 new ClickAction(
                         () -> GUIActions.openPlayListAdder(wrapper, this)
                 )
@@ -74,7 +74,7 @@ public class PlayListEditorGUI {
         }
         gui.addItem(
                 49,
-                ItemUtils.createStack(XMaterial.PAPER, Lang.SAVE_PLAYLIST_CHANGE.toString(), lore),
+                ItemUtils.createStack(Material.PAPER, Lang.SAVE_PLAYLIST_CHANGE.toString(), lore),
                 new ClickAction(
                         () -> {
                             if (!model.getSongs().isEmpty()) {
@@ -98,7 +98,7 @@ public class PlayListEditorGUI {
         );
         gui.addItem(
                 51,
-                ItemUtils.createStack(XMaterial.BARRIER, Lang.DELETE_PLAYLIST.toString("{playlist}", model.getName()), null),
+                ItemUtils.createStack(Material.BARRIER, Lang.DELETE_PLAYLIST.toString("{playlist}", model.getName()), null),
                 new ClickAction(
                         () -> {
                             model.delete();
@@ -112,12 +112,12 @@ public class PlayListEditorGUI {
         if (page > 0)
             gui.addItem(
                     45,
-                    ItemUtils.createStack(XMaterial.MAGMA_CREAM, Lang.BACK.toString(), null),
+                    ItemUtils.createStack(Material.MAGMA_CREAM, Lang.BACK.toString(), null),
                     new ClickAction(() -> open(page - 1)));
         if ((last - 1) > page)
             gui.addItem(
                     53,
-                    ItemUtils.createStack(XMaterial.MAGMA_CREAM, Lang.NEXT.toString(), null),
+                    ItemUtils.createStack(Material.MAGMA_CREAM, Lang.NEXT.toString(), null),
                     new ClickAction(() -> open(page + 1)));
     }
 

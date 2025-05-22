@@ -3,15 +3,15 @@ package ru.spliterash.musicbox.customPlayers.models;
 import com.xxmicloxx.NoteBlockAPI.model.SoundCategory;
 import com.xxmicloxx.NoteBlockAPI.songplayer.SongPlayer;
 import lombok.Getter;
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 import ru.spliterash.musicbox.MusicBox;
 import ru.spliterash.musicbox.customPlayers.interfaces.IPlayList;
 import ru.spliterash.musicbox.customPlayers.interfaces.MusicBoxSongPlayer;
 import ru.spliterash.musicbox.gui.song.SPControlGUI;
 import ru.spliterash.musicbox.song.MusicBoxSong;
 
-import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.locks.Lock;
 import java.util.function.Function;
 
 @Getter
@@ -21,6 +21,8 @@ public class MusicBoxSongPlayerModel {
     private final IPlayList playList;
     private final Function<IPlayList, ? extends MusicBoxSongPlayer> nextSongRunnable;
     private boolean run = false;
+    private boolean nextCreated = false;
+    private boolean songEndNormal = false;
 
     /**
      * @param songPlayer       плеер который связан с этой моделью
@@ -35,7 +37,14 @@ public class MusicBoxSongPlayerModel {
     }
 
     public static void destroyAll() {
-        all.forEach(a -> a.getMusicBoxSongPlayer().destroy());
+        List<MusicBoxSongPlayerModel> modelsToDestroy = new ArrayList<>(all);
+        for (MusicBoxSongPlayerModel model : modelsToDestroy) {
+            if (model != null && model.getMusicBoxSongPlayer() != null) {
+                if (!model.getMusicBoxSongPlayer().isDestroyed()) {
+                    model.getMusicBoxSongPlayer().destroy();
+                }
+            }
+        }
         all.clear();
     }
 
@@ -45,118 +54,102 @@ public class MusicBoxSongPlayerModel {
 
     public void runPlayer() {
         if (!run) {
-            SongPlayer songPlayer = this.musicBoxSongPlayer.getApiPlayer();
-            if (MusicBox.getInstance().getConfigObject().isEnable10octave()) {
-                songPlayer.setEnable10Octave(true);
+            SongPlayer apiSongPlayer = this.musicBoxSongPlayer.getApiPlayer();
+            if (apiSongPlayer == null) {
+                MusicBox.getInstance().getLogger().warning("MusicBoxSongPlayerModel: apiSongPlayer is null in runPlayer.");
+                return;
             }
-            songPlayer.setCategory(SoundCategory.RECORDS); // Forces the songs to always play on the "RECORDS" category.
-            songPlayer.setPlaying(true);
+
+            if (MusicBox.getInstance().getConfigObject().isEnable10octave()) {
+                apiSongPlayer.setEnable10Octave(true);
+            }
+            apiSongPlayer.setCategory(SoundCategory.RECORDS);
+            apiSongPlayer.setPlaying(true);
             run = true;
         }
     }
 
-    /**
-     * Вызывается при вызове {@link SongPlayer#destroy()}
-     */
     public void destroy() {
-        if (controlGUI != null)
+        if (controlGUI != null) {
             controlGUI.close();
+            controlGUI = null;
+        }
     }
 
     private SPControlGUI controlGUI;
 
-    /**
-     * Создаёт GUI для настройки этого SongPlayer'а
-     */
     public SPControlGUI getControlGUI() {
-        if (controlGUI == null)
+        if (controlGUI == null) {
             controlGUI = new SPControlGUI(this);
+        }
         return controlGUI;
     }
-    // Немного чернухи
 
-    private static final Field lockField;
-
-    private static final Field playersField;
-
-    static {
-        try {
-            playersField = SongPlayer.class.getDeclaredField("playerList");
-            lockField = SongPlayer.class.getDeclaredField("lock");
-            playersField.setAccessible(true);
-            lockField.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
+    public void setPlayers(Collection<UUID> newPlayerUUIDs) {
+        SongPlayer apiSongPlayer = this.musicBoxSongPlayer.getApiPlayer();
+        if (apiSongPlayer == null) {
+            MusicBox.getInstance().getLogger().warning("MusicBoxSongPlayerModel: apiSongPlayer is null in setPlayers, cannot update listeners.");
+            return;
         }
-    }
 
-    private Lock getLock() throws IllegalAccessException {
-        return (Lock) lockField.get(musicBoxSongPlayer);
-    }
+        Set<UUID> currentPlayerUUIDs = new HashSet<>(apiSongPlayer.getPlayerUUIDs());
+        Set<UUID> targetPlayerUUIDs = new HashSet<>(newPlayerUUIDs);
 
-    private Map<UUID, Boolean> getPlayers() throws IllegalAccessException {
-        //noinspection unchecked
-        return (Map<UUID, Boolean>) playersField.get(musicBoxSongPlayer);
-    }
+        if (currentPlayerUUIDs.equals(targetPlayerUUIDs)) {
+            return;
+        }
 
-    public void setPlayers(Collection<UUID> players) {
-        try {
-            Map<UUID, Boolean> map = getPlayers();
-            if (map.keySet().containsAll(players) && !players.isEmpty())
-                return;
-            Lock lock = getLock();
-            lock.lock();
-            try {
-                map.clear();
-                players.forEach(p -> map.put(p, true));
-            } finally {
-                lock.unlock();
+        Set<UUID> uuidsToRemove = new HashSet<>(currentPlayerUUIDs);
+        uuidsToRemove.removeAll(targetPlayerUUIDs);
+
+        Set<UUID> uuidsToAdd = new HashSet<>(targetPlayerUUIDs);
+        uuidsToAdd.removeAll(currentPlayerUUIDs);
+
+        for (UUID uuid : uuidsToRemove) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                apiSongPlayer.removePlayer(player);
             }
-        } catch (IllegalAccessException e) {
-            throw new RuntimeException(e);
+        }
+
+        for (UUID uuid : uuidsToAdd) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                apiSongPlayer.addPlayer(player);
+            }
         }
     }
 
-    /**
-     * Применяет следующий плейлист
-     */
     private void acceptNext() {
         MusicBoxSongPlayer nextPlayer = nextSongRunnable.apply(playList);
-        if (nextPlayer != null && controlGUI != null)
+        if (nextPlayer != null && controlGUI != null) {
             controlGUI.openNext(nextPlayer.getMusicBoxModel());
+        }
     }
 
-    /**
-     * Вызывается из event'a
-     */
     public void onSongEnd() {
         startNext();
     }
 
-    private boolean nextCreated = false;
-
     public void createNextPlayer() {
-        nextCreated = true;
-        getMusicBoxSongPlayer().destroy();
+        this.nextCreated = true;
+        if (this.musicBoxSongPlayer != null && !this.musicBoxSongPlayer.isDestroyed()) {
+            this.musicBoxSongPlayer.destroy();
+        }
         acceptNext();
     }
 
-    /**
-     * Завершилась ли музыка сама по себе, или её destroy()
-     */
-    private boolean songEndNormal = false;
-
-    /**
-     * Возможно костыль, но сначало нужно destroy SongPlayer а потом его модель
-     */
     public void pingSongEnded() {
-        songEndNormal = true;
+        this.songEndNormal = true;
     }
 
     public void startNext() {
         if (playList.tryNext()) {
             createNextPlayer();
-        } else
-            getMusicBoxSongPlayer().destroy();
+        } else {
+            if (this.musicBoxSongPlayer != null && !this.musicBoxSongPlayer.isDestroyed()) {
+                this.musicBoxSongPlayer.destroy();
+            }
+        }
     }
 }

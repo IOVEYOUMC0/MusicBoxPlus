@@ -1,10 +1,10 @@
 package ru.spliterash.musicbox.gui.song;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 import ru.spliterash.musicbox.Lang;
@@ -70,7 +70,7 @@ public class SongContainerGUI {
         FullSongContainer container = this.container;
 
 
-        PeekList<XMaterial> list = new PeekList<>(BukkitUtils.DISCS);
+        PeekList<Material> list = new PeekList<>(BukkitUtils.DISCS);
         List<MusicBoxSong> songs = container.getSongs();
         MusicBoxSong playerSong = wrapper.getActivePlayer() != null ? wrapper.getActivePlayer().getMusicBoxSong() : null;
         /*
@@ -161,7 +161,7 @@ public class SongContainerGUI {
 
             gui.addItem(
                     46,
-                    ItemUtils.createStack(XMaterial.TORCH, Lang.PARENT_CONTAINER.toString(), null),
+                    ItemUtils.createStack(Material.TORCH, Lang.PARENT_CONTAINER.toString(), null),
                     new ClickAction(() -> new SongContainerGUI((FullSongContainer) container.getParentContainer(), wrapper)
                             .openPage(0, params))
             );
@@ -170,12 +170,12 @@ public class SongContainerGUI {
         if (page > 0)
             gui.addItem(
                     45,
-                    ItemUtils.createStack(XMaterial.MAGMA_CREAM, Lang.BACK.toString(), null),
+                    ItemUtils.createStack(Material.MAGMA_CREAM, Lang.BACK.toString(), null),
                     new ClickAction(() -> openPage(page - 1, params)));
         if ((pageCount - 1) > page)
             gui.addItem(
                     53,
-                    ItemUtils.createStack(XMaterial.MAGMA_CREAM, Lang.NEXT.toString(), null),
+                    ItemUtils.createStack(Material.MAGMA_CREAM, Lang.NEXT.toString(), null),
                     new ClickAction(() -> openPage(
                             page + 1, params)));
 

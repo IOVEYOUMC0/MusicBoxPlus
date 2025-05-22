@@ -34,7 +34,7 @@ public class MusicBoxExecutor implements TabExecutor {
     @Override
     public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command, @NotNull String label, String[] args) {
         if (!MusicBox.getInstance().isLoaded()) {
-            sender.sendMessage(ChatColor.RED + "Plugin not loaded, please wait or check console if wait too long");
+            sender.sendMessage(ChatColor.RED + "MusicBox isn't fully loaded yet, this may take a few minutes depending on a few factors! Please wait, or try checking the console if you think you've waited too long.");
             return true;
         }
 

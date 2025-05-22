@@ -1,6 +1,6 @@
 package ru.spliterash.musicbox.gui.song;
 
-import com.cryptomorin.xseries.XMaterial;
+import org.bukkit.Material;
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -49,7 +49,7 @@ public class SPControlGUI {
         List<MusicBoxSong> prev = list.getPrevSongs(4);
         Collections.reverse(prev);
         List<MusicBoxSong> next = list.getNextSongs(4);
-        PeekList<XMaterial> peekList = new PeekList<>(BukkitUtils.DISCS);
+        PeekList<Material> peekList = new PeekList<>(BukkitUtils.DISCS);
         int startFrom = 4 - prev.size();
         for (ListIterator<MusicBoxSong> iterator = prev.listIterator(); iterator.hasNext(); ) {
             int i = iterator.nextIndex() + startFrom;
@@ -75,7 +75,7 @@ public class SPControlGUI {
         }
     }
 
-    private void addDiscItem(int index, MusicBoxSong song, PeekList<XMaterial> peekList, boolean playNow, int songNum) {
+    private void addDiscItem(int index, MusicBoxSong song, PeekList<Material> peekList, boolean playNow, int songNum) {
         gui.addItem(index, song.getSongStack(peekList.getAndNext(),
                 SongUtils.getSongName(songNum, song, playNow),
                 playNow ? Lang.SONG_PANEL_NOW_PLAYING.toList() : Lang.SONG_PANEL_SWITCH_TO.toList(),
@@ -95,9 +95,6 @@ public class SPControlGUI {
     }
 
     private void updateRewind() {
-        if (closed) {
-            return;
-        }
         MusicBoxSongPlayer musicPlayer = spModel.getMusicBoxSongPlayer();
         short allTicks = musicPlayer.getMusicBoxSong().getLength();
         short currentTick = musicPlayer.getTick();
@@ -106,11 +103,11 @@ public class SPControlGUI {
         for (int i = 0; i < 9; i++) {
             int currentIndex = i + 9;
             short chunkStart = (short) (i * chunkSize);
-            XMaterial material;
+            Material material;
             if (currentTick >= chunkStart) {
-                material = XMaterial.WHITE_STAINED_GLASS_PANE;
+                material = Material.WHITE_STAINED_GLASS_PANE;
             } else {
-                material = XMaterial.GRAY_STAINED_GLASS_PANE;
+                material = Material.GRAY_STAINED_GLASS_PANE;
             }
             String[] rewindReplaceArray = new String[]{
                     "{percent}", String.valueOf((int) Math.floor(((double) chunkStart / (double) allTicks) * 100)),
@@ -145,7 +142,7 @@ public class SPControlGUI {
 
     public void close() {
         closed = true;
-        ItemStack close = ItemUtils.createStack(XMaterial.RED_STAINED_GLASS_PANE, Lang.CLOSE.toString(), null);
+        ItemStack close = ItemUtils.createStack(Material.RED_STAINED_GLASS_PANE, Lang.CLOSE.toString(), null);
         InventoryAction action = new PlayerClickAction(HumanEntity::closeInventory);
         for (int i = 0; i < gui.getInventory().getSize(); i++) {
             gui.addItem(i, close, action);

@@ -1,10 +1,10 @@
 package ru.spliterash.musicbox.customPlayers.objects;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.Getter;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -109,7 +109,7 @@ public class SignPlayer extends AbstractBlockPlayer {
             face = FaceUtils.invertFace(face);
             @NotNull Block leverBlock = block.getRelative(face, 2);
 
-            if (XMaterial.matchXMaterial(leverBlock.getType()) == XMaterial.LEVER) {
+            if (Material.matchMaterial(String.valueOf(leverBlock.getType())) == Material.LEVER) {
                 versionUtils.setLever(leverBlock, true);
                 Bukkit.getScheduler().runTaskLater(MusicBox.getInstance(), () ->
                         versionUtils.setLever(leverBlock, false), 10);

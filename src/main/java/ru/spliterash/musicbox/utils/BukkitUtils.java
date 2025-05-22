@@ -1,9 +1,9 @@
 package ru.spliterash.musicbox.utils;
 
-import com.cryptomorin.xseries.XMaterial;
 import lombok.experimental.UtilityClass;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
@@ -18,23 +18,23 @@ import java.util.stream.Collectors;
 
 @UtilityClass
 public class BukkitUtils {
-    public final List<XMaterial> DISCS = Collections.unmodifiableList(
+    public final List<Material> DISCS = Collections.unmodifiableList(
             Arrays.asList(
-                    XMaterial.MUSIC_DISC_13,
-                    XMaterial.MUSIC_DISC_BLOCKS,
-                    XMaterial.MUSIC_DISC_CAT,
-                    XMaterial.MUSIC_DISC_CHIRP,
-                    XMaterial.MUSIC_DISC_FAR,
-                    XMaterial.MUSIC_DISC_MALL,
-                    XMaterial.MUSIC_DISC_MELLOHI,
-                    XMaterial.MUSIC_DISC_STAL,
-                    XMaterial.MUSIC_DISC_STRAD,
-                    XMaterial.MUSIC_DISC_WAIT,
-                    XMaterial.MUSIC_DISC_WARD
+                    Material.MUSIC_DISC_13,
+                    Material.MUSIC_DISC_BLOCKS,
+                    Material.MUSIC_DISC_CAT,
+                    Material.MUSIC_DISC_CHIRP,
+                    Material.MUSIC_DISC_FAR,
+                    Material.MUSIC_DISC_MALL,
+                    Material.MUSIC_DISC_MELLOHI,
+                    Material.MUSIC_DISC_STAL,
+                    Material.MUSIC_DISC_STRAD,
+                    Material.MUSIC_DISC_WAIT,
+                    Material.MUSIC_DISC_WARD
             )
     );
 
-    public XMaterial getRandomDisc() {
+    public Material getRandomDisc() {
         return ArrayUtils.getRandom(DISCS);
     }
 
