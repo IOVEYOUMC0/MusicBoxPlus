@@ -1,5 +1,5 @@
 # MusicBox
-*(*Requires NoteBlockAPI to function.** A download can be found alongside the [MusicBox releases](https://github.com/DaringShepard/MusicBox/releases)! Alternatively, you can build and/or download the NoteBockAPI jar, yourself, from the [official NBAPI repository](https://github.com/koca2000/NoteBlockAPI).
+**Requires NoteBlockAPI to function.** A download can be found alongside the [MusicBox releases](https://github.com/DaringShepard/MusicBox/releases)! Alternatively, you can build and/or download the NoteBockAPI jar, yourself, from the [official NBAPI repository](https://github.com/koca2000/NoteBlockAPI).
 > **Tested Versions:** ``1.21.4``, ``1.21.7``. It may also work on other versions, but you'll have to do your own testing! It was built with 1.21.4's API, so anything older than that is unlikely to work well *(if at all)*.
 
 MusicBox adds the ability to play [NBS songs](https://opennbs.org/) through records, signs, and/or through a GUI menu on Paper servers! A full description can be found on the original author's [Spigot page](https://www.spigotmc.org/resources/musicbox-custom-noteblockmusic-on-discs.67949/).
