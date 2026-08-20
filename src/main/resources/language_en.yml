@@ -1,0 +1,657 @@
+# MusicBox language configuration
+# Contains command messages, errors, status texts and other user-facing strings
+# Supports MiniMessage format: <color>text</color>, <bold>text</bold>, etc.
+#
+# Note: GUI item texts are primarily configured in gui-config.yml
+# This file keeps non-GUI and shared message strings
+
+# Basic Messages
+no_permissions: "<red>You do not have permission to do that.</red>"
+only_players: "<red>This command can only be used by players.</red>"
+specify_player: "<red>You need to specify a player name.</red>"
+player_not_found: "<red>Player not found.</red>"
+invalid_arguments: "<red>Invalid arguments.</red>"
+unknown_command: "<red>Unknown command.</red>"
+enable: "Enabled"
+disable: "Disabled"
+"no": "No"
+error: "<red>Error: {message}</red>"
+error_occurred: "<red>An error occurred.</red>"
+database_unavailable: "<red>The database is temporarily unavailable. Please try again later.</red>"
+no_music_playing: "<red>No music is playing right now.</red>"
+music_stopped: "<green>Music stopped.</green>"
+music_stopped_other: "<green>Stopped music for </green><yellow>{player}</yellow><green>.</green>"
+music_stopped_by_other: "<yellow>Your music was stopped by an administrator.</yellow>"
+no_music_playing_other: "<red>Player </red><yellow>{player}</yellow><red> is not playing any music.</red>"
+play_feedback_self: "<green>Playing </green><yellow>{song}</yellow><gray> [{mode}, {silent}]</gray>"
+play_feedback_other: "<green>Playing </green><yellow>{song}</yellow><green> for </green><yellow>{player}</yellow><gray> [{mode}, {silent}]</gray>"
+play_feedback_target: "<green>Now playing </green><yellow>{song}</yellow><gray> [{mode}, {silent}]</gray>"
+play_mode_feedback: "<gray>Playback mode set to </gray><yellow>{mode}</yellow><gray>.</gray>"
+play_silent_feedback: "<gray>Silent mode set to </gray><yellow>{silent}</yellow><gray>.</gray>"
+play_silent_state_silent: "silent"
+play_silent_state_audible: "audible"
+cant_switch: "<red>Cannot switch playback mode.</red>"
+player_offline: "<red>That player is offline.</red>"
+unknown: "Unknown"
+unknown_type: "<red>Unknown type.</red>"
+input_name: "<gold>Please enter a name:</gold>"
+cancelled: "<red>Cancelled</red>"
+reloaded: "<green>Configuration reloaded.</green>"
+plugin_not_loaded: "<red>The plugin is still loading.</red>"
+block_not_play: "<red>This block cannot play music.</red>"
+playlist: "Playlist"
+random_mode_button: "Random mode: {status}"
+
+# Song Loading
+song_not_found: "<red>Song not found. Please check the name and try again.</red>"
+song_added: "<green>Added song '{song}'.</green>"
+
+# Playlist Management
+create_playlist_input: "<gold>Enter a name for the new playlist:</gold>"
+playlist_created: "<green>Playlist '{name}' created successfully.</green>"
+playlist_exists: "<red>A playlist named '{name}' already exists.</red>"
+playlist_invalid_name: "<red>Playlist names must be between 1 and 32 characters.</red>"
+playlist_deleted: "<green>Deleted playlist '{name}'.</green>"
+delete_confirm_title: "<red>Confirm delete: {name}</red>"
+delete_confirm_warning: "<red>Are you sure you want to delete </red><yellow>{name}</yellow><red>?</red>"
+delete_confirm_yes: "<green>Confirm delete</green>"
+delete_confirm_no: "<red>Cancel</red>"
+playlist_saved: "<green>Playlist '{playlist}' saved.</green>"
+playlist_zero_size: "<red>Cannot save an empty playlist.</red>"
+chill_chill_man: "<red>Already saving, please wait.</red>"
+playlist_unsaved_exit_confirm: "<yellow>You have unsaved playlist changes. Click back again within 3 seconds to discard them.</yellow>"
+playlist_item_lore:
+  - "<gray>Left-click to play this playlist</gray>"
+  - "<gray>Right-click to edit this playlist</gray>"
+playlist_click_help: "<yellow>Click to select</yellow>"
+playlist_edit_help: "<yellow>Right-click to edit</yellow>"
+playlist_song_num: "<gray>#{num}</gray>"
+current_playlist_song: "<green>Current: </green><white>{song}</white>"
+another_playlist_song: "<gray>Next: </gray><white>{song}</white>"
+
+# Search
+search_no_results: "<red>No results found.</red>"
+search_results: "<gold>Search results: </gold><yellow>{count} songs found</yellow>"
+search_title: "<gold>Search Music</gold>"
+search_placeholder: "<gray>Type a keyword to search...</gray>"
+search_filter_hint: "<gray>Filters: </gray><yellow>tag:</yellow><gray>, </gray><yellow>author:</yellow><gray>, </gray><yellow>original:</yellow><gray>, </gray><yellow>folder:</yellow><gray>, </gray><yellow>type:musicboxplus|record</yellow>"
+search_results_title: "<gold>Search Results </gold><gray>- </gray><yellow>{query}</yellow><gray> ({page}/{last_page})</gray>"
+search_record_use_disc: "<yellow>This song is a custom record. Buy or use the disc item in a jukebox.</yellow>"
+search_song_lore:
+  - "<gray>Click to play this song</gray>"
+
+# Purchase and Rewards
+no_has_money: "<gold>You do not have enough money: </gold><yellow>{amount}</yellow><gold>.</gold>"
+no_inventory_space: "<red>Your inventory is full.</red>"
+disc_purchased: "<gold>You purchased the disc </gold><yellow>{disc}</yellow><gold>.</gold>"
+disc_music_unavailable: "<red>This disc's music no longer exists.</red>"
+you_get_disc: "<gold>You received the disc </gold><yellow>{disc}</yellow><gold>.</gold>"
+buy_container_no_space: "<red>You need </red><yellow>{need}</yellow><red> more empty slots. You currently have </red><yellow>{have}</yellow><red>.</red>"
+buy_container_no_money: "<red>You need </red><yellow>{price}</yellow><red> but only have </red><yellow>{balance}</yellow><red>. Missing: </red><yellow>{need}</yellow><red>.</red>"
+buy_container_success: "<green>Purchased </green><yellow>{count}</yellow><green> discs for </green><yellow>{price}</yellow><green>.</green>"
+click_to_play_container:
+  - "<gray>Click to play this disc from the container</gray>"
+
+# Music Signs
+sign_not_owner: "<red>You are not the owner of this sign.</red>"
+sign_master_text: "MusicBox"
+container_added: "<green>Added </green><yellow>{count}</yellow><green> discs to </green><yellow>{container}</yellow><green>.</green>"
+
+# Volume
+volume_current: "<gold>Current volume: </gold><yellow>{volume}% </yellow><reset>{bar}</reset>"
+volume_increased: "<green>Volume increased to </green><yellow>{volume}%</yellow>"
+volume_decreased: "<red>Volume decreased to </red><yellow>{volume}%</yellow>"
+volume_set: "<green>Volume set to </green><yellow>{volume}%</yellow>"
+volume_reset: "<green>Volume reset to default (100%)</green>"
+volume_invalid: "<red>Volume must be between 0 and 100</red>"
+speed_current: "<gold>Current playback speed: </gold><yellow>{speed}</yellow>"
+speed_set: "<green>Playback speed set to </green><yellow>{speed}</yellow><green>.</green>"
+speed_reset: "<green>Playback speed reset to </green><yellow>{speed}</yellow><green>.</green>"
+speed_invalid: "<red>Playback speed must be between {min} and {max}.</red>"
+speed_button: "<gold>Playback Speed</gold>"
+speed_button_lore:
+  - "<yellow>Current: {speed}</yellow>"
+  - "<green>Left Click: Faster (+{step})</green>"
+  - "<red>Right Click: Slower (-{step})</red>"
+
+# Loop Mode
+loop_mode_off: "<red>Off</red>"
+loop_mode_single: "<yellow>Single</yellow>"
+loop_mode_all: "<green>All</green>"
+
+# Seek and Rewind
+rewind_to: "<gold>Jumped to </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
+rewound: "<gold>Rewound to </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
+
+# Reload
+reload_time: "<gray>Reload completed in {time}ms</gray>"
+reload_success_with_time: "<green>Reload completed in </green><yellow>{time}ms</yellow><green>.</green>"
+
+# Silent Mode
+silent_mode_response: "<gold>Set silent mode for </gold><yellow>{player}</yellow><gold> to {state}</gold>"
+muted: "<gold>Muted player </gold><yellow>{player}</yellow><gold>.</gold>"
+
+# Time Formatting
+human_time_second: "{value}s"
+human_time_minute: "{value}m"
+
+# Command Help
+command_help: "<gold>=== Available MusicBox Commands ===</gold>"
+command_help_main: "<gold>/musicboxplus</gold><dark_gray> - </dark_gray><yellow>Open the main MusicBox GUI</yellow>"
+command_help_play: "<gold>/musicboxplus play <song> [speaker|radio|silent|unsilent]</gold><dark_gray> - </dark_gray><yellow>Play a song with optional mode flags</yellow>"
+command_help_stop: "<gold>/musicboxplus stop</gold><dark_gray> - </dark_gray><yellow>Stop the current song</yellow>"
+command_help_volume: "<gold>/musicboxplus volume [0-100]</gold><dark_gray> - </dark_gray><yellow>Adjust playback volume</yellow>"
+command_help_silent: "<gold>/musicboxplus silent [on,off,switch]</gold><dark_gray> - </dark_gray><yellow>Toggle silent mode</yellow>"
+command_help_speed: "<gold>/musicboxplus speed [0.25-2|reset]</gold><dark_gray> - </dark_gray><yellow>Adjust playback speed</yellow>"
+command_help_mute: "<gold>/musicboxplus mute <player></gold><dark_gray> - </dark_gray><yellow>Mute a player</yellow>"
+command_help_playlist: "<gold>/musicboxplus playlist</gold><dark_gray> - </dark_gray><yellow>Manage your playlists</yellow>"
+command_help_shop: "<gold>/musicboxplus shop</gold><dark_gray> - </dark_gray><yellow>Open the disc shop</yellow>"
+command_help_shop_player: "<gold>/musicboxplus shop player</gold><dark_gray> - </dark_gray><yellow>Open the player music shop</yellow>"
+command_help_shop_publish: "<gold>/musicboxplus shop publish</gold><dark_gray> - </dark_gray><yellow>Publish your music</yellow>"
+command_help_shop_music: "<gold>/musicboxplus shopmusic</gold><dark_gray> - </dark_gray><yellow>Open player music or publishing</yellow>"
+command_help_give: "<gold>/musicboxplus give</gold><dark_gray> - </dark_gray><yellow>Get a disc</yellow>"
+command_help_reload: "<gold>/musicboxplus reload [type]</gold><dark_gray> - </dark_gray><yellow>Reload the plugin configuration</yellow>"
+command_help_tag: "<gold>/musicboxplus tag</gold><dark_gray> - </dark_gray><yellow>Manage song tags and appearances</yellow>"
+command_help_textplayer: "<gold>/musicboxplus textplayer</gold><dark_gray> - </dark_gray><yellow>Manage text display players</yellow>"
+admin_help: "<gold>=== MusicBox Admin Commands ===</gold>"
+admin_help_shop: "<gold>/musicboxplus shop [player]</gold><dark_gray> - </dark_gray><yellow>Open the shop for a player</yellow>"
+admin_help_give: "<gold>/musicboxplus give [player]</gold><dark_gray> - </dark_gray><yellow>Give a disc to a player</yellow>"
+admin_help_play: "<gold>/musicboxplus play [player] <song> [speaker|radio|silent|unsilent]</gold><dark_gray> - </dark_gray><yellow>Play a song for yourself or another player with optional mode flags</yellow>"
+admin_help_stop: "<gold>/musicboxplus stop [player]</gold><dark_gray> - </dark_gray><yellow>Stop music for yourself or another player</yellow>"
+admin_help_volume: "<gold>/musicboxplus volume [0-100] [player]</gold><dark_gray> - </dark_gray><yellow>Change playback volume</yellow>"
+admin_help_silent: "<gold>/musicboxplus silent [on,off,switch] [player]</gold><dark_gray> - </dark_gray><yellow>Toggle silent mode</yellow>"
+admin_help_mute: "<gold>/musicboxplus mute [player]</gold><dark_gray> - </dark_gray><yellow>Mute a player</yellow>"
+admin_help_reload: "<gold>/musicboxplus reload [type]</gold><dark_gray> - </dark_gray><yellow>Reload the plugin configuration</yellow>"
+admin_help_tag: "<gold>/musicboxplus tag</gold><dark_gray> - </dark_gray><yellow>Manage song tags and appearances</yellow>"
+admin_help_textplayer: "<gold>/musicboxplus textplayer</gold><dark_gray> - </dark_gray><yellow>Manage text display players</yellow>"
+
+# Song Tags
+tag_usage_title: "<gold>=== Song Tag Commands ===</gold>"
+tag_usage_addalias: "<yellow>/musicboxplus tag <song> addalias <alias></yellow><gray> - Add an alias to a song</gray>"
+tag_usage_removealias: "<yellow>/musicboxplus tag <song> removealias <alias></yellow><gray> - Remove an alias from a song</gray>"
+tag_usage_addtag: "<yellow>/musicboxplus tag <song> addtag <tag></yellow><gray> - Add a tag to a song</gray>"
+tag_usage_removetag: "<yellow>/musicboxplus tag <song> removetag <tag></yellow><gray> - Remove a tag from a song</gray>"
+tag_usage_list: "<yellow>/musicboxplus tag <song> list</yellow><gray> - Show aliases and tags for a song</gray>"
+tag_usage_aliases: "<red>Usage: /musicboxplus tag aliases <song></red>"
+tag_usage_tags: "<red>Usage: /musicboxplus tag tags <song></red>"
+tag_usage_search: "<red>Usage: /musicboxplus tag search <tag></red>"
+tag_help_title: "<gold>=== Song Tag Help ===</gold>"
+tag_help_list: "<yellow>/musicboxplus tag list</yellow><gray> - List aliases and tags for a song</gray>"
+tag_help_aliases: "<yellow>/musicboxplus tag aliases <song></yellow><gray> - Show aliases for a song</gray>"
+tag_help_tags: "<yellow>/musicboxplus tag tags <song></yellow><gray> - Show tags for a song</gray>"
+tag_help_addalias: "<yellow>/musicboxplus tag addalias <song> <alias></yellow><gray> - Add an alias</gray>"
+tag_help_removealias: "<yellow>/musicboxplus tag removealias <song> <alias></yellow><gray> - Remove an alias</gray>"
+tag_help_addtag: "<yellow>/musicboxplus tag addtag <song> <tag></yellow><gray> - Add a tag</gray>"
+tag_help_removetag: "<yellow>/musicboxplus tag removetag <song> <tag></yellow><gray> - Remove a tag</gray>"
+tag_help_search: "<yellow>/musicboxplus tag search <tag></yellow><gray> - Search songs by tag</gray>"
+tag_help_reload: "<yellow>/musicboxplus tag reload</yellow><gray> - Reload the tag configuration</gray>"
+tag_song_list: "<gold>=== Song List ({count}) ===</gold>"
+tag_song_not_found: "<red>Song not found: {song}</red>"
+tag_aliases_title: "<gold>=== Aliases for {song} ===</gold>"
+tag_no_aliases: "<gray>This song has no aliases</gray>"
+tag_tags_title: "<gold>=== Tags for {song} ===</gold>"
+tag_no_tags: "<gray>This song has no tags</gray>"
+tag_alias_added: "<green>Added alias </green><yellow>{alias}</yellow><gray> -> </gray><white>{song}</white>"
+tag_alias_removed: "<green>Removed alias </green><yellow>{alias}</yellow><gray> from </gray><white>{song}</white>"
+tag_tag_added: "<green>Added tag </green><aqua>{tag}</aqua><gray> -> </gray><white>{song}</white>"
+tag_tag_removed: "<green>Removed tag </green><aqua>{tag}</aqua><gray> from </gray><white>{song}</white>"
+tag_search_title: "<gold>=== Songs with tag '</gold><aqua>{tag}</aqua><gold>' ({count}) ===</gold>"
+tag_no_matches: "<gray>No songs matched that tag</gray>"
+tag_config_reloaded: "<green>Tag configuration reloaded</green>"
+tag_alias_not_found: "<red>Alias </red><yellow>{alias}</yellow><gray> was not found on </gray><white>{song}</white>"
+tag_tag_not_found: "<red>Tag </red><aqua>{tag}</aqua><gray> was not found on </gray><white>{song}</white>"
+tag_list_header: "<gold>=== Song Tags for {song} ===</gold>"
+tag_list_aliases: "<yellow>Aliases: </yellow><white>{aliases}</white>"
+tag_list_tags: "<aqua>Tags: </aqua><white>{tags}</white>"
+tag_note: "<gray>Use song aliases and tags to improve search results.</gray>"
+tag_usage_setmaterial: "<yellow>/musicboxplus tag <song> setmaterial <MATERIAL></yellow><gray> - Set custom item material</gray>"
+tag_usage_setmodeldata: "<yellow>/musicboxplus tag <song> setmodeldata <number></yellow><gray> - Set custom model data</gray>"
+tag_usage_setitemmodel: "<yellow>/musicboxplus tag <song> setitemmodel <namespace:key></yellow><gray> - Set custom item model</gray>"
+tag_usage_setcraftengineitem: "<yellow>/musicboxplus tag <song> setcraftengineitem <namespace:key></yellow><gray> - Set CraftEngine custom item appearance</gray>"
+tag_usage_setjukebox: "<yellow>/musicboxplus tag <song> setjukebox <key></yellow><gray> - Set jukebox playable key</gray>"
+tag_set_material: "<green>Set custom material for </green><yellow>{song}</yellow><green> to </green><white>{material}</white>"
+tag_set_modeldata: "<green>Set custom model data for </green><yellow>{song}</yellow><green> to </green><white>{modelData}</white>"
+tag_set_itemmodel: "<green>Set item model for </green><yellow>{song}</yellow><green> to </green><white>{itemModel}</white>"
+tag_set_craftengineitem: "<green>Set CraftEngine item for </green><yellow>{song}</yellow><green> to </green><white>{item}</white>"
+tag_set_jukebox: "<green>Set jukebox playable for </green><yellow>{song}</yellow><green> to </green><white>{key}</white>"
+tag_invalid_number: "<red>Invalid number. Please enter a valid integer.</red>"
+tag_usage_unset: "<yellow>/musicboxplus tag <song> unset <material|modeldata|itemmodel|craftengineitem|jukebox></yellow><gray> - Clear a custom appearance setting</gray>"
+tag_unset: "<green>Cleared </green><white>{field}</white><green> from </green><yellow>{song}</yellow>"
+tag_unset_unknown_field: "<red>Unknown field: </red><white>{field}</white><gray> (material, modeldata, itemmodel, craftengineitem, jukebox)</gray>"
+
+# PlaceholderAPI Placeholders
+placeholder_no_song: "No song"
+placeholder_status_playing: "Playing"
+placeholder_status_paused: "Paused"
+placeholder_status_stopped: "Stopped"
+placeholder_mode_radio: "Radio"
+placeholder_mode_speaker: "Speaker"
+
+# Reload Commands
+reload_usage_title: "<gold>=== Reload Commands ===</gold>"
+reload_usage_all: "<yellow>/musicboxplus reload</yellow><gray> - Reload everything</gray>"
+reload_usage_config: "<yellow>/musicboxplus reload config</yellow><gray> - Reload config</gray>"
+reload_usage_lang: "<yellow>/musicboxplus reload lang</yellow><gray> - Reload language file</gray>"
+reload_usage_songs: "<yellow>/musicboxplus reload songs</yellow><gray> - Reload songs</gray>"
+reload_usage_gui: "<yellow>/musicboxplus reload gui</yellow><gray> - Reload GUI configuration</gray>"
+reload_usage_database: "<yellow>/musicboxplus reload database</yellow><gray> - Reload database connection</gray>"
+reload_usage_aliases: "<yellow>/musicboxplus reload aliases</yellow><gray> - Reload song aliases</gray>"
+reload_unknown_type: "<red>Unknown reload type: {type}</red>"
+
+# Music Editing Commands
+command_help_edit: "<gold>=== Music Editing Commands ===</gold>"
+command_help_edit_create: "<yellow>/musicboxplus edit create <name></yellow><gray> - Create a new song</gray>"
+command_help_edit_list: "<yellow>/musicboxplus edit list</yellow><gray> - List your songs</gray>"
+command_help_edit_import: "<yellow>/musicboxplus edit import <file></yellow><gray> - Import a .nbs or .mid file</gray>"
+command_help_edit_export: "<yellow>/musicboxplus edit export <name></yellow><gray> - Export your song as .nbs</gray>"
+command_help_edit_web: "<yellow>/musicboxplus edit web <name></yellow><gray> - Open the web editor</gray>"
+
+# Editor Messages
+edit_usage_create: "<red>Usage: /musicboxplus edit create <name></red>"
+edit_usage_rename: "<red>Usage: /musicboxplus edit rename <old> <new></red>"
+edit_create_failed: "<red>Failed to create song</red>"
+edit_not_found: "<red>Song not found: {name}</red>"
+edit_delete_failed: "<red>Failed to delete song</red>"
+edit_rename_failed: "<red>Failed to rename song</red>"
+edit_list_empty: "<red>You do not have any songs yet</red>"
+edit_list_title: "<gold>=== Your Songs ===</gold>"
+edit_list_item: "<gray>- </gray><white>{name}</white><gray> (Time Signature: {timeSignature}, Notes: {notes})</gray>"
+edit_no_music: "<red>You do not have any songs. Use </red><yellow>/musicboxplus edit create</yellow><red> to make one.</red>"
+edit_saved: "<green>Song '{name}' saved</green>"
+
+edit_notes_cleared: "<red>Cleared </red><yellow>{count}</yellow><red> notes</red>"
+edit_no_notes_to_play: "<red>There are no notes to play</red>"
+edit_playback_started: "<green>Playback started...</green>"
+edit_playback_stopped: "<yellow>Playback stopped</yellow>"
+edit_inventory_restored: "<green>Your inventory has been restored</green>"
+edit_mode_exited: "<yellow>Exited MusicBox edit mode and restored your inventory</yellow>"
+
+# Web Editor Messages
+edit_web_disabled: |
+  <red>========================================</red>
+  <red> Web editor is disabled</red>
+  <gray> Enable it in config.yml with:</gray>
+  <yellow> web.enabled: true</yellow>
+  <red>========================================</red>
+edit_web_usage: |
+  <gold>========================================</gold>
+  <gold> Web Editor Usage</gold>
+  <gray> Use: </gray><yellow>/musicbox edit web <name></yellow>
+  <gray> Generates a browser link for editing your song</gray>
+  <gold>========================================</gold>
+edit_web_link: |
+  <green>========================================</green>
+  <green> Web editor link created</green>
+  <gray> Song: </gray><yellow>{name}</yellow>
+  <gray> Open this link in your browser:</gray>
+  <aqua><click:open_url:'{url}'>{url}</click></aqua>
+  <green>========================================</green>
+
+# Create Song Messages
+edit_create_usage: |
+  <gold>========================================</gold>
+  <gold> Create a Song</gold>
+  <gray> Use: </gray><yellow>/musicbox edit create <name></yellow>
+  <gold>========================================</gold>
+edit_create_limit: |
+  <red>========================================</red>
+  <red> You have reached your song limit</red>
+  <gray> Limit: </gray><yellow>{limit}</yellow>
+  <red>========================================</red>
+edit_create_exists: |
+  <red>========================================</red>
+  <red> That song name already exists</red>
+  <gray> "{name}" is already in use</gray>
+  <red>========================================</red>
+edit_create_success: |
+  <green>========================================</green>
+  <green> Song created successfully</green>
+  <gray> Name: </gray><yellow>{name}</yellow>
+  <gray> You can now open it in the editor</gray>
+  <green>========================================</green>
+edit_create_failed_msg: |
+  <red>========================================</red>
+  <red> Failed to create song</red>
+  <gray> Please try again later</gray>
+  <red>========================================</red>
+
+# Delete Song Messages
+edit_delete_usage: |
+  <gold>========================================</gold>
+  <gold> Delete a Song</gold>
+  <gray> Use: </gray><yellow>/musicbox edit delete <name></yellow>
+  <gold>========================================</gold>
+edit_delete_not_found: |
+  <red>========================================</red>
+  <red> Song not found</red>
+  <gray> "{name}" does not exist</gray>
+  <red>========================================</red>
+edit_delete_success: |
+  <green>========================================</green>
+  <green> Song deleted successfully</green>
+  <gray> Name: </gray><yellow>{name}</yellow>
+  <green>========================================</green>
+edit_delete_failed_msg: |
+  <red>========================================</red>
+  <red> Failed to delete song</red>
+  <gray> Please try again later</gray>
+  <red>========================================</red>
+edit_delete_cancelled: |
+  <yellow>========================================</yellow>
+  <yellow> Delete cancelled</yellow>
+  <gray> The song was not removed</gray>
+  <yellow>========================================</yellow>
+edit_delete_select_title: "<red>Select Music to Delete</red>"
+edit_delete_click_lore: "<red>Click to delete this music</red>"
+edit_rename_select_title: "<yellow>Select Music to Rename</yellow>"
+edit_rename_click_lore: "<yellow>Click to enter a new name</yellow>"
+edit_export_select_title: "<aqua>Select Music to Export</aqua>"
+edit_export_click_lore: "<aqua>Click to export this music as an NBS file</aqua>"
+
+# Rename Song Messages
+edit_rename_usage: |
+  <gold>========================================</gold>
+  <gold> Rename a Song</gold>
+  <gray> Use: </gray><yellow>/musicbox edit rename <old> <new></yellow>
+  <gold>========================================</gold>
+edit_rename_not_found: |
+  <red>========================================</red>
+  <red> Song not found</red>
+  <gray> "{name}" does not exist</gray>
+  <red>========================================</red>
+edit_rename_exists: |
+  <red>========================================</red>
+  <red> Target name already exists</red>
+  <gray> "{name}" is already in use</gray>
+  <red>========================================</red>
+edit_rename_success: |
+  <green>========================================</green>
+  <green> Song renamed successfully</green>
+  <gray> {old} </gray><white>-> </white><yellow>{new}</yellow>
+  <green>========================================</green>
+edit_rename_failed_msg: |
+  <red>========================================</red>
+  <red> Failed to rename song</red>
+  <gray> Please try again later</gray>
+  <red>========================================</red>
+
+# List Songs Messages
+edit_list_empty_msg: |
+  <gold>========================================</gold>
+  <gold> You do not have any songs yet</gold>
+  <gray> Create one with </gray><yellow>/musicbox edit create</yellow>
+  <gold>========================================</gold>
+edit_list_header: "<gold>========================================</gold>"
+edit_list_title_msg: "<gold> Your Songs (</gold><yellow>{count}</yellow><gold>)</gold>"
+edit_list_item_msg: "<gold> </gold><green>{num}.</green><yellow> {name}</yellow><gray> ({notes} notes)</gray>"
+edit_list_footer: "<gold>========================================</gold>"
+
+# Edit Help Messages
+edit_help_header: "<gold>========================================</gold>"
+edit_help_title: "<gold> Music Editing Help</gold>"
+edit_help_edit: "<gold> </gold><yellow>/musicboxplus edit</yellow><gray> - Open the song editor</gray>"
+edit_help_create: "<gold> </gold><yellow>/musicboxplus edit create <name></yellow><gray> - Create a new song</gray>"
+edit_help_select: "<gold> </gold><yellow>/musicboxplus edit select <name></yellow><gray> - Select a song</gray>"
+edit_help_delete: "<gold> </gold><yellow>/musicboxplus edit delete <name></yellow><gray> - Delete a song</gray>"
+edit_help_rename: "<gold> </gold><yellow>/musicboxplus edit rename <old> <new></yellow><gray> - Rename a song</gray>"
+edit_help_list: "<gold> </gold><yellow>/musicboxplus edit list</yellow><gray> - List your songs</gray>"
+edit_help_import: "<gold> </gold><yellow>/musicboxplus edit import <file></yellow><gray> - Import a .nbs or .mid file</gray>"
+edit_help_web: "<gold> </gold><yellow>/musicboxplus edit web <name></yellow><gray> - Open the web editor</gray>"
+edit_help_footer: "<gold>========================================</gold>"
+
+instrument_harp: "Harp"
+instrument_bass: "Bass"
+instrument_basedrum: "Bass Drum"
+instrument_snare: "Snare"
+instrument_hat: "Hat"
+instrument_guitar: "Guitar"
+instrument_flute: "Flute"
+instrument_bell: "Bell"
+instrument_chime: "Chime"
+instrument_xylophone: "Xylophone"
+instrument_iron_xylophone: "Iron Xylophone"
+instrument_cow_bell: "Cow Bell"
+instrument_didgeridoo: "Didgeridoo"
+instrument_bit: "Bit"
+instrument_banjo: "Banjo"
+instrument_pling: "Pling"
+instrument_trumpet: "Trumpet"
+instrument_trumpet_exposed: "Trumpet (Exposed)"
+instrument_trumpet_weathered: "Trumpet (Weathered)"
+instrument_trumpet_oxidized: "Trumpet (Oxidized)"
+
+instrument_select_selected: "<gray>Currently selected</gray>"
+instrument_select_unselected: "<gray>Click to select</gray>"
+
+instrument_select_lore: "<gray>Choose which instruments should be used for this note.</gray>"
+
+# GUI Input
+gui_input_prompt: "<gold>Please type your input in chat.</gold>"
+gui_input_cancel: "<gray>Type 'cancel' to abort.</gray>"
+gui_input_cancelled: "<yellow>Input cancelled</yellow>"
+gui_input_invalid: "<red>Invalid input: {reason}</red>"
+gui_input_error: "<red>Input error: {error}</red>"
+
+# Jukebox
+
+# Control Panel
+control_panel_title: "<gold>Control Panel </gold><dark_gray>- </dark_gray><yellow>{song}</yellow>"
+
+# Sign Protection
+sign_created: "<green>Music sign created successfully</green>"
+sign_control_hint: "<gray>Sneak + right-click the sign to open the control panel</gray>"
+sign_options_hint: "<gray>Options: </gray><yellow>R</yellow><gray>=Rename </gray><yellow>E</yellow><gray>=Edit </gray><yellow>I</yellow><gray>=Info </gray><yellow>P</yellow><gray>=Protect</gray>"
+sign_protect_enabled: "<green>Sign protection enabled</green>"
+sign_protect_disabled: "<red>Sign protection disabled</red>"
+
+# Edit Locks
+edit_locked: "<red>This music is currently being edited by </red><yellow>{player}</yellow><red>.</red>"
+edit_locked_hint: "<red>Please wait until the other editor finishes.</red>"
+edit_locked_offline_hint: "<gray>If the editor went offline, the lock will clear automatically.</gray>"
+
+# Auto Save
+autosave_saved: "<gray>[Auto Save] </gray><green>Music saved automatically.</green>"
+
+# Editor Limits
+limit_current: "<gray>Current usage: </gray><yellow>{current}/{limit}</yellow>"
+limit_unlimited: "<gray>Current usage: </gray><yellow>{current}/Unlimited</yellow>"
+limit_upgrade_hint: "<gray>Use permission </gray><yellow>musicboxplus.edit.limit.X</yellow><gray> to raise the limit</gray>"
+
+# Sign Protection Toggle
+control_protect_enabled: "<green>Protection: Enabled</green>"
+control_protect_disabled: "<red>Protection: Disabled</red>"
+control_protect_status: "<gray>Status: {status}</gray>"
+control_protect_click: "<gray>Click to toggle protection</gray>"
+control_protect_close_hint: "<yellow>Click again to close</yellow>"
+control_protect_open_hint: "<yellow>Click to enable sign protection</yellow>"
+control_destroy_player: "<red>Destroy Player</red>"
+control_destroy_player_lore:
+  - "<gray>Destroy this player</gray>"
+  - "<gray>and return to setup</gray>"
+control_progress_unavailable: "<gray>Progress Unavailable</gray>"
+control_progress_unavailable_lore:
+  - "<gray>Seeking is not available for vanilla record playback</gray>"
+
+# Extended Octave
+extended_octave_disabled: "<red>Extended octave is disabled on this server.</red>"
+extended_octave_range: "<gray>Allowed note range: </gray><yellow>{note}</yellow><gray> (0-24)</gray>"
+extended_octave_config: "<gray>Enable </gray><yellow>enable10octave</yellow><gray> in config.yml to use this feature.</gray>"
+
+# Chat Input
+edit_input_name_prompt: "<green>Enter a new music name in chat:</green>"
+edit_input_price_prompt: "<green>Enter a new price (current: {price}):</green>"
+edit_input_description_prompt: "<green>Enter a description (current: {description}):</green>"
+edit_input_cancelled: "<yellow>Operation cancelled.</yellow>"
+edit_input_empty: "<red>Input cannot be empty</red>"
+edit_input_cancel_hint: "<gray>Type 'cancel' to abort</gray>"
+edit_input_empty_retry: "<red>Input cannot be empty. Try again or type 'cancel'.</red>"
+edit_input_search_prompt: "<green>Enter a search keyword in chat (type 'all' to show everything):</green>"
+edit_input_generic_prompt: "<green>Please enter your input in chat:</green>"
+edit_input_description_prompt_alt: "<green>Enter a description in chat (type 'cancel' to abort):</green>"
+save_failed_retry: "<red>Save failed. Please try again later.</red>"
+autosave_failed_manual: "<gray>[Auto Save] </gray><red>Save failed. Please save manually later.</red>"
+edit_name_updated: "<green>Name updated: </green><white>{name}</white>"
+edit_description_updated: "<green>Description updated.</green>"
+purchase_save_failed: "<red>Purchased music could not be saved. The payment was refunded if possible. Please contact an administrator.</red>"
+operation_failed: "<red>Operation failed.</red>"
+
+# NBS Import
+nbs_input_prompt: "<green>Enter the NBS file name (without extension):</green>"
+nbs_file_location: "<gray>Put the NBS file into the plugin data folder.</gray>"
+nbs_filename_empty: "<red>The file name cannot be empty.</red>"
+nbs_file_not_found: "<red>NBS file not found: </red><yellow>{filename}</yellow>"
+nbs_file_location_hint: "<gray>Place the NBS file in </gray><yellow>{path}</yellow>"
+nbs_import_success: "<green>Imported NBS file successfully: </green><yellow>{name}</yellow>"
+nbs_import_info: "<gray>Notes: </gray><yellow>{notes}</yellow><gray> | BPM: </gray><yellow>{bpm}</yellow>"
+nbs_import_failed: "<red>Failed to import NBS file: </red><yellow>{error}</yellow>"
+import_usage: "<gray>Use: </gray><yellow>/musicboxplus edit import <file></yellow>"
+import_input_prompt: "<green>Enter the file name to import (.nbs, .mid or .midi, extension optional):</green>"
+import_file_location: "<gray>Put the file into the plugin data folder.</gray>"
+import_filename_empty: "<red>The file name cannot be empty.</red>"
+import_file_not_found: "<red>Import file not found: </red><yellow>{filename}</yellow>"
+import_file_location_hint: "<gray>Place the file in </gray><yellow>{path}</yellow>"
+import_unsupported_format: "<red>Unsupported import format. Use .nbs, .mid or .midi.</red>"
+import_success: "<green>Imported {format} file successfully: </green><yellow>{name}</yellow>"
+import_info: "<gray>Notes: </gray><yellow>{notes}</yellow><gray> | BPM: </gray><yellow>{bpm}</yellow><gray> | Grid: </gray><yellow>1/{subdivision}</yellow>"
+import_failed: "<red>Failed to import file: </red><yellow>{error}</yellow>"
+import_warning_tempo_changes: "<yellow>This MIDI contains tempo changes. MusicBox imported it using the initial BPM only.</yellow>"
+import_warning_pitch_clamped: "<yellow>Some notes were outside the playable pitch range and were clamped during import.</yellow>"
+edit_available: "<green>Available</green>"
+autoplay_enabled: "<green>Auto-play on join enabled.</green>"
+autoplay_disabled: "<yellow>Auto-play on join disabled.</yellow>"
+edit_unavailable: "<red>Unavailable</red>"
+edit_display_button: "<aqua>Edit Display</aqua>"
+edit_display_button_lore:
+  - "<gray>Edit the floating text display lines</gray>"
+export_usage: "<gray>Use: </gray><yellow>/musicboxplus edit export <name></yellow>"
+export_success: "<green>Exported </green><yellow>{name}</yellow><green> to </green><yellow>{file}</yellow><green>.</green><gray> Path: </gray><yellow>{path}</yellow>"
+export_failed: "<red>Failed to export NBS file: </red><yellow>{error}</yellow>"
+export_warning_pitch_clamped: "<yellow>Some notes were clamped to the NBS pitch range during export.</yellow>"
+
+# Publishing
+publish_price_edit_prompt: "<green>Enter a new publish price (current: </green><yellow>{price}</yellow><green>):</green>"
+publish_original_not_found: "<red>Original song not found</red>"
+publish_sync_success: "<green>Published music synced successfully</green>"
+publish_sync_failed: "<red>Failed to sync published music</red>"
+publish_unpublished: "<red>Song unpublished</red>"
+publish_republished: "<green>Song republished</green>"
+publish_operation_failed: "<red>Publish operation failed</red>"
+publish_deleted: "<red>Published song deleted</red>"
+recent_songs_title: "<gold>Recent Songs </gold><gray>({page}/{last_page})</gray>"
+recent_songs_buy_title: "<gold>Recent Purchased Songs </gold><gray>({page}/{last_page})</gray>"
+playlist_editor_title: "<gold>Playlist Editor </gold><dark_gray>- </dark_gray><yellow>{playlist}</yellow><gray> ({page}/{last_page})</gray>"
+playlist_list_title: "<gold>Playlists </gold><gray>({page}/{last_page})</gray>"
+
+# Navigation
+
+# Publish Results
+publish_unavailable: "<red>Publishing is currently unavailable.</red>"
+publish_price_invalid: "<red>Invalid price.</red>"
+publish_price_out_of_range: "<red>Price must be between </red><yellow>{min}</yellow><red> and </red><yellow>{max}</yellow><red>.</red>"
+
+unpublish_success: "<red>Song unpublished successfully.</red>"
+republish_success: "<green>Song republished successfully.</green>"
+publish_delete_success: "<red>Published song deleted.</red>"
+publish_update_success: "<green>Published song updated successfully.</green>"
+publish_update_failed: "<red>Failed to update published song.</red>"
+publish_not_found: "<red>Published song not found</red>"
+
+purchase_no_money: "<red>You do not have enough money.</red>"
+purchase_payment_failed: "<red>Payment failed.</red>"
+
+revenue_none: "<red>You have no revenue to claim.</red>"
+
+shop_search_prompt: "<green>Enter a search term in chat (use 'all' to show everything):</green>"
+
+publish_price_prompt: "<green>Enter a new publish price in chat (current: </green><yellow>{current}</yellow><green>):</green>"
+publish_description_prompt: "<green>Enter a publish description in chat (type 'cancel' to abort):</green>"
+publish_description_empty: "(none)"
+
+my_music_title: "<gold>My Published Music</gold>"
+shop_title: "<gold>Music Shop</gold>"
+publish_confirm_title: "<gold>Publish Confirmation</gold>"
+manage_publish_title: "<gold>Manage Published Music</gold>"
+purchase_confirm_title: "<gold>Purchase Confirmation</gold>"
+
+# Edit Operations
+edit_note_extended_octave_only_delete: "<red>Extended octave notes can only be removed, not moved.</red>"
+edit_clear_cancelled: "<green>Clear operation cancelled</green>"
+edit_no_notes_to_clear: "<red>There are no notes to clear.</red>"
+edit_no_selection: "<red>You have not selected any notes.</red>"
+edit_notes_copied: "<green>Copied </green><yellow>{count}</yellow><green> notes.</green>"
+edit_clipboard_empty: "<red>Your clipboard is empty.</red>"
+edit_notes_pasted: "<green>Pasted </green><yellow>{count}</yellow><green> notes.</green>"
+edit_paste_cancelled: "<red>Paste cancelled.</red>"
+edit_paste_no_space: "<red>There is not enough space to paste these notes here.</red>"
+edit_notes_deleted: "<green>Deleted </green><yellow>{count}</yellow><green> notes.</green>"
+edit_instrument_changed: "<green>Changed the instrument for </green><yellow>{count}</yellow><green> notes to </green><yellow>{instrument}</yellow><green>.</green>"
+
+# Publish Chat Results
+publish_system_disabled: "<red>The publish system is disabled.</red>"
+publish_limit_reached_msg: "<red>You have reached the publish limit (</red><yellow>{limit}</yellow><red>).</red>"
+publish_success_msg: "<green>Published </green><yellow>{name}</yellow><green> successfully!</green>"
+publish_price_out_of_range_msg: "<red>Price must be between </red><yellow>{min}</yellow><red> and </red><yellow>{max}</yellow><red>.</red>"
+publish_failed_msg: "<red>Failed to publish the song.</red>"
+publish_description_set: "<green>Publish description updated.</green>"
+publish_description_set_msg: "<green>Publish description set to: </green><white>{description}</white>"
+publish_price_range_error: "<red>Price must be between </red><yellow>{min}</yellow><red> and </red><yellow>{max}</yellow><red>.</red>"
+publish_price_set: "<green>Publish price set to </green><yellow>{price}</yellow>"
+publish_price_invalid_number: "<red>Please enter a valid number for the price.</red>"
+
+# Purchase Chat Results
+purchase_success_msg: "<green>Purchased </green><yellow>{name}</yellow><green> successfully!</green>"
+purchase_music_not_found: "<red>Song not found.</red>"
+purchase_music_unavailable: "<red>This song is no longer available.</red>"
+purchase_own_music_msg: "<red>You have already claimed this published song.</red>"
+purchase_author_claim_success: "<green>Claimed your published song </green><yellow>{name}</yellow><green>.</green>"
+revenue_claimed_msg: "<green>Claimed </green><yellow>{amount}</yellow><green> in revenue.</green>"
+shop_music_description_prefix: "<gray>Description: </gray><white>{description}</white>"
+shop_music_action_own: "<green>This is your published song</green>"
+shop_music_action_own_claim: "<yellow>Click to claim once</yellow>"
+shop_music_action_buy: "<yellow>Click to buy</yellow>"
+shop_search_all: "<white>All</white>"
+publish_status_published: "<green>Published</green>"
+publish_status_unpublished: "<gray>Unpublished</gray>"
+publish_status_pending: "<yellow>Pending Review</yellow>"
+publish_status_rejected: "<red>Rejected</red>"
+publish_review_empty: "<red>There are no publications awaiting review.</red>"
+publish_review_approved: "<green>Approved publication of </green><yellow>{name}</yellow><green>.</green>"
+publish_review_rejected: "<red>Rejected publication of </red><yellow>{name}</yellow><red>.</red>"
+publish_approved_notice: "<green>Your music </green><yellow>{name}</yellow><green> has been approved and is now on sale!</green>"
+publish_rejected_notice: "<red>Your music </red><yellow>{name}</yellow><red> was rejected. Edit it and resubmit from your publish list.</red>"
+publish_review_usage: "<gold>Usage: </gold><yellow>/musicboxplus publish <review|list|approve <id>|reject <id>></yellow>"
+publish_review_not_found: "<red>That pending publication was not found (it may already have been reviewed).</red>"
+publish_review_list_header: "<gold>Publications awaiting review:</gold>"
+publish_review_list_entry: "<yellow>{name}</yellow> <gray>by {author}</gray> <green>{price}</green> <dark_gray>({id})</dark_gray>"
+publish_action_manage: "<yellow>Click to manage</yellow>"
+publish_action_publish: "<yellow>Click to publish</yellow>"
+buy_container_lore_click_all: "<gray>Right click to review and buy all songs</gray>"
+buy_container_lore_total: "<gray>Total: </gray><yellow>{price}</yellow>"
+get_container_lore_click_all: "<gray>Click to get all discs</gray>"
+payment_failed: "Payment failed"
+container_has_no_songs: "Container has no songs"
+sign_info_mode_title: "<gold>Info Sign {status}</gold>"
+sign_info_mode_lore: "<gray>Click to toggle search info</gray>"
+sign_random_mode_lore:
+  - "<gray>Click to toggle random playback</gray>"
+  - "<gray>Current status: {status}</gray>"
+sign_playlist_editor_lore:
+  - "<gray>Click to select a playlist</gray>"
+
+# Legacy Keys Still Referenced In Code
+stop_button: "<red>Stop Playback</red>"
+stop_button_lore:
+  - "<gray>Click to stop the current playback</gray>"
+dont_forget_to_save: "<yellow>Don't forget to save your changes</yellow>"
+save_playlist_change: "<green>Save Playlist Changes</green>"
+delete_playlist: "<red>Delete Playlist</red>"
+shuffle_playlist: "<aqua>Shuffle Playlist</aqua>"
+add_music_to_playlist_item: "<yellow>Add Music to Playlist</yellow>"
+sign_playlist_editor: "<gold>Sign Playlist Editor</gold>"
+in_playlist: "<gray>Already in playlist</gray>"
+click_to_add: "<yellow>Click to add</yellow>"
+right_click_add_all: "<yellow>Right-click to add all</yellow>"
+tag_added_alias: "<green>Added alias </green><yellow>{alias}</yellow><green> to </green><yellow>{song}</yellow>"
+tag_removed_alias: "<green>Removed alias </green><yellow>{alias}</yellow><green> from </green><yellow>{song}</yellow>"
+tag_added_tag: "<green>Added tag </green><yellow>{tag}</yellow><green> to </green><yellow>{song}</yellow>"
+tag_removed_tag: "<green>Removed tag </green><yellow>{tag}</yellow><green> from </green><yellow>{song}</yellow>"

@@ -1,44 +1,333 @@
-# Enable or disable inscription about 1.14 instruments
-# Включает или выключает надпись о новых инструментах из 1.14
-printNewInstrument: true
-# bStats send
-# Включить или выключить метрику(пожалуйста не вырубай, а то сидишь дома, печаль, печеньки кончились,
-# и вот на метрику смотришь и понимаешь что твой плагин кому то нужен, и уже легче становится)
-# Если вырубишь, то к тебе со спины придёт крипер, и взорвёт тебя вместе с алмазами, так что я бы на твоём месте подумал
+# MusicBox main configuration
+#
+# Key names map one-to-one onto the code; reordering sections does not affect loading
+# (existing servers keep their own config.yml, this file is only the fresh-install template).
+
+# ----------------------------------------
+# General
+# ----------------------------------------
+
+# Enable bStats metrics reporting
 bStats: true
-economy:
-  # Enable song sold by /musicbox shop
-  # Включает продажу пластинок
-  enable: true
-  # Price for disc
-  # Цена за диск в магазине
-  price: 500
-# Maximum sound distance in speaker mode
-# Максимальная длина звука в режиме колонки
+
+# Enable debug logging
+debug: false
+
+# Prevent direct database work on the main server thread
+blockMainThreadDb: true
+
+# Require `musicboxplus.hear` permission to hear MusicBox playback
+hearPermissionsCheck: false
+
+# Require `musicboxplus.control` permission to open control panels of block players
+# (signs and jukeboxes). When disabled, any player can control any block player.
+# Default: false (anyone can control)
+blockPlayerControlPermission: false
+
+# Language
+# Language code to load. en and zh_cn are bundled; any other code loads
+# language_<code>.yml from this folder, so you can drop in your own translation.
+# An unknown code falls back to English with a warning in the console.
+language: en
+
+# Automatically copy missing keys from the English fallback file
+languageAutoFillMissing: true
+
+# ----------------------------------------
+# Feature modules
+# Disabled modules do not register their subcommands and their related listeners/behavior are skipped.
+# ----------------------------------------
+modules:
+  playback: true
+  shop: true
+  playerMusic: true
+  # Heavy creation/economy features default OFF — enable per server as needed.
+  # publish also needs publish.enable below; webEditor also needs editor and web.enabled.
+  publish: false
+  editor: false
+  webEditor: false
+  signs: true
+  jukeboxes: true
+  playlists: true
+  give: true
+  textPlayer: true
+  songTags: true
+
+# ----------------------------------------
+# Playback
+# ----------------------------------------
+
+# Playback sound category. Controls which Minecraft volume slider affects MusicBox.
+# Options: MASTER, MUSIC, RECORDS, WEATHER, BLOCKS, HOSTILE, NEUTRAL, PLAYERS,
+#           AMBIENT, VOICE
+# Default: RECORDS (Jukebox/Note Blocks slider)
+soundCategory: RECORDS
+
+# Delay before a song starts playing (20 ticks = 1 second). Accepted range 0-100; higher
+# values are silently clamped.
+playDelayTicks: 0
+
+# Maximum number of recent songs to remember per player. Accepted range 1-100.
+maxRecentSongs: 28
+
+# Auto-destroy unattended block players after this many seconds with no listener in range.
+# Applies to signs and jukeboxes. Speakers follow their owner and are not covered.
+# Set to 0 to disable.
+autoDestroy: 60
+
+# Playback radius (in blocks) of block players.
 speakerRadius: 10
-# Music bossbar setting
-# Настройки музыкального боссбара
+jukeboxRadius: 64
+
+# Enable notes outside vanilla Minecraft's normal octave range.
+# A resource pack is required if you want those extended notes to sound correct.
+enable10octave: false
+
+# Trumpet-family note blocks (NBS instrument ids 16-19, added in Minecraft 1.26):
+# - If the server exposes trumpet instruments, MusicBox uses them automatically. Songs using them
+#   play correctly with no configuration and this option does nothing.
+# - If it does not, those notes are silent. Set this to true to still offer trumpet in the editor
+#   and keep it through import, then give it an actual sound with resourcePackInstruments.soundKeys
+#   below -- this option exposes the instrument, the sound key is what makes it audible.
+enableTrumpetResourcePackFallback: false
+
+# Optional resource-pack sound overrides for editor/player-made notes.
+# Disabled by default.
+# When enabled, any configured instrument below will use the specified sound key instead of the
+# normal Bukkit note-block instrument, using pitch-shifted playback.
+# Example:
+# resourcePackInstruments:
+#   enabled: true
+#   soundKeys:
+#     HARP: "musicboxplus:piano"
+#     BELL: "musicboxplus:bell_soft"
+resourcePackInstruments:
+  enabled: false
+  soundKeys: {}
+
+# Automatically start playing music when a player joins (personal radio).
+# Players can opt out per-account with /musicboxplus autoplay off (kept across sessions).
+autoPlay:
+  enable: false
+  # What to play:
+  #   ""  or  "master" / "all"  -> all songs as a playlist
+  #   a song name                -> that single song
+  #   "CHEST:<id>"               -> a specific song folder
+  source: ""
+  # Shuffle the playlist (only affects folder/all-songs sources)
+  shuffle: false
+  # Loop mode: OFF / SINGLE / ALL  (ALL keeps cycling the whole list)
+  loop: "ALL"
+  # Delay before starting, in ticks (lets the client finish loading)
+  delayTicks: 40
+
+# Per-player playback internals
+player:
+  # How often a personal player dispatches notes, in ticks.
+  # 1 (~50ms) is full precision; 2 (~100ms) halves the work and can drop notes in fast songs.
+  tickInterval: 1
+  # How often a block player recomputes who is in range, in milliseconds.
+  # This also paces the block player's own task, so raising it delays how quickly someone
+  # walking up to a sign or jukebox starts hearing the song.
+  rangeCacheClearInterval: 5000
+
+# Volume
+volume:
+  defaultVolume: 100
+  step: 10
+  minVolume: 0
+  maxVolume: 100
+  # How often changed player volumes are flushed to the database, in ticks (6000 = 5 minutes)
+  autoSaveInterval: 6000
+
+# Playback speed
+speed:
+  defaultSpeed: 1.0
+  step: 0.25
+  minSpeed: 0.25
+  maxSpeed: 2.0
+
+# Boss bar
 bossbar:
-  # Enable or disable bossbar
-  # Включает или выключает боссбар
   enable: true
   color: BLUE
   style: SEGMENTED_20
-# Language setting
-# Настройки языка, есть ru и en
-lang: en
-# Radius in which disc's will be heard from this plugin
-# Как далеко будет слышно пластинки из этого плагина
-jukeboxRadius: 64
-# Enable or disable autodestroy range player if nobody hear him (Speaker mode, Sign,Jukeboxes) Time in seconds(0 disable)
-# Включить или выключить автоуничтожение проигрывателей если никто их не слышит в течении N секунд
-autoDestroy: 60
-# Нужно ли проверять пекс musicbox.hear. По дефолту он не проверяется и все могут слышать музыку,
-# но вдруг вам сильно приспичило и надо прям, тогда ставим true и теперь никто без этого пекса слышать музыку не может
-# ----
-# Whether it is necessary to check the permissions of musicbox.hear. By default, it is not checked and everyone can hear music
-# but if you need it, then set to true and now no one can hear music without this permission
-hearPermissionsCheck: false
-# Enables support for octaves outside minecraft's default 2, which requires a resource pack to hear.
-# If false, notes outside the octave range are automatically transposed into it
-enable10octave: false
+  # Supported placeholders:
+  # {song}, {author}, {original_author}, {length}, {mode}, {silent}, {speed}, {volume}
+  format: "<green>{song}</green><gray> [{mode}]</gray>"
+  # Optional Bukkit BossBar flags:
+  # - DARKEN_SKY
+  # - PLAY_BOSS_MUSIC
+  # - CREATE_FOG
+  flags: []
+
+# ----------------------------------------
+# Music blocks
+# ----------------------------------------
+
+# Music signs
+sign:
+  # Text that turns a sign into a music sign. Matching ignores case and colour codes, so
+  # listing "[Music]" and "[MUSIC]" alongside "[music]" adds nothing.
+  # The FIRST entry is the one MusicBox writes when it sets a sign up itself.
+  aliases:
+    - "[music]"
+    - "[musik]"
+  displayText: "<gold>[MusicBox]</gold>"
+  setupText: "<yellow>[Setting]</yellow>"
+
+# Custom records / jukebox_playable
+# When enabled, songs can define a `jukebox-playable` key in song-aliases.yml.
+# This lets a MusicBox song item behave like a custom 1.21+ record item.
+#
+# `vanillaJukeboxPlayback: false`
+#   MusicBox still intercepts the disc and plays the NBS song itself.
+#   The custom record component is only used for item appearance/compatibility.
+#
+# `vanillaJukeboxPlayback: true`
+#   If a song has `jukebox-playable`, vanilla/Paper jukebox playback is allowed.
+#   This is intended for custom OGG-backed records provided by a resource pack.
+customRecords:
+  enabled: false
+  vanillaJukeboxPlayback: false
+  defaultNamespace: "musicboxplus"
+
+# ----------------------------------------
+# Database
+# ----------------------------------------
+database:
+  # Supported values: sqlite, mysql
+  type: sqlite
+
+  mysql:
+    host: "localhost"
+    port: 3306
+    database: "musicboxplus"
+    username: "root"
+    password: "password"
+    tablePrefix: "musicbox_"
+
+# ----------------------------------------
+# Cache & performance
+# ----------------------------------------
+
+# Cache
+cache:
+  # Song-search result cache size
+  searchCacheSize: 100
+  # GUI item/lore render caches (item and lore strings rebuilt on every render)
+  guiItemCacheSize: 200
+  guiLoreCacheSize: 200
+  # Number of compiled song arrangements kept in the LRU playback cache. Roughly 60 KB per
+  # entry on a typical library; 0 disables the strong cache (falls back to SoftReference only).
+  compiledSongCacheSize: 64
+
+# Performance
+performance:
+  # When true, the music editor may redraw only changed grid slots where supported.
+  editorIncrementalUpdate: true
+  # Number of note rows inserted per JDBC batch when saving player-made music.
+  databaseBatchSize: 50
+  # Maximum number of unique keywords kept in the song search index.
+  maxKeywordIndexSize: 10000
+  # Text display player title/progress refresh interval in ticks.
+  # Lower values are smoother; higher values reduce work when many text displays are playing.
+  textDisplayRefreshIntervalTicks: 10
+
+# Search
+search:
+  # Longest keyword accepted by the song search box
+  maxKeywordLength: 10
+
+# ----------------------------------------
+# Economy
+# ----------------------------------------
+
+# Requires Vault plus an economy plugin; without one, everything stays free and no error is shown.
+economy:
+  enable: false
+  # Cost of buying one music disc from the shop
+  price: 500
+
+# ----------------------------------------
+# Publish system
+# Takes effect only when modules.publish and publish.enable are both true.
+# ----------------------------------------
+publish:
+  enable: true
+  minPrice: 0
+  maxPrice: 1000000
+  taxRate: 0.1
+  maxPublishedPerPlayer: 50
+  # When true, new (and re-submitted) listings wait for an admin to approve them before
+  # appearing in the shop. Admins review them with /musicboxplus publish review, or
+  # approve/reject by id. Rejected listings can be resubmitted by their author.
+  requireApproval: false
+  # Allow the author to claim their own published music from the player shop.
+  allowAuthorClaimOwnMusic: true
+  # When enabled, each author can only claim each published song once.
+  authorClaimOwnMusicOnce: true
+
+# ----------------------------------------
+# Music editor
+# ----------------------------------------
+editor:
+  # Note-pitch range of the editor grid (0-24 = vanilla octaves, up to 119 with
+  # enable10octave on)
+  defaultMaxPitch: 24
+  extendedMaxPitch: 119
+  # BPM range and adjustment step
+  minBpm: 20
+  maxBpm: 300
+  bpmStep: 5
+  # Instruments per page in the instrument picker
+  instrumentsPerPage: 27
+  # Undo/redo history size
+  maxHistorySize: 50
+  # Default note limit per tick when placing notes
+  defaultLimit: 10
+  # Defaults for a new song
+  defaultBpm: 120
+  defaultBeatSubdivision: 4
+  # How often unsaved edits are autosaved, in ticks (6000 = 5 minutes)
+  autoSaveInterval: 6000
+
+# When true, any .mid/.midi files found in the song library are automatically converted to
+# real .nbs files on load (written next to the source, re-converted only when the MIDI is newer),
+# so they appear as normal songs. Set to false to leave MIDI files untouched.
+convertMidiToNbs: true
+
+# ----------------------------------------
+# Storage
+# ----------------------------------------
+storage:
+  publishedMusicFolder: "PublishedMusic"
+  inventoryBackupFolder: "inventory_backups"
+
+# ----------------------------------------
+# Web editor
+# Needs THREE switches on: modules.editor, modules.webEditor, and web.enabled below.
+# ----------------------------------------
+web:
+  enabled: false
+  # Address to bind to. Leave empty to use `host` below.
+  bindAddress: ""
+  # Bind to every interface instead of `bindAddress`/`host`. Exposes the editor to the network.
+  bindAllInterfaces: false
+  host: "localhost"
+  port: 8080
+  # Show the port in the chat link handed to the player
+  showPortInChat: false
+  # Editing session lifetime, in minutes
+  linkExpireTime: 10
+  # Maximum song length accepted by the editor, in ticks
+  maxMusicLength: 10000
+  # Maximum request body size, in megabytes
+  maxRequestSize: 10
+  # Maximum requests per client IP per 60 seconds
+  rateLimit: 100
+  # Value required in the Origin header; empty accepts any origin
+  allowedOrigin: ""
+  # Reverse-proxy addresses allowed to set X-Forwarded-For. Rate limiting is keyed on the
+  # resulting client IP, so trusting an untrusted proxy lets a client forge its own bucket.
+  trustedProxies: []

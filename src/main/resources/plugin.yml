@@ -1,12 +1,96 @@
-name: MusicBox
-version: 3.1
-main: ru.spliterash.musicbox.MusicBox
+name: MusicBoxPlus
+version: 1.0.0
+main: com.huidu.musicboxplus.MusicBox
+# The plugin was called MusicBox up to 3.2. Without this alias, getPlugin("MusicBox") and every
+# downstream depend/softdepend on the old name resolve to nothing.
+provides:
+  - MusicBox
 authors:
-  - Spliterash
-depend:
-  - NoteBlockAPI
-commands:
-  musicbox: {}
-api-version: "1.21"
+  - Spliterash,HuiDu_OwO
+api-version: "1.21.4"
+folia-supported: true
 softdepend:
   - Vault
+  - PlaceholderAPI
+  - CraftEngine
+
+commands:
+  musicboxplus:
+    description: "MusicBoxPlus main command - play and manage music"
+    usage: "/musicboxplus"
+    aliases:
+      - musicbox
+
+permissions:
+  musicboxplus.use:
+    description: "Basic MusicBox usage"
+    default: true
+  musicboxplus.shop:
+    description: "Access to music shop"
+    default: true
+  musicboxplus.shopmusic:
+    description: "Shop music commands (legacy alias)"
+    default: true
+  musicboxplus.reload:
+    description: "Reload MusicBox configuration"
+    default: op
+  musicboxplus.stop:
+    description: "Stop your own music"
+    default: true
+  musicboxplus.stop.others:
+    description: "Stop another player's music"
+    default: op
+  musicboxplus.edit:
+    description: "Create and edit music"
+    default: op
+  musicboxplus.speaker:
+    description: "Use speaker mode"
+    default: true
+  musicboxplus.play.other:
+    description: "Play songs for other players"
+    default: op
+  musicboxplus.silent.other:
+    description: "Change silent mode for other players"
+    default: op
+  musicboxplus.hear:
+    description: "Hear music from speakers"
+    default: true
+  musicboxplus.playlist:
+    description: "Create and manage playlists"
+    default: true
+  musicboxplus.volume:
+    description: "Control volume"
+    default: true
+  musicboxplus.speed:
+    description: "Control playback speed"
+    default: true
+  musicboxplus.autoplay:
+    description: "Receive and toggle auto-play music on join"
+    default: true
+  musicboxplus.sign:
+    description: "Create music signs"
+    default: op
+  musicboxplus.sign.protect:
+    description: "Toggle sign prevent destroy mode"
+    default: op
+  musicboxplus.tag:
+    description: "Manage song tags and aliases"
+    default: op
+  musicboxplus.give:
+    description: "Give music discs to players"
+    default: op
+  musicboxplus.mute:
+    description: "Stop a player's current music"
+    default: op
+  musicboxplus.control:
+    description: "Open the control panel of signs and jukeboxes"
+    default: true
+  musicboxplus.edit.limit.unlimited:
+    description: "Bypass the per-player music count limit"
+    default: op
+  musicboxplus.publish.review:
+    description: "Approve or reject published music listings"
+    default: op
+  musicboxplus.admin:
+    description: "Admin commands (reload, etc.)"
+    default: op

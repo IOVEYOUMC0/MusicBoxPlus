@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicBox Web Editor</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <header class="header">
+            <h1>MusicBox Web Editor</h1>
+            <div class="header-info">
+                <span id="music-name">加载中...</span>
+                <span id="note-count">0 音符</span>
+            </div>
+        </header>
+        
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <button id="btn-play" title="播放">播放</button>
+                <button id="btn-stop" title="停止">停止</button>
+            </div>
+            <div class="toolbar-group">
+                <button id="btn-undo" title="撤销">撤销</button>
+                <button id="btn-redo" title="重做">重做</button>
+            </div>
+            <div class="toolbar-group">
+                <button id="btn-copy" title="复制">复制</button>
+                <button id="btn-paste" title="粘贴">粘贴</button>
+                <button id="btn-delete" title="删除">删除</button>
+            </div>
+            <div class="toolbar-group">
+                <button id="btn-clear" title="清空">清空</button>
+                <button id="btn-import" title="导入音乐文件">导入</button>
+            </div>
+            <div class="toolbar-group toolbar-right">
+                <span id="save-state" class="save-state">已保存</span>
+                <button id="btn-save" class="btn-primary">保存</button>
+            </div>
+        </div>
+
+        <div class="main-container">
+            <div class="sidebar-left">
+                <h3>乐器选择</h3>
+                <div id="instrument-list" class="instrument-list">
+                    <!-- 乐器列表将通过 JS 动态生成 -->
+                </div>
+            </div>
+
+            <div class="editor-container">
+                <div class="piano-roll">
+                    <div class="grid-container">
+                        <div class="piano-roll-inner" id="piano-roll-inner">
+                            <div class="corner-cell"></div>
+                            <div class="time-ruler" id="time-ruler">
+                                <!-- 时间标尺将通过 JS 动态生成 -->
+                            </div>
+                            <div class="piano-keys" id="piano-keys">
+                                <!-- 钢琴键将通过 JS 动态生成 -->
+                            </div>
+                            <div class="note-grid" id="note-grid">
+                                <!-- 音符网格将通过 JS 动态生成 -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="scrollbar-vertical">
+                        <input type="range" id="scroll-vertical" min="0" max="0" value="0" title="垂直滚动">
+                    </div>
+                </div>
+                <div class="scrollbar-horizontal">
+                    <input type="range" id="scroll-horizontal" min="0" max="100" value="0">
+                </div>
+            </div>
+
+            <div class="sidebar-right">
+                <h3>属性</h3>
+                <div class="property-panel">
+                    <div class="property-group">
+                        <label>标题</label>
+                        <input type="text" id="title-input" placeholder="歌曲名称">
+                    </div>
+                    <div class="property-group">
+                        <label>BPM</label>
+                        <input type="number" id="bpm-input" min="20" max="1000" value="120">
+                    </div>
+                    <div class="property-group">
+                        <label>拍号</label>
+                        <select id="time-signature-input"></select>
+                    </div>
+                    <div class="property-group">
+                        <label>细分</label>
+                        <input type="number" id="subdivision-input" min="1" max="16" value="4">
+                    </div>
+                    <div class="property-group">
+                        <label>描述</label>
+                        <textarea id="description-input" rows="4" maxlength="1000" placeholder="歌曲说明"></textarea>
+                    </div>
+                    <div class="property-group">
+                        <label>最大 Tick</label>
+                        <span id="max-ticks">10000</span>
+                    </div>
+                </div>
+                
+                <h3>选中音符</h3>
+                <div id="selected-note-info" class="selected-note-info">
+                    <p>未选中音符</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="status-bar">
+            <span id="status-text">就绪</span>
+            <div class="transport-controls">
+                <span id="tick-display">Tick: 0</span>
+                <input type="range" id="playhead-slider" min="0" max="0" value="0" title="播放位置">
+                <span id="metronome-light" class="metronome-light" title="节拍器"></span>
+                <label class="speed-control">
+                    <span>速度</span>
+                    <input type="range" id="speed-slider" min="25" max="200" value="100" title="播放速度">
+                    <span id="speed-value">1.0x</span>
+                </label>
+                <label class="volume-control">
+                    <span>音量</span>
+                    <input type="range" id="volume-slider" min="0" max="100" value="70">
+                    <span id="volume-value">70%</span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="import-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header">导入音乐</div>
+            <div class="modal-body">
+                <div class="import-field">
+                    <label for="import-file-input">本地文件</label>
+                    <input id="import-file-input" type="file" accept=".nbs,.mid,.midi,audio/midi">
+                </div>
+                <div class="import-divider">或</div>
+                <div class="import-field">
+                    <label for="import-path-input">服务器文件名</label>
+                    <input id="import-path-input" type="text" placeholder="例如 imports/demo.nbs">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="import-cancel" class="modal-btn cancel" type="button">取消</button>
+                <button id="import-confirm" class="modal-btn confirm" type="button">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

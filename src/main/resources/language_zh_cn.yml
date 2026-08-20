@@ -1,0 +1,610 @@
+# MusicBox Simplified Chinese language overrides
+# Missing keys will fall back to language_en.yml
+
+no_permissions: "<red>你没有权限执行此操作。</red>"
+only_players: "<red>该命令只能由玩家使用。</red>"
+specify_player: "<red>你需要指定一名玩家。</red>"
+player_not_found: "<red>未找到该玩家。</red>"
+invalid_arguments: "<red>参数无效。</red>"
+unknown_command: "<red>未知命令。</red>"
+enable: "启用"
+disable: "禁用"
+"no": "否"
+error: "<red>错误: {message}</red>"
+error_occurred: "<red>发生了一个错误。</red>"
+database_unavailable: "<red>数据库暂时不可用，请稍后再试。</red>"
+no_music_playing: "<red>当前没有正在播放的音乐。</red>"
+music_stopped: "<green>音乐已停止。</green>"
+music_stopped_other: "<green>已停止 </green><yellow>{player}</yellow><green> 的音乐。</green>"
+music_stopped_by_other: "<yellow>你的音乐已被管理员停止。</yellow>"
+no_music_playing_other: "<red>玩家 </red><yellow>{player}</yellow><red> 当前没有播放任何音乐。</red>"
+cant_switch: "<red>无法切换播放模式。</red>"
+player_offline: "<red>该玩家不在线。</red>"
+unknown: "未知"
+unknown_type: "<red>未知类型。</red>"
+input_name: "<gold>请输入名称：</gold>"
+cancelled: "<red>已取消</red>"
+reloaded: "<green>配置已重载。</green>"
+plugin_not_loaded: "<red>插件仍在加载中。</red>"
+block_not_play: "<red>这个方块无法播放音乐。</red>"
+
+playlist: "播放列表"
+random_mode_button: "随机模式: {status}"
+create_playlist_input: "<gold>请输入新播放列表名称：</gold>"
+playlist_created: "<green>播放列表 '{name}' 创建成功。</green>"
+playlist_exists: "<red>名为 '{name}' 的播放列表已存在。</red>"
+playlist_invalid_name: "<red>播放列表名称长度必须在 1 到 32 个字符之间。</red>"
+playlist_deleted: "<green>已删除播放列表 '{name}'。</green>"
+playlist_saved: "<green>播放列表 '{playlist}' 已保存。</green>"
+playlist_zero_size: "<red>不能保存空播放列表。</red>"
+playlist_unsaved_exit_confirm: "<yellow>你有未保存的播放列表更改。3 秒内再次点击返回将放弃这些更改。</yellow>"
+playlist_click_help: "<yellow>点击选择</yellow>"
+playlist_edit_help: "<yellow>右键编辑</yellow>"
+current_playlist_song: "<green>当前: </green><white>{song}</white>"
+another_playlist_song: "<gray>下一首: </gray><white>{song}</white>"
+delete_confirm_title: "<red>确认删除: {name}</red>"
+delete_confirm_warning: "<red>你确定要删除 </red><yellow>{name}</yellow><red> 吗？</red>"
+delete_confirm_yes: "<green>确认删除</green>"
+delete_confirm_no: "<red>取消</red>"
+
+song_not_found: "<red>未找到歌曲。请检查名称后重试。</red>"
+song_added: "<green>已添加歌曲 '{song}'。</green>"
+
+search_no_results: "<red>没有找到结果。</red>"
+search_results: "<gold>搜索结果: </gold><yellow>{count} 首歌曲</yellow>"
+search_title: "<gold>搜索音乐</gold>"
+search_placeholder: "<gray>输入关键词进行搜索...</gray>"
+search_filter_hint: "<gray>筛选: </gray><yellow>tag:</yellow><gray>, </gray><yellow>author:</yellow><gray>, </gray><yellow>original:</yellow><gray>, </gray><yellow>folder:</yellow><gray>, </gray><yellow>type:musicboxplus|record</yellow>"
+search_results_title: "<gold>搜索结果 </gold><gray>- </gray><yellow>{query}</yellow><gray> ({page}/{last_page})</gray>"
+search_record_use_disc: "<yellow>这首歌是自定义唱片。请购买或在唱片机中使用该唱片物品。</yellow>"
+
+volume_current: "<gold>当前音量: </gold><yellow>{volume}% </yellow><reset>{bar}</reset>"
+volume_increased: "<green>音量已提高到 </green><yellow>{volume}%</yellow>"
+volume_decreased: "<red>音量已降低到 </red><yellow>{volume}%</yellow>"
+volume_set: "<green>音量已设置为 </green><yellow>{volume}%</yellow>"
+volume_reset: "<green>音量已重置为默认值 (100%)</green>"
+volume_invalid: "<red>音量必须在 0 到 100 之间</red>"
+speed_current: "<gold>当前播放速度: </gold><yellow>{speed}</yellow>"
+speed_set: "<green>播放速度已设置为 </green><yellow>{speed}</yellow><green>。</green>"
+speed_reset: "<green>播放速度已重置为 </green><yellow>{speed}</yellow><green>。</green>"
+speed_invalid: "<red>播放速度必须在 {min} 和 {max} 之间。</red>"
+speed_button: "<gold>播放速度</gold>"
+speed_button_lore:
+  - "<yellow>当前速度: {speed}</yellow>"
+  - "<green>左键: 加快 (+{step})</green>"
+  - "<red>右键: 减慢 (-{step})</red>"
+loop_mode_off: "<red>关闭</red>"
+loop_mode_single: "<yellow>单曲</yellow>"
+loop_mode_all: "<green>全部</green>"
+rewind_to: "<gold>已跳转到 </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
+rewound: "<gold>已回退到 </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
+human_time_second: "{value}秒"
+human_time_minute: "{value}分"
+
+command_help: "<gold>=== MusicBox 可用命令 ===</gold>"
+command_help_main: "<gold>/musicboxplus</gold><dark_gray> - </dark_gray><yellow>打开 MusicBox 主界面</yellow>"
+command_help_play: "<gold>/musicboxplus play <song></gold><dark_gray> - </dark_gray><yellow>播放一首歌曲</yellow>"
+command_help_stop: "<gold>/musicboxplus stop</gold><dark_gray> - </dark_gray><yellow>停止当前歌曲</yellow>"
+command_help_volume: "<gold>/musicboxplus volume [0-100]</gold><dark_gray> - </dark_gray><yellow>调整播放音量</yellow>"
+command_help_silent: "<gold>/musicboxplus silent [on,off,switch]</gold><dark_gray> - </dark_gray><yellow>切换静音模式</yellow>"
+command_help_speed: "<gold>/musicboxplus speed [0.25-2|reset]</gold><dark_gray> - </dark_gray><yellow>调整播放速度</yellow>"
+command_help_mute: "<gold>/musicboxplus mute <player></gold><dark_gray> - </dark_gray><yellow>静音一名玩家</yellow>"
+command_help_playlist: "<gold>/musicboxplus playlist</gold><dark_gray> - </dark_gray><yellow>管理你的播放列表</yellow>"
+command_help_reload: "<gold>/musicboxplus reload [type]</gold><dark_gray> - </dark_gray><yellow>重载插件配置</yellow>"
+command_help_tag: "<gold>/musicboxplus tag</gold><dark_gray> - </dark_gray><yellow>管理歌曲标签和外观</yellow>"
+command_help_textplayer: "<gold>/musicboxplus textplayer</gold><dark_gray> - </dark_gray><yellow>管理文字播放器</yellow>"
+command_help_edit: "<gold>=== 音乐编辑命令 ===</gold>"
+command_help_edit_create: "<yellow>/musicboxplus edit create <name></yellow><gray> - 创建一首新歌</gray>"
+command_help_edit_list: "<yellow>/musicboxplus edit list</yellow><gray> - 列出你的歌曲</gray>"
+command_help_edit_import: "<yellow>/musicboxplus edit import <file></yellow><gray> - 导入 .nbs 或 .mid 文件</gray>"
+command_help_edit_export: "<yellow>/musicboxplus edit export <name></yellow><gray> - 将歌曲导出为 .nbs</gray>"
+command_help_edit_web: "<yellow>/musicboxplus edit web <name></yellow><gray> - 打开 Web 编辑器</gray>"
+
+edit_usage_create: "<red>用法: /musicboxplus edit create <name></red>"
+edit_usage_rename: "<red>用法: /musicboxplus edit rename <old> <new></red>"
+edit_create_failed: "<red>创建歌曲失败</red>"
+edit_not_found: "<red>未找到歌曲: {name}</red>"
+edit_delete_failed: "<red>删除歌曲失败</red>"
+edit_delete_select_title: "<red>选择要删除的音乐</red>"
+edit_delete_click_lore: "<red>点击删除这首音乐</red>"
+edit_rename_failed: "<red>重命名歌曲失败</red>"
+edit_rename_select_title: "<yellow>选择要重命名的音乐</yellow>"
+edit_rename_click_lore: "<yellow>点击后输入新名称</yellow>"
+edit_export_select_title: "<aqua>选择要导出的音乐</aqua>"
+edit_export_click_lore: "<aqua>点击导出为 NBS 文件</aqua>"
+edit_available: "<green>可用</green>"
+autoplay_enabled: "<green>已开启进入游戏自动播放。</green>"
+autoplay_disabled: "<yellow>已关闭进入游戏自动播放。</yellow>"
+edit_unavailable: "<red>不可用</red>"
+edit_display_button: "<aqua>编辑显示</aqua>"
+edit_display_button_lore:
+  - "<gray>编辑浮动文字显示行</gray>"
+edit_rename_usage: |
+  <gold>========================================</gold>
+  <gold> 重命名歌曲</gold>
+  <gray> 输入新的歌曲名称</gray>
+  <gray> 命令用法: </gray><yellow>/musicbox edit rename <旧名称> <新名称></yellow>
+  <gold>========================================</gold>
+edit_rename_not_found: |
+  <red>========================================</red>
+  <red> 未找到歌曲</red>
+  <gray> "{name}" 不存在</gray>
+  <red>========================================</red>
+edit_rename_exists: |
+  <red>========================================</red>
+  <red> 目标名称已存在</red>
+  <gray> "{name}" 已被使用</gray>
+  <red>========================================</red>
+edit_rename_success: |
+  <green>========================================</green>
+  <green> 歌曲重命名成功</green>
+  <gray> {old} </gray><white>-> </white><yellow>{new}</yellow>
+  <green>========================================</green>
+edit_rename_failed_msg: |
+  <red>========================================</red>
+  <red> 重命名歌曲失败</red>
+  <gray> 请稍后重试</gray>
+  <red>========================================</red>
+edit_list_empty: "<red>你还没有任何歌曲</red>"
+edit_list_title: "<gold>=== 你的歌曲 ===</gold>"
+edit_list_item: "<gray>- </gray><white>{name}</white><gray> (拍号: {timeSignature}, 音符数: {notes})</gray>"
+edit_no_music: "<red>你还没有任何歌曲。使用 </red><yellow>/musicboxplus edit create</yellow><red> 创建一首。</red>"
+edit_saved: "<green>歌曲 '{name}' 已保存</green>"
+edit_notes_cleared: "<red>已清除 </red><yellow>{count}</yellow><red> 个音符</red>"
+edit_no_notes_to_play: "<red>没有可播放的音符</red>"
+edit_playback_started: "<green>开始播放...</green>"
+edit_playback_stopped: "<yellow>播放已停止</yellow>"
+edit_inventory_restored: "<green>你的背包已恢复</green>"
+edit_mode_exited: "<yellow>已退出 MusicBox 编辑模式并恢复你的背包</yellow>"
+autosave_saved: "<gray>[自动保存] </gray><green>歌曲已保存。</green>"
+autosave_failed_manual: "<gray>[自动保存] </gray><red>保存失败，请稍后手动保存。</red>"
+
+edit_web_disabled: |
+  <red>========================================</red>
+  <red> Web 编辑器已禁用</red>
+  <gray> 请在 config.yml 中启用:</gray>
+  <yellow> web.enabled: true</yellow>
+  <red>========================================</red>
+edit_web_usage: |
+  <gold>========================================</gold>
+  <gold> Web 编辑器用法</gold>
+  <gray> 用法: </gray><yellow>/musicbox edit web <name></yellow>
+  <gray> 为你的歌曲生成浏览器编辑链接</gray>
+  <gold>========================================</gold>
+edit_web_link: |
+  <green>========================================</green>
+  <green> Web 编辑器链接已创建</green>
+  <gray> 歌曲: </gray><yellow>{name}</yellow>
+  <gray> 请在浏览器中打开此链接:</gray>
+  <aqua><click:open_url:'{url}'>{url}</click></aqua>
+  <green>========================================</green>
+
+instrument_harp: "竖琴"
+instrument_bass: "低音"
+instrument_basedrum: "底鼓"
+instrument_snare: "军鼓"
+instrument_hat: "踩镲"
+instrument_guitar: "吉他"
+instrument_flute: "长笛"
+instrument_bell: "钟铃"
+instrument_chime: "钟琴"
+instrument_xylophone: "木琴"
+instrument_iron_xylophone: "铁木琴"
+instrument_cow_bell: "牛铃"
+instrument_didgeridoo: "迪吉里杜管"
+instrument_bit: "Bit"
+instrument_banjo: "班卓琴"
+instrument_pling: "叮"
+instrument_trumpet: "小号"
+instrument_trumpet_exposed: "小号（斑驳）"
+instrument_trumpet_weathered: "小号（风化）"
+instrument_trumpet_oxidized: "小号（氧化）"
+instrument_select_selected: "<gray>当前已选中</gray>"
+instrument_select_unselected: "<gray>点击选择</gray>"
+instrument_select_lore: "<gray>选择这个音符应使用的乐器。</gray>"
+
+placeholder_no_song: "无歌曲"
+placeholder_status_playing: "播放中"
+placeholder_status_paused: "已暂停"
+placeholder_status_stopped: "已停止"
+placeholder_mode_radio: "电台"
+placeholder_mode_speaker: "扬声器"
+
+reload_usage_title: "<gold>=== 重载命令 ===</gold>"
+reload_usage_all: "<yellow>/musicboxplus reload</yellow><gray> - 重载全部内容</gray>"
+reload_usage_config: "<yellow>/musicboxplus reload config</yellow><gray> - 重载配置</gray>"
+reload_usage_lang: "<yellow>/musicboxplus reload lang</yellow><gray> - 重载语言文件</gray>"
+reload_usage_songs: "<yellow>/musicboxplus reload songs</yellow><gray> - 重载歌曲</gray>"
+reload_usage_gui: "<yellow>/musicboxplus reload gui</yellow><gray> - 重载 GUI 配置</gray>"
+reload_usage_database: "<yellow>/musicboxplus reload database</yellow><gray> - 重载数据库连接</gray>"
+reload_usage_aliases: "<yellow>/musicboxplus reload aliases</yellow><gray> - 重载歌曲别名</gray>"
+reload_unknown_type: "<red>未知的重载类型: {type}</red>"
+
+publish_price_edit_prompt: "<green>请输入新的发布价格（当前: </green><yellow>{price}</yellow><green>）：</green>"
+publish_original_not_found: "<red>未找到原始歌曲</red>"
+publish_sync_success: "<green>已发布音乐同步成功</green>"
+publish_sync_failed: "<red>同步已发布音乐失败</red>"
+publish_unpublished: "<red>歌曲已下架</red>"
+publish_republished: "<green>歌曲已重新上架</green>"
+publish_operation_failed: "<red>发布操作失败</red>"
+publish_deleted: "<red>已发布歌曲已删除</red>"
+publish_unavailable: "<red>当前无法发布。</red>"
+publish_price_invalid: "<red>价格无效。</red>"
+publish_price_out_of_range: "<red>价格必须在 </red><yellow>{min}</yellow><red> 和 </red><yellow>{max}</yellow><red> 之间。</red>"
+publish_not_found: "<red>未找到已发布歌曲</red>"
+publish_system_disabled: "<red>发布系统已禁用。</red>"
+publish_limit_reached_msg: "<red>你已达到发布上限 (</red><yellow>{limit}</yellow><red>)。</red>"
+publish_success_msg: "<green>已成功发布 </green><yellow>{name}</yellow><green>！</green>"
+publish_failed_msg: "<red>发布歌曲失败。</red>"
+publish_description_set: "<green>发布描述已更新。</green>"
+publish_description_set_msg: "<green>发布描述已设置为: </green><white>{description}</white>"
+publish_description_empty: "(无)"
+publish_price_set: "<green>发布价格已设置为 </green><yellow>{price}</yellow>"
+publish_price_invalid_number: "<red>请输入有效的价格数字。</red>"
+my_music_title: "<gold>我发布的音乐</gold>"
+shop_title: "<gold>音乐商店</gold>"
+publish_confirm_title: "<gold>发布确认</gold>"
+manage_publish_title: "<gold>管理已发布音乐</gold>"
+purchase_confirm_title: "<gold>购买确认</gold>"
+
+purchase_no_money: "<red>你的金钱不足。</red>"
+purchase_payment_failed: "<red>支付失败。</red>"
+purchase_success_msg: "<green>已成功购买 </green><yellow>{name}</yellow><green>！</green>"
+purchase_save_failed: "<red>购买成功但保存到音乐库失败，已尝试退回付款，请联系管理员。</red>"
+purchase_music_not_found: "<red>未找到歌曲。</red>"
+purchase_music_unavailable: "<red>这首歌已不可用。</red>"
+purchase_own_music_msg: "<red>你已经领取过这首自己发布的歌曲。</red>"
+purchase_author_claim_success: "<green>已领取自己发布的歌曲 </green><yellow>{name}</yellow><green>。</green>"
+revenue_none: "<red>你没有收益可领取。</red>"
+revenue_claimed_msg: "<green>已领取 </green><yellow>{amount}</yellow><green> 的收益。</green>"
+shop_search_prompt: "<green>请在聊天栏中输入搜索词（输入 'all' 显示全部）：</green>"
+shop_search_all: "<white>全部</white>"
+shop_music_description_prefix: "<gray>描述: </gray><white>{description}</white>"
+shop_music_action_own: "<green>这是你发布的歌曲</green>"
+shop_music_action_own_claim: "<yellow>点击领取一次</yellow>"
+shop_music_action_buy: "<yellow>点击查看并购买</yellow>"
+publish_price_out_of_range_msg: "<red>价格必须在 </red><yellow>{min}</yellow><red> 和 </red><yellow>{max}</yellow><red> 之间。</red>"
+publish_price_range_error: "<red>价格必须在 </red><yellow>{min}</yellow><red> 和 </red><yellow>{max}</yellow><red> 之间。</red>"
+publish_status_published: "<green>已上架</green>"
+publish_status_unpublished: "<gray>已下架</gray>"
+publish_status_pending: "<yellow>待审批</yellow>"
+publish_status_rejected: "<red>已拒绝</red>"
+publish_review_empty: "<red>当前没有待审批的发布。</red>"
+publish_review_approved: "<green>已通过 </green><yellow>{name}</yellow><green> 的发布。</green>"
+publish_review_rejected: "<red>已拒绝 </red><yellow>{name}</yellow><red> 的发布。</red>"
+publish_approved_notice: "<green>你的音乐 </green><yellow>{name}</yellow><green> 已通过审批并上架!</green>"
+publish_rejected_notice: "<red>你的音乐 </red><yellow>{name}</yellow><red> 被拒绝,可在发布管理中修改后重新提交。</red>"
+publish_review_usage: "<gold>用法: </gold><yellow>/musicboxplus publish <review|list|approve <id>|reject <id>></yellow>"
+publish_review_not_found: "<red>未找到该待审批的发布(可能已被处理)。</red>"
+publish_review_list_header: "<gold>待审批发布列表:</gold>"
+publish_review_list_entry: "<yellow>{name}</yellow> <gray>by {author}</gray> <green>{price}</green> <dark_gray>({id})</dark_gray>"
+publish_action_manage: "<yellow>点击管理发布</yellow>"
+publish_action_publish: "<yellow>点击发布</yellow>"
+buy_container_no_space: "<red>你需要 </red><yellow>{need}</yellow><red> 个空槽位，目前只有 </red><yellow>{have}</yellow><red> 个。</red>"
+buy_container_no_money: "<red>购买需要 </red><yellow>{price}</yellow><red>，你的余额为 </red><yellow>{balance}</yellow><red>，还差 </red><yellow>{need}</yellow><red>。</red>"
+buy_container_success: "<green>已购买 </green><yellow>{count}</yellow><green> 张唱片，花费 </green><yellow>{price}</yellow><green>。</green>"
+buy_container_lore_click_all: "<gray>右键确认并购买全部歌曲</gray>"
+buy_container_lore_total: "<gray>总价: </gray><yellow>{price}</yellow>"
+get_container_lore_click_all: "<gray>点击获取全部唱片</gray>"
+payment_failed: "支付失败"
+container_has_no_songs: "容器中没有歌曲"
+
+sign_created: "<green>音乐告示牌创建成功</green>"
+sign_control_hint: "<gray>潜行 + 右键告示牌可打开控制面板</gray>"
+sign_options_hint: "<gray>选项: </gray><yellow>R</yellow><gray>=重命名 </gray><yellow>E</yellow><gray>=编辑 </gray><yellow>I</yellow><gray>=信息 </gray><yellow>P</yellow><gray>=保护</gray>"
+sign_protect_enabled: "<green>告示牌保护已启用</green>"
+sign_protect_disabled: "<red>告示牌保护已禁用</red>"
+control_destroy_player: "<red>销毁播放器</red>"
+control_destroy_player_lore:
+  - "<gray>销毁这个播放器</gray>"
+  - "<gray>并返回设置界面</gray>"
+control_progress_unavailable: "<gray>进度不可用</gray>"
+control_progress_unavailable_lore:
+  - "<gray>原版唱片播放不支持跳转进度</gray>"
+sign_info_mode_title: "<gold>信息告示牌 {status}</gold>"
+sign_info_mode_lore: "<gray>点击切换信息显示</gray>"
+sign_random_mode_lore:
+  - "<gray>点击切换随机播放模式</gray>"
+  - "<gray>当前状态: {status}</gray>"
+sign_playlist_editor_lore:
+  - "<gray>点击选择播放列表</gray>"
+
+stop_button: "<red>停止播放</red>"
+stop_button_lore:
+  - "<gray>点击停止当前播放</gray>"
+command_help_shop: "<gold>/musicboxplus shop</gold><dark_gray> - </dark_gray><yellow>打开唱片商店</yellow>"
+command_help_shop_player: "<gold>/musicboxplus shop player</gold><dark_gray> - </dark_gray><yellow>打开玩家音乐商店</yellow>"
+command_help_shop_publish: "<gold>/musicboxplus shop publish</gold><dark_gray> - </dark_gray><yellow>发布你的音乐</yellow>"
+command_help_shop_music: "<gold>/musicboxplus shopmusic</gold><dark_gray> - </dark_gray><yellow>打开玩家音乐/发布入口</yellow>"
+command_help_give: "<gold>/musicboxplus give</gold><dark_gray> - </dark_gray><yellow>获取一张唱片</yellow>"
+admin_help: "<gold>=== MusicBox 管理命令 ===</gold>"
+admin_help_shop: "<gold>/musicboxplus shop [player]</gold><dark_gray> - </dark_gray><yellow>为玩家打开商店</yellow>"
+admin_help_give: "<gold>/musicboxplus give [player]</gold><dark_gray> - </dark_gray><yellow>给玩家一张唱片</yellow>"
+admin_help_play: "<gold>/musicboxplus play [song] [player]</gold><dark_gray> - </dark_gray><yellow>为自己或其他玩家播放一首歌曲</yellow>"
+admin_help_stop: "<gold>/musicboxplus stop [player]</gold><dark_gray> - </dark_gray><yellow>为自己或其他玩家停止音乐</yellow>"
+admin_help_volume: "<gold>/musicboxplus volume [0-100] [player]</gold><dark_gray> - </dark_gray><yellow>修改播放音量</yellow>"
+admin_help_silent: "<gold>/musicboxplus silent [on,off,switch] [player]</gold><dark_gray> - </dark_gray><yellow>切换静音模式</yellow>"
+admin_help_mute: "<gold>/musicboxplus mute [player]</gold><dark_gray> - </dark_gray><yellow>静音一名玩家</yellow>"
+admin_help_reload: "<gold>/musicboxplus reload [type]</gold><dark_gray> - </dark_gray><yellow>重载插件配置</yellow>"
+admin_help_tag: "<gold>/musicboxplus tag</gold><dark_gray> - </dark_gray><yellow>管理歌曲标签和外观</yellow>"
+admin_help_textplayer: "<gold>/musicboxplus textplayer</gold><dark_gray> - </dark_gray><yellow>管理文字播放器</yellow>"
+
+tag_usage_title: "<gold>=== 歌曲标签命令 ===</gold>"
+tag_usage_addalias: "<yellow>/musicboxplus tag <song> addalias <alias></yellow><gray> - 为歌曲添加别名</gray>"
+tag_usage_removealias: "<yellow>/musicboxplus tag <song> removealias <alias></yellow><gray> - 从歌曲移除别名</gray>"
+tag_usage_addtag: "<yellow>/musicboxplus tag <song> addtag <tag></yellow><gray> - 为歌曲添加标签</gray>"
+tag_usage_removetag: "<yellow>/musicboxplus tag <song> removetag <tag></yellow><gray> - 从歌曲移除标签</gray>"
+tag_usage_list: "<yellow>/musicboxplus tag <song> list</yellow><gray> - 显示歌曲的别名和标签</gray>"
+tag_usage_aliases: "<red>用法: /musicboxplus tag aliases <song></red>"
+tag_usage_tags: "<red>用法: /musicboxplus tag tags <song></red>"
+tag_usage_search: "<red>用法: /musicboxplus tag search <tag></red>"
+tag_help_title: "<gold>=== 歌曲标签帮助 ===</gold>"
+tag_help_list: "<yellow>/musicboxplus tag list</yellow><gray> - 列出歌曲的别名和标签</gray>"
+tag_help_aliases: "<yellow>/musicboxplus tag aliases <song></yellow><gray> - 显示歌曲别名</gray>"
+tag_help_tags: "<yellow>/musicboxplus tag tags <song></yellow><gray> - 显示歌曲标签</gray>"
+tag_help_addalias: "<yellow>/musicboxplus tag addalias <song> <alias></yellow><gray> - 添加别名</gray>"
+tag_help_removealias: "<yellow>/musicboxplus tag removealias <song> <alias></yellow><gray> - 移除别名</gray>"
+tag_help_addtag: "<yellow>/musicboxplus tag addtag <song> <tag></yellow><gray> - 添加标签</gray>"
+tag_help_removetag: "<yellow>/musicboxplus tag removetag <song> <tag></yellow><gray> - 移除标签</gray>"
+tag_help_search: "<yellow>/musicboxplus tag search <tag></yellow><gray> - 按标签搜索歌曲</gray>"
+tag_help_reload: "<yellow>/musicboxplus tag reload</yellow><gray> - 重载标签配置</gray>"
+tag_song_list: "<gold>=== 歌曲列表 ({count}) ===</gold>"
+tag_song_not_found: "<red>未找到歌曲: {song}</red>"
+tag_aliases_title: "<gold>=== {song} 的别名 ===</gold>"
+tag_no_aliases: "<gray>这首歌没有别名</gray>"
+tag_tags_title: "<gold>=== {song} 的标签 ===</gold>"
+tag_no_tags: "<gray>这首歌没有标签</gray>"
+tag_alias_added: "<green>已添加别名 </green><yellow>{alias}</yellow><gray> -> </gray><white>{song}</white>"
+tag_alias_removed: "<green>已从 </green><white>{song}</white><gray> 移除别名 </gray><yellow>{alias}</yellow>"
+tag_tag_added: "<green>已添加标签 </green><aqua>{tag}</aqua><gray> -> </gray><white>{song}</white>"
+tag_tag_removed: "<green>已从 </green><white>{song}</white><gray> 移除标签 </gray><aqua>{tag}</aqua>"
+tag_search_title: "<gold>=== 拥有标签 '</gold><aqua>{tag}</aqua><gold>' 的歌曲 ({count}) ===</gold>"
+tag_no_matches: "<gray>没有歌曲匹配该标签</gray>"
+tag_config_reloaded: "<green>标签配置已重载</green>"
+tag_alias_not_found: "<red>在 </red><white>{song}</white><gray> 上未找到别名 </gray><yellow>{alias}</yellow>"
+tag_tag_not_found: "<red>在 </red><white>{song}</white><gray> 上未找到标签 </gray><aqua>{tag}</aqua>"
+tag_list_header: "<gold>=== {song} 的歌曲标签 ===</gold>"
+tag_list_aliases: "<yellow>别名: </yellow><white>{aliases}</white>"
+tag_list_tags: "<aqua>标签: </aqua><white>{tags}</white>"
+tag_note: "<gray>使用歌曲别名和标签可以改善搜索结果。</gray>"
+tag_usage_setmaterial: "<yellow>/musicboxplus tag <song> setmaterial <MATERIAL></yellow><gray> - 设置自定义物品材质</gray>"
+tag_usage_setmodeldata: "<yellow>/musicboxplus tag <song> setmodeldata <number></yellow><gray> - 设置自定义模型数据</gray>"
+tag_usage_setitemmodel: "<yellow>/musicboxplus tag <song> setitemmodel <namespace:key></yellow><gray> - 设置自定义物品模型</gray>"
+tag_usage_setcraftengineitem: "<yellow>/musicboxplus tag <song> setcraftengineitem <namespace:key></yellow><gray> - 设置 CraftEngine 自定义物品外观</gray>"
+tag_usage_setjukebox: "<yellow>/musicboxplus tag <song> setjukebox <key></yellow><gray> - 设置唱片机播放键</gray>"
+tag_set_material: "<green>已将 </green><yellow>{song}</yellow><green> 的自定义材质设置为 </green><white>{material}</white>"
+tag_set_modeldata: "<green>已将 </green><yellow>{song}</yellow><green> 的自定义模型数据设置为 </green><white>{modelData}</white>"
+tag_set_itemmodel: "<green>已将 </green><yellow>{song}</yellow><green> 的物品模型设置为 </green><white>{itemModel}</white>"
+tag_set_craftengineitem: "<green>已将 </green><yellow>{song}</yellow><green> 的 CraftEngine 物品设置为 </green><white>{item}</white>"
+tag_set_jukebox: "<green>已将 </green><yellow>{song}</yellow><green> 的唱片机播放键设置为 </green><white>{key}</white>"
+tag_invalid_number: "<red>无效的数字，请输入一个有效的整数。</red>"
+tag_usage_unset: "<yellow>/musicboxplus tag <song> unset <material|modeldata|itemmodel|craftengineitem|jukebox></yellow><gray> - 清除某项自定义外观设置</gray>"
+tag_unset: "<green>已清除 </green><yellow>{song}</yellow><green> 的 </green><white>{field}</white><green> 设置</green>"
+tag_unset_unknown_field: "<red>未知字段: </red><white>{field}</white><gray> (material, modeldata, itemmodel, craftengineitem, jukebox)</gray>"
+play_feedback_self: "<green>正在播放 </green><yellow>{song}</yellow><gray> [{mode}, {silent}]</gray>"
+play_feedback_other: "<green>正在为 </green><yellow>{player}</yellow><green> 播放 </green><yellow>{song}</yellow><gray> [{mode}, {silent}]</gray>"
+play_feedback_target: "<green>现在播放 </green><yellow>{song}</yellow><gray> [{mode}, {silent}]</gray>"
+play_mode_feedback: "<gray>播放模式已设置为 </gray><yellow>{mode}</yellow><gray>。</gray>"
+play_silent_feedback: "<gray>静音状态已设置为 </gray><yellow>{silent}</yellow><gray>。</gray>"
+play_silent_state_silent: "静音"
+play_silent_state_audible: "可听"
+
+# ===== 以下键此前缺失，会回退到英文；补齐于 2026-07-31 =====
+
+# --- 通用 / 经济 / 唱片 ---
+chill_chill_man: "<red>正在保存，请稍候。</red>"
+playlist_song_num: "<gray>#{num}</gray>"
+no_has_money: "<gold>你的金钱不足：</gold><yellow>{amount}</yellow><gold>。</gold>"
+no_inventory_space: "<red>你的背包已满。</red>"
+disc_purchased: "<gold>你购买了唱片 </gold><yellow>{disc}</yellow><gold>。</gold>"
+disc_music_unavailable: "<red>这张唱片对应的音乐已不存在。</red>"
+you_get_disc: "<gold>你获得了唱片 </gold><yellow>{disc}</yellow><gold>。</gold>"
+sign_not_owner: "<red>你不是这个告示牌的所有者。</red>"
+sign_master_text: "MusicBox"
+container_added: "<green>已向 </green><yellow>{container}</yellow><green> 添加 </green><yellow>{count}</yellow><green> 张唱片。</green>"
+reload_time: "<gray>重载完成，耗时 {time}ms</gray>"
+reload_success_with_time: "<green>重载完成，耗时 </green><yellow>{time}ms</yellow><green>。</green>"
+silent_mode_response: "<gold>已将 </gold><yellow>{player}</yellow><gold> 的静音模式设为 {state}</gold>"
+muted: "<gold>已静音玩家 </gold><yellow>{player}</yellow><gold>。</gold>"
+
+# --- 音乐编辑：创建 / 删除 / 列表 ---
+edit_create_usage: |
+  <gold>========================================</gold>
+  <gold> 创建乐曲</gold>
+  <gray> 用法：</gray><yellow>/musicbox edit create <名称></yellow>
+  <gold>========================================</gold>
+edit_create_limit: |
+  <red>========================================</red>
+  <red> 你已达到乐曲数量上限</red>
+  <gray> 上限：</gray><yellow>{limit}</yellow>
+  <red>========================================</red>
+edit_create_exists: |
+  <red>========================================</red>
+  <red> 该乐曲名称已存在</red>
+  <gray> “{name}” 已被占用</gray>
+  <red>========================================</red>
+edit_create_success: |
+  <green>========================================</green>
+  <green> 乐曲创建成功</green>
+  <gray> 名称：</gray><yellow>{name}</yellow>
+  <gray> 现在可以在编辑器中打开它</gray>
+  <green>========================================</green>
+edit_create_failed_msg: |
+  <red>========================================</red>
+  <red> 创建乐曲失败</red>
+  <gray> 请稍后重试</gray>
+  <red>========================================</red>
+edit_delete_usage: |
+  <gold>========================================</gold>
+  <gold> 删除乐曲</gold>
+  <gray> 用法：</gray><yellow>/musicbox edit delete <名称></yellow>
+  <gold>========================================</gold>
+edit_delete_not_found: |
+  <red>========================================</red>
+  <red> 未找到该乐曲</red>
+  <gray> “{name}” 不存在</gray>
+  <red>========================================</red>
+edit_delete_success: |
+  <green>========================================</green>
+  <green> 乐曲删除成功</green>
+  <gray> 名称：</gray><yellow>{name}</yellow>
+  <green>========================================</green>
+edit_delete_failed_msg: |
+  <red>========================================</red>
+  <red> 删除乐曲失败</red>
+  <gray> 请稍后重试</gray>
+  <red>========================================</red>
+edit_delete_cancelled: |
+  <yellow>========================================</yellow>
+  <yellow> 已取消删除</yellow>
+  <gray> 该乐曲未被移除</gray>
+  <yellow>========================================</yellow>
+edit_list_empty_msg: |
+  <gold>========================================</gold>
+  <gold> 你还没有任何乐曲</gold>
+  <gray> 用 </gray><yellow>/musicbox edit create</yellow><gray> 创建一首</gray>
+  <gold>========================================</gold>
+edit_list_header: "<gold>========================================</gold>"
+edit_list_title_msg: "<gold> 你的乐曲（</gold><yellow>{count}</yellow><gold>）</gold>"
+edit_list_item_msg: "<gold> </gold><green>{num}.</green><yellow> {name}</yellow><gray>（{notes} 个音符）</gray>"
+edit_list_footer: "<gold>========================================</gold>"
+
+# --- 音乐编辑：帮助 ---
+edit_help_header: "<gold>========================================</gold>"
+edit_help_title: "<gold> 音乐编辑帮助</gold>"
+edit_help_edit: "<gold> </gold><yellow>/musicboxplus edit</yellow><gray> - 打开乐曲编辑器</gray>"
+edit_help_create: "<gold> </gold><yellow>/musicboxplus edit create <名称></yellow><gray> - 创建新乐曲</gray>"
+edit_help_select: "<gold> </gold><yellow>/musicboxplus edit select <名称></yellow><gray> - 选择乐曲</gray>"
+edit_help_delete: "<gold> </gold><yellow>/musicboxplus edit delete <名称></yellow><gray> - 删除乐曲</gray>"
+edit_help_rename: "<gold> </gold><yellow>/musicboxplus edit rename <旧名> <新名></yellow><gray> - 重命名乐曲</gray>"
+edit_help_list: "<gold> </gold><yellow>/musicboxplus edit list</yellow><gray> - 列出你的乐曲</gray>"
+edit_help_import: "<gold> </gold><yellow>/musicboxplus edit import <文件></yellow><gray> - 导入 .nbs 或 .mid 文件</gray>"
+edit_help_web: "<gold> </gold><yellow>/musicboxplus edit web <名称></yellow><gray> - 打开网页编辑器</gray>"
+edit_help_footer: "<gold>========================================</gold>"
+
+# --- GUI 聊天输入 ---
+gui_input_prompt: "<gold>请在聊天栏输入内容。</gold>"
+gui_input_cancel: "<gray>输入 cancel 可取消。</gray>"
+gui_input_cancelled: "<yellow>已取消输入</yellow>"
+gui_input_invalid: "<red>输入无效：{reason}</red>"
+gui_input_error: "<red>输入出错：{error}</red>"
+control_panel_title: "<gold>控制面板 </gold><dark_gray>- </dark_gray><yellow>{song}</yellow>"
+
+# --- 编辑锁 / 额度 ---
+edit_locked: "<red>这首音乐正在被 </red><yellow>{player}</yellow><red> 编辑。</red>"
+edit_locked_hint: "<red>请等待对方编辑完成。</red>"
+edit_locked_offline_hint: "<gray>如果对方已离线，锁会自动解除。</gray>"
+limit_current: "<gray>当前用量：</gray><yellow>{current}/{limit}</yellow>"
+limit_unlimited: "<gray>当前用量：</gray><yellow>{current}/无限制</yellow>"
+limit_upgrade_hint: "<gray>使用权限 </gray><yellow>musicboxplus.edit.limit.X</yellow><gray> 可提高上限</gray>"
+
+# --- 告示牌保护 ---
+control_protect_enabled: "<green>保护：已启用</green>"
+control_protect_disabled: "<red>保护：已禁用</red>"
+control_protect_status: "<gray>状态：{status}</gray>"
+control_protect_click: "<gray>点击切换保护状态</gray>"
+control_protect_close_hint: "<yellow>再次点击以关闭</yellow>"
+control_protect_open_hint: "<yellow>点击以启用告示牌保护</yellow>"
+
+# --- 扩展八度 ---
+extended_octave_disabled: "<red>本服务器已禁用扩展八度。</red>"
+extended_octave_range: "<gray>允许的音符范围：</gray><yellow>{note}</yellow><gray>（0-24）</gray>"
+extended_octave_config: "<gray>在 config.yml 中启用 </gray><yellow>enable10octave</yellow><gray> 以使用此功能。</gray>"
+
+# --- 编辑器输入提示 ---
+edit_input_name_prompt: "<green>请在聊天栏输入新的音乐名称：</green>"
+edit_input_price_prompt: "<green>请输入新的价格（当前：{price}）：</green>"
+edit_input_description_prompt: "<green>请输入简介（当前：{description}）：</green>"
+edit_input_cancelled: "<yellow>操作已取消。</yellow>"
+edit_input_empty: "<red>输入内容不能为空</red>"
+edit_input_cancel_hint: "<gray>输入 cancel 可取消</gray>"
+edit_input_empty_retry: "<red>输入内容不能为空，请重试或输入 cancel 取消。</red>"
+edit_input_search_prompt: "<green>请在聊天栏输入搜索关键词（输入 all 显示全部）：</green>"
+edit_input_generic_prompt: "<green>请在聊天栏输入内容：</green>"
+edit_input_description_prompt_alt: "<green>请在聊天栏输入简介（输入 cancel 取消）：</green>"
+save_failed_retry: "<red>保存失败，请稍后重试。</red>"
+edit_name_updated: "<green>名称已更新：</green><white>{name}</white>"
+edit_description_updated: "<green>简介已更新。</green>"
+operation_failed: "<red>操作失败。</red>"
+
+# --- NBS 导入 ---
+nbs_input_prompt: "<green>请输入 NBS 文件名（不含扩展名）：</green>"
+nbs_file_location: "<gray>请将 NBS 文件放入插件数据文件夹。</gray>"
+nbs_filename_empty: "<red>文件名不能为空。</red>"
+nbs_file_not_found: "<red>未找到 NBS 文件：</red><yellow>{filename}</yellow>"
+nbs_file_location_hint: "<gray>请将 NBS 文件放到 </gray><yellow>{path}</yellow>"
+nbs_import_success: "<green>NBS 文件导入成功：</green><yellow>{name}</yellow>"
+nbs_import_info: "<gray>音符数：</gray><yellow>{notes}</yellow><gray> | BPM：</gray><yellow>{bpm}</yellow>"
+nbs_import_failed: "<red>NBS 文件导入失败：</red><yellow>{error}</yellow>"
+
+# --- 通用导入 / 导出 ---
+import_usage: "<gray>用法：</gray><yellow>/musicboxplus edit import <文件></yellow>"
+import_input_prompt: "<green>请输入要导入的文件名（.nbs、.mid 或 .midi，扩展名可省略）：</green>"
+import_file_location: "<gray>请将文件放入插件数据文件夹。</gray>"
+import_filename_empty: "<red>文件名不能为空。</red>"
+import_file_not_found: "<red>未找到导入文件：</red><yellow>{filename}</yellow>"
+import_file_location_hint: "<gray>请将文件放到 </gray><yellow>{path}</yellow>"
+import_unsupported_format: "<red>不支持的导入格式，请使用 .nbs、.mid 或 .midi。</red>"
+import_success: "<green>{format} 文件导入成功：</green><yellow>{name}</yellow>"
+import_info: "<gray>音符数：</gray><yellow>{notes}</yellow><gray> | BPM：</gray><yellow>{bpm}</yellow><gray> | 网格：</gray><yellow>1/{subdivision}</yellow>"
+import_failed: "<red>文件导入失败：</red><yellow>{error}</yellow>"
+import_warning_tempo_changes: "<yellow>该 MIDI 含有变速，MusicBox 仅按初始 BPM 导入。</yellow>"
+import_warning_pitch_clamped: "<yellow>部分音符超出可播放音高范围，导入时已被钳制。</yellow>"
+export_usage: "<gray>用法：</gray><yellow>/musicboxplus edit export <名称></yellow>"
+export_success: "<green>已将 </green><yellow>{name}</yellow><green> 导出为 </green><yellow>{file}</yellow><green>。</green><gray> 路径：</gray><yellow>{path}</yellow>"
+export_failed: "<red>NBS 文件导出失败：</red><yellow>{error}</yellow>"
+export_warning_pitch_clamped: "<yellow>部分音符在导出时被钳制到 NBS 音高范围内。</yellow>"
+
+# --- GUI 标题 ---
+recent_songs_title: "<gold>最近播放 </gold><gray>({page}/{last_page})</gray>"
+recent_songs_buy_title: "<gold>最近购买 </gold><gray>({page}/{last_page})</gray>"
+playlist_editor_title: "<gold>播放列表编辑器 </gold><dark_gray>- </dark_gray><yellow>{playlist}</yellow><gray> ({page}/{last_page})</gray>"
+playlist_list_title: "<gold>播放列表 </gold><gray>({page}/{last_page})</gray>"
+
+# --- 发布 / 下架 ---
+unpublish_success: "<red>乐曲已成功下架。</red>"
+republish_success: "<green>乐曲已重新上架。</green>"
+publish_delete_success: "<red>已删除发布的乐曲。</red>"
+publish_update_success: "<green>发布信息更新成功。</green>"
+publish_update_failed: "<red>发布信息更新失败。</red>"
+publish_price_prompt: "<green>请在聊天栏输入新的发布价格（当前：</green><yellow>{current}</yellow><green>）：</green>"
+publish_description_prompt: "<green>请在聊天栏输入发布简介（输入 cancel 取消）：</green>"
+
+# --- 音符编辑操作 ---
+edit_note_extended_octave_only_delete: "<red>扩展八度的音符只能删除，不能移动。</red>"
+edit_clear_cancelled: "<green>已取消清空操作</green>"
+edit_no_notes_to_clear: "<red>没有可清空的音符。</red>"
+edit_no_selection: "<red>你尚未选中任何音符。</red>"
+edit_notes_copied: "<green>已复制 </green><yellow>{count}</yellow><green> 个音符。</green>"
+edit_clipboard_empty: "<red>剪贴板为空。</red>"
+edit_notes_pasted: "<green>已粘贴 </green><yellow>{count}</yellow><green> 个音符。</green>"
+edit_paste_cancelled: "<red>已取消粘贴。</red>"
+edit_paste_no_space: "<red>此处空间不足，无法粘贴这些音符。</red>"
+edit_notes_deleted: "<green>已删除 </green><yellow>{count}</yellow><green> 个音符。</green>"
+edit_instrument_changed: "<green>已将 </green><yellow>{count}</yellow><green> 个音符的乐器改为 </green><yellow>{instrument}</yellow><green>。</green>"
+dont_forget_to_save: "<yellow>别忘了保存你的更改</yellow>"
+
+# --- 播放列表编辑 ---
+save_playlist_change: "<green>保存播放列表更改</green>"
+delete_playlist: "<red>删除播放列表</red>"
+shuffle_playlist: "<aqua>随机播放列表</aqua>"
+add_music_to_playlist_item: "<yellow>添加音乐到播放列表</yellow>"
+sign_playlist_editor: "<gold>告示牌播放列表编辑器</gold>"
+in_playlist: "<gray>已在播放列表中</gray>"
+click_to_add: "<yellow>点击添加</yellow>"
+right_click_add_all: "<yellow>右键添加全部</yellow>"
+
+# --- 别名 / 标签 ---
+tag_added_alias: "<green>已为 </green><yellow>{song}</yellow><green> 添加别名 </green><yellow>{alias}</yellow>"
+tag_removed_alias: "<green>已从 </green><yellow>{song}</yellow><green> 移除别名 </green><yellow>{alias}</yellow>"
+tag_added_tag: "<green>已为 </green><yellow>{song}</yellow><green> 添加标签 </green><yellow>{tag}</yellow>"
+tag_removed_tag: "<green>已从 </green><yellow>{song}</yellow><green> 移除标签 </green><yellow>{tag}</yellow>"
+
+# --- lore 列表（此前遗漏，值为 YAML 列表而非标量）---
+playlist_item_lore:
+  - "<gray>左键播放该播放列表</gray>"
+  - "<gray>右键编辑该播放列表</gray>"
+search_song_lore:
+  - "<gray>点击播放这首歌</gray>"
+click_to_play_container:
+  - "<gray>点击从容器中播放这张唱片</gray>"

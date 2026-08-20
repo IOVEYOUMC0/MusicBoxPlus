@@ -1,0 +1,2123 @@
+# =====================================================
+# 全局设置
+# =====================================================
+
+# GUI 标题关键词
+# 用于识别插件打开的 GUI，并在重载或切换流程中安全关闭相关 GUI
+gui-title-keywords:
+  - "MusicBox"
+  - "Playlist"
+  - "Control"
+  - "Volume"
+  - "Search"
+  - "播放列表"
+  - "控制"
+  - "音量"
+  - "搜索"
+  - "歌曲"
+  - "Song"
+  - "Sign"
+  - "编辑器"
+
+# =====================================================
+# 编辑菜单
+# =====================================================
+edit-menu:
+  title: "<gold>音乐编辑菜单</gold>"
+  layout: |
+    XXXCXXXXX
+    XSXDXRXXX
+    XXXLIEXXX
+    XXXXBXXXX
+  button-mapping:
+    create: "C"
+    select: "S"
+    delete: "D"
+    rename: "R"
+    list: "L"
+    import: "I"
+    export: "E"
+    back: "B"
+  buttons:
+    create:
+      material: "EMERALD"
+      name: "<green>创建新音乐</green>"
+      lore:
+        - "<gray>创建一首新的音乐</gray>"
+        - "<gray>用法: /musicboxplus edit create <名称></gray>"
+      custom-model-data: 0
+    select:
+      material: "NOTE_BLOCK"
+      name: "<yellow>选择音乐编辑</yellow>"
+      lore:
+        - "<gray>选择已有音乐进行编辑</gray>"
+        - "<gray>用法: /musicboxplus edit select <名称></gray>"
+      custom-model-data: 0
+    delete:
+      material: "REDSTONE"
+      name: "<red>删除音乐</red>"
+      lore:
+        - "<gray>删除一首音乐</gray>"
+        - "<gray>用法: /musicboxplus edit delete <名称></gray>"
+      custom-model-data: 0
+    rename:
+      material: "NAME_TAG"
+      name: "<yellow>重命名音乐</yellow>"
+      lore:
+        - "<gray>选择一首音乐并输入新名称</gray>"
+        - "<gray>用法: /musicboxplus edit rename <旧名称> <新名称></gray>"
+      custom-model-data: 0
+    list:
+      material: "BOOK"
+      name: "<aqua>音乐列表</aqua>"
+      lore:
+        - "<gray>查看所有音乐</gray>"
+      custom-model-data: 0
+    import:
+      material: "MUSIC_DISC_CAT"
+      name: "<light_purple>导入音乐文件</light_purple>"
+      lore:
+        - "<gray>从 NBS 或 MIDI 文件导入音乐</gray>"
+        - "<gray>用法: /musicboxplus edit import <文件名></gray>"
+        - "<gray>支持 .nbs / .mid / .midi</gray>"
+        - "<gray>文件放在插件目录中</gray>"
+      custom-model-data: 0
+    export:
+      material: "MUSIC_DISC_11"
+      name: "<aqua>导出为 NBS</aqua>"
+      lore:
+        - "<gray>导出当前音乐为 NBS 文件</gray>"
+      custom-model-data: 0
+    back:
+      material: "BARRIER"
+      name: "<red>返回</red>"
+      lore:
+        - "<gray>点击返回</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 粘贴预览界面
+# =====================================================
+paste-preview:
+  title: "<gold>粘贴预览: {count}个音符</gold>"
+  layout: |
+    XXXXIXXXX
+    XXXXCXXXX
+    XXXXBXXXX
+  button-mapping:
+    info: "I"
+    confirm: "C"
+    cancel: "B"
+  buttons:
+    info:
+      material: "BOOK"
+      name: "<yellow>信息</yellow>"
+      lore:
+        - "<gray>确认或取消下方的粘贴操作</gray>"
+      custom-model-data: 0
+    confirm:
+      material: "LIME_STAINED_GLASS_PANE"
+      name: "<green>确认粘贴</green>"
+      lore:
+        - "<gray>粘贴剪贴板中的音符</gray>"
+      custom-model-data: 0
+    cancel:
+      material: "RED_STAINED_GLASS_PANE"
+      name: "<red>取消</red>"
+      lore:
+        - "<gray>取消粘贴操作</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 清空确认界面（玩家背包显示）
+# =====================================================
+clear-confirm:
+  button-mappings:
+    confirm: 0
+    info: 4
+    cancel: 8
+  buttons:
+    info:
+      material: "BOOK"
+      name: "<yellow>警告</yellow>"
+      lore:
+        - "<gray>将删除 <red>{count}</red> <gray>个音符</gray>"
+        - "<red>此操作不可撤销!</red>"
+      custom-model-data: 0
+    confirm:
+      material: "RED_STAINED_GLASS_PANE"
+      name: "<red>确认清空</red>"
+      lore:
+        - "<gray>点击确认清空所有音符</gray>"
+      custom-model-data: 0
+    cancel:
+      material: "LIME_STAINED_GLASS_PANE"
+      name: "<green>取消</green>"
+      lore:
+        - "<gray>点击取消操作</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# GUI 布局配置
+# =====================================================
+
+gui:
+  # 主歌曲列表 GUI
+  song-list:
+    rows: 6
+    title: "<gold>音乐</gold> <dark_gray>-</dark_gray> <yellow>{container}</yellow> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    # 可自定义布局字符，请避免重复字符
+    button-mapping:
+      songs: "S"           # 歌曲区域
+      previous: "P"        # 上一页
+      next: "N"            # 下一页
+      parent: "F"          # 父目录
+      search: "H"          # 搜索
+      control-panel: "C"   # 控制面板
+      playlist: "L"        # 播放列表
+      stop: "T"            # 停止
+      volume: "V"          # 音量
+      speed: "Y"           # 播放速度
+      recent-songs: "R"    # 最近播放
+      play-pause: "A"      # 播放/暂停
+      play-mode: "M"       # 播放模式（静音/扬声器）
+      empty: "X"           # 空位
+    
+    layout: |
+      FXXXHXXXR
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      PYVCATLMN
+
+  # 文字播放器选歌 GUI
+  textplayer-songs:
+    rows: 6
+    title: "<gold>文字播放器选歌</gold> <dark_gray>-</dark_gray> <yellow>{container}</yellow> <gray>({page}/{last_page})</gray>"
+
+    button-mapping:
+      songs: "S"
+      previous: "P"
+      next: "N"
+      parent: "F"
+      search: "H"
+      empty: "X"
+
+    layout: |
+      FXXXHXXXX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      PXXXXXXXN
+
+  # 播放列表编辑器 GUI
+  playlist-editor:
+    rows: 6
+    title: "<gold>播放列表</gold> <dark_gray>-</dark_gray> <yellow>{playlist}</yellow> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    button-mapping:
+      songs: "S"           # 歌曲区域
+      back: "B"            # 上一页
+      next: "N"            # 下一页
+      add: "A"             # 添加
+      delete: "D"          # 删除
+      shuffle: "H"         # 随机
+      save: "V"            # 保存
+      return: "R"          # 返回列表
+      empty: "X"           # 空位
+    
+    layout: |
+      XXXXXXXXX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      BXADHVRXN
+
+  # 播放列表列表 GUI
+  playlist-list:
+    rows: 6
+    title: "<gold>播放列表编辑</gold> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    button-mapping:
+      playlist: "P"       # 播放列表页
+      back: "B"           # 返回主菜单
+      previous: "G"       # 上一页
+      next: "N"           # 下一页
+      empty: "X"          # 空位
+      create: "C"         # 创建
+      master: "M"         # 主播放列表
+      close: "L"          # 关闭
+    
+    layout: |
+      XXXXXXXXX
+      XPPPPPPPX
+      XPPPPPPPX
+      XPPPPPPPX
+      XPPPPPPPX
+      BGXXCMXNL
+
+  # 搜索结果 GUI
+  search-results:
+    rows: 6
+    title: "<gold>搜索:</gold> <yellow>{query}</yellow> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    button-mapping:
+      results: "R"        # 结果页
+      back: "B"           # 返回菜单
+      previous: "P"       # 上一页
+      next: "N"           # 下一页
+      empty: "X"          # 空位
+    
+    layout: |
+      XXXXXXXXX
+      XRRRRRRRX
+      XRRRRRRRX
+      XRRRRRRRX
+      XRRRRRRRX
+      BXXPXXNXX
+
+  # 最近播放 GUI
+  recent-songs:
+    rows: 6
+    title: "<gold>最近播放</gold> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    button-mapping:
+      songs: "S"          # 歌曲页
+      back: "B"           # 返回菜单
+      previous: "P"       # 上一页
+      next: "N"           # 下一页
+      empty: "X"          # 空位
+    
+    layout: |
+      XXXXXXXXX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      BXXPXXNXX
+
+  # 告示牌设置界面 GUI
+  sign-setup:
+    rows: 6
+    title: "<gold>告示牌设置</gold> <gray>({page}/{last_page})</gray>"
+    
+    # 按钮字符映射
+    button-mapping:
+      songs: "S"           # 歌曲区域
+      previous: "P"        # 上一页
+      next: "N"            # 下一页
+      parent: "B"          # 返回上级目录
+      prevent-destroy: "D" # 防止破坏
+      info-sign: "I"       # 信息按钮
+      random: "R"          # 随机按钮
+      playlist: "L"        # 播放列表编辑器
+      search: "F"          # 搜索
+      recent-songs: "H"    # 最近播放
+      empty: "X"           # 空位
+    
+    layout: |
+      BXXXFXXXH
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      XSSSSSSSX
+      PXIRXDLXN
+
+  # 控制面板GUI
+  control-panel:
+    rows: 3
+    title: "<gold>控制面板</gold> <dark_gray>-</dark_gray> <yellow>{song}</yellow>"
+    
+    # 按钮字符映射
+    button-mapping:
+      progress: "P"           # 进度条
+      song-list: "S"          # 歌曲列表
+      back: "B"               # 返回
+      play-pause: "A"         # 播放/暂停
+      stop: "T"               # 停止
+      loop: "L"               # 循环
+      volume: "V"             # 音量
+      speed: "Y"              # 播放速度
+      protect: "K"            # 防止破坏（告示牌专用）
+      empty: "X"              # 空位
+    
+    # 布局模式
+    # 第一行: P=进度条（代码中固定槽位0-8）
+    # 第二行: S=歌曲列表（代码中固定槽位9-17）
+    # 第三行: 按钮栏
+    layout: |
+      PPPPPPPPP
+      SSSSSSSSS
+      XBKVAYTLX
+    
+    progress-bar:
+      enabled: true
+      row: 0
+      start-col: 0
+      end-col: 9
+      # 进度状态材质
+      material-unplayed: "GRAY_STAINED_GLASS_PANE"
+      material-unplayed-model-data: 0
+      material-playing: "WHITE_STAINED_GLASS_PANE"
+      material-playing-model-data: 0
+      material-halfway: "LIME_STAINED_GLASS_PANE"
+      material-halfway-model-data: 0
+      material-played: "GREEN_STAINED_GLASS_PANE"
+      material-played-model-data: 0
+      # 进度显示格式
+      format: "<yellow>{percent}%</yellow> <gray>- {time}</gray>"
+      lore:
+        - "<gray>点击跳转到此位置</gray>"
+
+# =====================================================
+# 按钮配置
+# =====================================================
+
+buttons:
+  # GUI 导航按钮
+  previous:
+    material: "ARROW"
+    name: "<gold>上一页</gold>"
+    lore:
+      - "<gray>点击翻到上一页</gray>"
+    custom-model-data: 0
+
+  next:
+    material: "ARROW"
+    name: "<gold>下一页</gold>"
+    lore:
+      - "<gray>点击翻到下一页</gray>"
+    custom-model-data: 0
+
+  back:
+    material: "ARROW"
+    name: "<gold>返回</gold>"
+    lore:
+      - "<gray>点击返回</gray>"
+    custom-model-data: 0
+
+  parent-folder:
+    material: "TORCH"
+    name: "<gold>返回上级目录</gold>"
+    custom-model-data: 0
+
+  parent:
+    material: "TORCH"
+    name: "<gold>返回上级目录</gold>"
+    lore:
+      - "<gray>点击返回上级目录</gray>"
+    custom-model-data: 0
+
+  close:
+    material: "BARRIER"
+    name: "<red>关闭</red>"
+    lore:
+      - "<gray>点击关闭</gray>"
+    custom-model-data: 0
+
+  # 音乐控制按钮
+  play:
+    material: "EMERALD_BLOCK"
+    name: "<green>播放</green>"
+    lore:
+      - "<gray>点击恢复当前播放</gray>"
+    custom-model-data: 0
+
+  pause:
+    material: "REDSTONE_BLOCK"
+    name: "<red>暂停</red>"
+    lore:
+      - "<gray>点击暂停当前播放</gray>"
+    custom-model-data: 0
+
+  playback-unavailable:
+    material: "GRAY_DYE"
+    name: "<gray>此功能不可用</gray>"
+    lore:
+      - "<gray>原版自定义唱片使用的是原版唱片机播放。</gray>"
+      - "<gray>因此这里无法可靠地暂停或跳转进度。</gray>"
+    custom-model-data: 0
+
+  playback-unavailable-pause:
+    material: "GRAY_DYE"
+    name: "<gray>此功能不可用</gray>"
+    lore:
+      - "<gray>原版自定义唱片使用的是原版唱片机播放。</gray>"
+      - "<gray>因此这里无法可靠地暂停或恢复播放。</gray>"
+    custom-model-data: 0
+
+  playback-unavailable-loop:
+    material: "GRAY_DYE"
+    name: "<gray>此功能不可用</gray>"
+    lore:
+      - "<gray>原版自定义唱片使用的是原版唱片机播放。</gray>"
+      - "<gray>因此这里无法可靠地控制循环模式。</gray>"
+    custom-model-data: 0
+
+  playback-unavailable-progress:
+    material: "GRAY_STAINED_GLASS_PANE"
+    name: "<gray>进度不可用</gray>"
+    lore:
+      - "<gray>原版自定义唱片不会向插件暴露可靠进度。</gray>"
+      - "<gray>因此这里无法安全地跳转播放位置。</gray>"
+    custom-model-data: 0
+
+  # 模式切换按钮
+  play-mode:
+    material: "NOTE_BLOCK"
+    name: "<gold>播放模式</gold>"
+    lore:
+      - "<gray>当前播放模式状态</gray>"
+      - "<yellow>静音: {silent}</yellow>"
+      - "<yellow>扬声器: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>左键: 切换静音</yellow>"
+      - "<yellow>右键: 切换扬声器</yellow>"
+    custom-model-data: 0
+
+  play-mode-normal:
+    material: "NOTE_BLOCK"
+    name: "<gold>播放模式</gold>"
+    lore:
+      - "<gray>当前播放模式状态：</gray>"
+      - "<yellow>静音: {silent}</yellow>"
+      - "<yellow>扬声器: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>左键: 切换静音</yellow>"
+      - "<yellow>右键: 切换扬声器</yellow>"
+    custom-model-data: 0
+
+  play-mode-silent:
+    material: "GRAY_DYE"
+    name: "<gold>播放模式</gold>"
+    lore:
+      - "<gray>当前播放模式状态：</gray>"
+      - "<yellow>静音: {silent}</yellow>"
+      - "<yellow>扬声器: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>左键: 切换静音</yellow>"
+      - "<yellow>右键: 切换扬声器</yellow>"
+    custom-model-data: 0
+
+  play-mode-speaker:
+    material: "JUKEBOX"
+    name: "<gold>播放模式</gold>"
+    lore:
+      - "<gray>当前播放模式状态：</gray>"
+      - "<yellow>静音: {silent}</yellow>"
+      - "<yellow>扬声器: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>左键: 切换静音</yellow>"
+      - "<yellow>右键: 切换扬声器</yellow>"
+    custom-model-data: 0
+
+  speaker-mode:
+    material: "JUKEBOX"
+    name: "<gold>扬声器模式：{status}</gold>"
+    lore:
+      - "<gray>点击切换扬声器模式</gray>"
+      - "<gray>当前：{status}</gray>"
+    custom-model-data: 0
+
+  speaker-mode-on:
+    material: "JUKEBOX"
+    name: "<gold>扬声器模式：{status}</gold>"
+    lore:
+      - "<gray>点击切换扬声器模式</gray>"
+      - "<gray>当前：{status}</gray>"
+    custom-model-data: 0
+
+  speaker-mode-off:
+    material: "NOTE_BLOCK"
+    name: "<gold>扬声器模式：{status}</gold>"
+    lore:
+      - "<gray>点击切换扬声器模式</gray>"
+      - "<gray>当前：{status}</gray>"
+    custom-model-data: 0
+
+  speaker-mode-no-permission:
+    material: "BARRIER"
+    name: "<gold>扬声器模式：{status}</gold>"
+    lore:
+      - "<red>你没有使用扬声器的权限。</red>"
+    custom-model-data: 0
+
+  # 播放列表按钮
+  playlist:
+    material: "BOOK"
+    name: "<gold>播放列表</gold>"
+    lore:
+      - "<gray>点击打开播放列表</gray>"
+    custom-model-data: 0
+
+  # 控制面板按钮
+  control-panel:
+    material: "REDSTONE_TORCH"
+    name: "<gold>控制面板</gold>"
+    lore:
+      - "<gray>点击打开控制面板</gray>"
+    custom-model-data: 0
+
+  control-panel-playing:
+    material: "REDSTONE_TORCH"
+    name: "<gold>控制面板</gold>"
+    lore:
+      - "<gray>播放状态：<yellow>{status}</yellow></gray>"
+      - ""
+      - "<yellow>左键: 打开面板</yellow>"
+    custom-model-data: 0
+
+  control-panel-paused:
+    material: "LEVER"
+    name: "<gold>控制面板</gold>"
+    lore:
+      - "<gray>播放状态：<yellow>{status}</yellow></gray>"
+      - ""
+      - "<yellow>左键: 打开面板</yellow>"
+    custom-model-data: 0
+
+  # 循环模式按钮（三种状态独立配置）
+  loop-mode-off:
+    material: "REDSTONE"
+    name: "<gold>循环模式: </gold><red>关闭</red>"
+    lore:
+      - "<gray>点击切换循环模式</gray>"
+      - "<gray>当前: </gray><red>关闭</red>"
+    custom-model-data: 0
+
+  loop-mode-single:
+    material: "REPEATER"
+    name: "<gold>循环模式: </gold><yellow>单曲循环</yellow>"
+    lore:
+      - "<gray>点击切换循环模式</gray>"
+      - "<gray>当前: </gray><yellow>单曲循环</yellow>"
+    custom-model-data: 0
+
+  loop-mode-all:
+    material: "COMPARATOR"
+    name: "<gold>循环模式: </gold><green>列表循环</green>"
+    lore:
+      - "<gray>点击切换循环模式</gray>"
+      - "<gray>当前: </gray><green>列表循环</green>"
+    custom-model-data: 0
+
+  # 防止破坏按钮（告示牌专用）
+  protect-enabled:
+    material: "SHIELD"
+    name: "<green>防止破坏: 开启</green>"
+    lore:
+      - "<gray>当前状态: </gray><green>开启</green>"
+      - "<gray>点击切换防止破坏模式</gray>"
+      - "<yellow>再次点击可关闭</yellow>"
+    custom-model-data: 0
+
+  protect-disabled:
+    material: "LEATHER"
+    name: "<red>防止破坏: 关闭</red>"
+    lore:
+      - "<gray>当前状态: </gray><red>关闭</red>"
+      - "<gray>点击切换防止破坏模式</gray>"
+      - "<yellow>开启后告示牌不会被破坏</yellow>"
+    custom-model-data: 0
+
+  # 搜索按钮
+  search:
+    material: "COMPASS"
+    name: "<gold>搜索音乐</gold>"
+    lore:
+      - "<gray>点击搜索音乐</gray>"
+    custom-model-data: 0
+
+  # 最近播放按钮
+  recent-songs:
+    material: "CLOCK"
+    name: "<gold>最近播放</gold>"
+    lore:
+      - "<gray>最近播放：<yellow>{count}</yellow> <gray>首歌曲</gray>"
+    custom-model-data: 0
+
+  recent-songs-empty:
+    material: "CLOCK"
+    name: "<gold>最近播放</gold>"
+    lore:
+      - "<gray>当前没有最近播放记录</gray>"
+    custom-model-data: 0
+
+  # 特殊项目
+  master-playlist:
+    material: "ENCHANTED_BOOK"
+    name: "<gold>主播放列表</gold>"
+    lore:
+      - "<gold>所有歌曲（随机打乱）</gold>"
+    custom-model-data: 0
+
+  # 告示牌设置按钮
+  random-mode:
+    material: "MUSIC_DISC_13"
+    name: "<gold>随机模式: {status}</gold>"
+    lore:
+      - "<gray>点击切换随机播放模式</gray>"
+      - "<gray>当前状态: {status}</gray>"
+    custom-model-data: 0
+
+  info-sign-mode:
+    material: "OAK_SIGN"
+    name: "<gold>信息告示牌: {status}</gold>"
+    lore:
+      - "<gold>当播放音乐时</gold>"
+      - "<gold>显示歌曲信息</gold>"
+    custom-model-data: 0
+
+  prevent-destroy:
+    material: "IRON_BLOCK"
+    name: "<gold>防止破坏: {status}</gold>"
+    lore:
+      - "<gold>当没有人收听时</gold>"
+      - "<gold>防止告示牌被破坏</gold>"
+    custom-model-data: 0
+
+  # 播放列表编辑器按钮
+  create-playlist:
+    material: "WRITABLE_BOOK"
+    name: "<green>创建播放列表</green>"
+    lore:
+      - "<gray>点击创建新播放列表</gray>"
+    custom-model-data: 0
+
+  shuffle-playlist:
+    material: "MUSIC_DISC_13"
+    name: "<gold>随机打乱播放列表</gold>"
+    lore:
+      - "<gray>点击随机打乱当前列表</gray>"
+    custom-model-data: 0
+
+  add-music-to-playlist:
+    material: "SUNFLOWER"
+    name: "<green>添加音乐到播放列表</green>"
+    lore:
+      - "<yellow>别忘了保存！</yellow>"
+    custom-model-data: 0
+
+  save-playlist-change:
+    material: "PAPER"
+    name: "<gold>保存更改！</gold>"
+    lore:
+      - "<gray>点击保存当前播放列表更改</gray>"
+    custom-model-data: 0
+
+  delete-playlist:
+    material: "LAVA_BUCKET"
+    name: "<red>删除播放列表</red>"
+    lore:
+      - "<gray>点击删除当前播放列表</gray>"
+    custom-model-data: 0
+
+  # 音量控制按钮
+  volume-control:
+    material: "NOTE_BLOCK"
+    name: "<gold>音量控制</gold>"
+    lore:
+      - "<yellow>当前音量: {volume}%</yellow>"
+      - "<reset>"
+      - "<green>左键: 增加音量 (+10%)</green>"
+      - "<red>右键: 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level:
+    material: "NOTE_BLOCK"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level-muted:
+    material: "BARRIER"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level-low:
+    material: "RED_WOOL"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level-medium:
+    material: "ORANGE_WOOL"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level-high:
+    material: "YELLOW_WOOL"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  volume-level-full:
+    material: "GREEN_WOOL"
+    name: "<yellow>音量：{volume}%</yellow>"
+    lore:
+      - "<green>左键 增加音量 (+10%)</green>"
+      - "<red>右键 减少音量 (-10%)</red>"
+    custom-model-data: 0
+
+  # 播放速度按钮
+  speed-control:
+    material: "CLOCK"
+    name: "<gold>播放速度</gold>"
+    lore:
+      - "<yellow>当前速度: {speed}</yellow>"
+      - "<reset>"
+      - "<green>左键: 加快 (+{step})</green>"
+      - "<red>右键: 减慢 (-{step})</red>"
+    custom-model-data: 0
+
+  # 停止播放按钮（唱片机/普通玩家）
+  stop:
+    material: "BARRIER"
+    name: "<red>停止播放</red>"
+    lore:
+      - "<gray>点击停止播放</gray>"
+    custom-model-data: 0
+
+  # 销毁播放器按钮（告示牌专用）
+  destroy:
+    material: "BARRIER"
+    name: "<red>销毁播放器</red>"
+    lore:
+      - "<gray>点击销毁此播放器</gray>"
+      - "<gray>并返回设置界面</gray>"
+    custom-model-data: 0
+
+# =====================================================
+# 歌曲物品配置
+# =====================================================
+
+song-item:
+  disc:
+    # Set custom-enabled: true and use a non-vanilla-disc material such as PAPER
+    # when you want the item model to provide the disc look without vanilla record UI.
+    custom-enabled: false
+    custom-material: "MUSIC_DISC_CAT"
+    custom-model-data: 0
+    # Optional 1.21.4+ item model key, for example "musicboxplus:custom_disc".
+    item-model: ""
+    use-random-disc: true
+    available-discs:
+      - "MUSIC_DISC_13"
+      - "MUSIC_DISC_CAT"
+      - "MUSIC_DISC_BLOCKS"
+      - "MUSIC_DISC_CHIRP"
+      - "MUSIC_DISC_FAR"
+      - "MUSIC_DISC_MALL"
+      - "MUSIC_DISC_MELLOHI"
+      - "MUSIC_DISC_STAL"
+      - "MUSIC_DISC_STRAD"
+      - "MUSIC_DISC_WAIT"
+      - "MUSIC_DISC_OTHERSIDE"
+      - "MUSIC_DISC_5"
+      - "MUSIC_DISC_PIGSTEP"
+      - "MUSIC_DISC_RELIC"
+  
+  name-format: "<gold>{song}</gold>"
+  lore-format:
+    - "<gold>时长</gold><dark_gray>: </dark_gray><yellow>{length}</yellow>"
+    - "<gold>作者</gold><dark_gray>: </dark_gray><yellow>{author}</yellow>"
+    - "<gold>原作者</gold><dark_gray>: </dark_gray><yellow>{original_author}</yellow>"
+  aliases-format: "<gray>别名: </gray><yellow>{aliases}</yellow>"
+  tags-format: "<gray>标签: </gray><aqua>{tags}</aqua>"
+  
+  # 商店模式下的额外描述
+  shop-lore:
+    - "<gray>点击购买此唱片</gray>"
+    - "<gray>价格: </gray><yellow>{price}</yellow>"
+  
+  # 获取模式下的额外描述
+  get-lore:
+    - "<gray>点击获取此唱片</gray>"
+  
+  # 搜索结果中的描述
+  search-lore:
+    - "<gray>点击播放此歌曲</gray>"
+  
+  # 最近播放中的描述
+  recent-lore:
+    - "<gray>点击播放</gray>"
+  
+  # 文件夹右键播放全部的描述
+  container-play-all-lore:
+    - "<yellow>右键播放全部</yellow>"
+
+  # 商店模式下文件夹右键购买全部的描述
+  container-buy-all-lore:
+    - "<yellow>右键购买文件夹内全部唱片</yellow>"
+    - "<gray>共 </gray><yellow>{count}</yellow><gray> 张唱片</gray>"
+    - "<gray>总价: </gray><yellow>{price}</yellow>"
+
+# =====================================================
+# 商店文件夹购买确认界面
+# =====================================================
+shop-container-purchase-confirm:
+  title: "<gold>购买文件夹: {folder}</gold>"
+  layout: |
+    XXXIXXXXX
+    XPXXCXXXX
+    XXXXBXXXX
+  button-mapping:
+    info: "I"
+    price: "P"
+    confirm: "C"
+    no-money: "C"
+    back: "B"
+  buttons:
+    info:
+      material: "CHEST"
+      name: "<yellow>{folder}</yellow>"
+      lore:
+        - "<gray>将购买此文件夹内全部唱片</gray>"
+        - "<gray>数量: </gray><yellow>{count}</yellow>"
+    price:
+      material: "GOLD_INGOT"
+      name: "<gold>总价: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>你的余额: </gray><yellow>{balance}</yellow>"
+    confirm:
+      material: "LIME_WOOL"
+      name: "<green>确认购买</green>"
+      lore:
+        - "<gray>点击支付并获得全部唱片</gray>"
+    no-money:
+      material: "RED_WOOL"
+      name: "<red>余额不足</red>"
+      lore:
+        - "<gray>还需要: </gray><yellow>{need}</yellow>"
+    back:
+      material: "BARRIER"
+      name: "<red>返回</red>"
+      lore:
+        - "<gray>点击返回</gray>"
+
+# =====================================================
+# 播放列表物品配置
+# =====================================================
+
+playlist-item:
+  name-format: "<gold>{playlist}</gold>"
+  lore-format:
+    - "<gold>歌曲数: </gold><yellow>{count}</yellow>"
+  item-lore:
+    - "<gray>点击播放</gray>"
+    - "<gray>右键移除</gray>"
+  list-lore:
+    - "<gray>点击打开</gray>"
+    - "<gray>右键编辑</gray>"
+  add-song-lore:
+    - "<yellow>点击添加到播放列表</yellow>"
+  add-song-exists-lore:
+    - "<gray>已在播放列表中</gray>"
+  add-container-lore:
+    - "<yellow>右键添加整个文件夹</yellow>"
+  default-lore:
+    - "<gray>默认播放列表</gray>"
+    - "<gray>包含所有可用歌曲</gray>"
+
+# =====================================================
+# 进度显示配置
+# =====================================================
+
+toggle-status:
+  enabled: "<green>启用</green>"
+  disabled: "<red>禁用</red>"
+
+playback-status:
+  playing: "<green>播放中</green>"
+  paused: "<yellow>已暂停</yellow>"
+
+# =====================================================
+# 最近播放按钮配置
+# =====================================================
+
+recent-songs:
+  name: "<gold>最近播放</gold>"
+  lore:
+    - "<gray>查看最近播放的歌曲</gray>"
+
+# =====================================================
+# 文件夹物品配置
+# =====================================================
+
+folder-item:
+  material: "CHEST"
+  custom-model-data: 0
+  name-format: "<gold>{folder}</gold>"
+  # {description} expands to the folder's info.txt / folder.yml (display.description) content.
+  # If you remove this placeholder the description is still appended after the lore.
+  lore-format:
+    - "<gray>包含 </gray><yellow>{count}</yellow> <gray>首歌曲</gray>"
+    - "{description}"
+    - ""
+    - "<yellow>点击打开</yellow>"
+
+# =====================================================
+# 音量控制配置
+# =====================================================
+
+volume-control:
+  title: "<gold>音量控制</gold>"
+  level-format: "<yellow>音量：{volume}%</yellow>"
+  increase-text: "<green>增加音量</green>"
+  decrease-text: "<red>减少音量</red>"
+  materials:
+    mute:
+      material: "BARRIER"
+      custom-model-data: 0
+    low:
+      material: "RED_WOOL"
+      custom-model-data: 0
+    medium:
+      material: "ORANGE_WOOL"
+      custom-model-data: 0
+    high:
+      material: "YELLOW_WOOL"
+      custom-model-data: 0
+    full:
+      material: "GREEN_WOOL"
+      custom-model-data: 0
+
+# =====================================================
+# 音乐编辑器 GUI
+# =====================================================
+
+music-editor:
+  # GUI 标题
+  title: "<gold>音乐编辑器</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  
+  # 整体布局（箱子 6 行 + 玩家背包 4 行 = 10 行）
+  # 前 6 行是编辑区域，后 4 行是玩家背包与功能按钮
+  layout: |
+    EEEEEEEEE
+    EEEEEEEEE
+    EEEEEEEEE
+    EEEEEEEEE
+    EEEEEEEEE
+    EEEEEEEEE
+    BTMGXXXXC
+    YZQWJKXXX
+    XXXXXXXXX
+    UDLRIPSHX
+  
+  # 按钮字符映射
+  button-mapping:
+    edit-area: "E"        # 编辑区域
+    empty: "X"            # 空位
+    # 快捷栏按钮(最后一行) - 导航和常用操作
+    pitch-up: "U"         # 音高上移
+    pitch-down: "D"       # 音高下移
+    tick-left: "L"        # 拍位左移
+    tick-right: "R"       # 拍位右移
+    instrument: "I"       # 切换乐器
+    play: "P"             # 播放/停止
+    save: "S"             # 保存音乐
+    exit: "H"             # 退出编辑
+    # 背包第一行 - 设置按钮
+    bpm-up: "B"           # BPM+5
+    bpm-down: "T"         # BPM-5
+    time-signature: "M"   # 节拍切换
+    settings: "G"         # 编辑设置
+    clear-all: "C"        # 清空音符
+    # 背包第三行 - 撤销/重做/复制/粘贴
+    undo: "Y"             # 撤销
+    redo: "Z"             # 重做
+    copy: "Q"             # 复制选中
+    paste: "J"            # 粘贴
+    delete-selection: "K" # 删除选中
+    batch-instrument: "W" # 批量修改乐器
+    cancel: "A"           # 取消
+  
+  buttons:
+    pitch-up:
+      material: "LIME_STAINED_GLASS_PANE"
+      name: "<green>音高上移</green>"
+      lore:
+        - "<gray>当前音区: </gray><yellow>{pitchRange}</yellow>"
+        - "<gray>音高偏移: </gray><dark_gray>{pitchOffset}</dark_gray>"
+        - "<dark_gray>向上查看更高音区</dark_gray>"
+      custom-model-data: 0
+    pitch-down:
+      material: "RED_STAINED_GLASS_PANE"
+      name: "<red>音高下移</red>"
+      lore:
+        - "<gray>当前音区: </gray><yellow>{pitchRange}</yellow>"
+        - "<gray>音高偏移: </gray><dark_gray>{pitchOffset}</dark_gray>"
+        - "<dark_gray>向下查看更低音区</dark_gray>"
+      custom-model-data: 0
+    tick-left:
+      material: "YELLOW_STAINED_GLASS_PANE"
+      name: "<yellow>拍位左移</yellow>"
+      lore:
+        - "<gray>当前拍位: </gray><yellow>{tickRange}</yellow>"
+        - "<gray>时间页: </gray><dark_gray>{tickOffset}</dark_gray>"
+        - "<dark_gray>向前移动时间线</dark_gray>"
+      custom-model-data: 0
+    tick-right:
+      material: "BLUE_STAINED_GLASS_PANE"
+      name: "<blue>拍位右移</blue>"
+      lore:
+        - "<gray>当前拍位: </gray><yellow>{tickRange}</yellow>"
+        - "<gray>时间页: </gray><dark_gray>{tickOffset}</dark_gray>"
+        - "<dark_gray>向后移动时间线</dark_gray>"
+      custom-model-data: 0
+    instrument:
+      material: "NOTE_BLOCK"
+      name: "<aqua>当前乐器</aqua>"
+      lore:
+        - "<gray>当前: </gray><white>{instrument}</white>"
+        - "<dark_gray>点击选择用于新音符的乐器</dark_gray>"
+      custom-model-data: 0
+    play:
+      material: "JUKEBOX"
+      name: "<green>播放</green>"
+      lore:
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+      custom-model-data: 0
+    play-stop:
+      material: "BARRIER"
+      name: "<red>停止播放</red>"
+      lore:
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+      custom-model-data: 0
+    save:
+      material: "WRITABLE_BOOK"
+      name: "<green>保存音乐</green>"
+      lore:
+        - "<gray>点击保存当前编辑</gray>"
+        - "<dark_gray>自动保存失败时可手动保存</dark_gray>"
+      custom-model-data: 0
+    exit:
+      material: "BARRIER"
+      name: "<red>退出编辑</red>"
+      lore:
+        - "<gray>点击退出编辑</gray>"
+        - "<dark_gray>有未保存内容时会弹出确认</dark_gray>"
+      custom-model-data: 0
+    empty:
+      material: "GRAY_STAINED_GLASS_PANE"
+      name: "<dark_gray>空位</dark_gray>"
+      lore:
+        - "<dark_gray>工具栏占位</dark_gray>"
+      custom-model-data: 0
+    bpm-up:
+      material: "LIME_DYE"
+      name: "<green>BPM +5</green>"
+      lore:
+        - "<gray>当前BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>范围: 20-300</gray>"
+      custom-model-data: 0
+    bpm-down:
+      material: "RED_DYE"
+      name: "<red>BPM -5</red>"
+      lore:
+        - "<gray>当前BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>范围: 20-300</gray>"
+      custom-model-data: 0
+    time-signature:
+      material: "CLOCK"
+      name: "<aqua>拍号: </aqua><yellow>{timeSignature}</yellow>"
+      lore:
+        - "<dark_gray>点击切换拍号</dark_gray>"
+      custom-model-data: 0
+    settings:
+      material: "COMPASS"
+      name: "<aqua>编辑设置</aqua>"
+      lore:
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>拍号: </gray><yellow>{timeSignature}</yellow>"
+        - "<gray>细分: </gray><yellow>{subdivision}</yellow>"
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>视图: </gray><yellow>{pitchRange}</yellow> <dark_gray>/</dark_gray> <yellow>{tickRange}</yellow>"
+        - "<dark_gray>点击打开设置、重命名和发布入口</dark_gray>"
+      custom-model-data: 0
+    clear-all:
+      material: "TNT"
+      name: "<red>清空音符</red>"
+      lore:
+        - "<dark_gray>点击清空所有音符</dark_gray>"
+        - "<red>此操作不可撤销!</red>"
+      custom-model-data: 0
+    undo:
+      material: "ARMOR_STAND"
+      name: "<yellow>撤销</yellow>"
+      lore:
+        - "<gray>可用: {canUndo}</gray>"
+        - "<dark_gray>点击撤销上一步</dark_gray>"
+      custom-model-data: 0
+    redo:
+      material: "END_CRYSTAL"
+      name: "<aqua>重做</aqua>"
+      lore:
+        - "<gray>可用: {canRedo}</gray>"
+        - "<dark_gray>点击重做上一步</dark_gray>"
+      custom-model-data: 0
+    copy:
+      material: "WRITTEN_BOOK"
+      name: "<green>复制</green>"
+      lore:
+        - "<gray>选中数量: </gray><yellow>{selectionCount}</yellow>"
+        - "<dark_gray>先 Shift+点击选择区域</dark_gray>"
+        - "<dark_gray>再点击复制选中音符</dark_gray>"
+      custom-model-data: 0
+    paste:
+      material: "BOOK"
+      name: "<gold>粘贴</gold>"
+      lore:
+        - "<gray>剪贴板: </gray><yellow>{clipboardSize}</yellow> <gray>个音符</gray>"
+        - "<dark_gray>粘贴到当前视图中心附近</dark_gray>"
+      custom-model-data: 0
+    delete-selection:
+      material: "TNT"
+      name: "<red>删除选中</red>"
+      lore:
+        - "<gray>选中数量: </gray><yellow>{selectionCount}</yellow>"
+        - "<dark_gray>先 Shift+点击选择区域</dark_gray>"
+        - "<dark_gray>删除当前选中的音符</dark_gray>"
+      custom-model-data: 0
+    batch-instrument:
+      material: "GOLD_BLOCK"
+      name: "<yellow>批量修改乐器</yellow>"
+      lore:
+        - "<gray>选中数量: </gray><yellow>{selectionCount}</yellow>"
+        - "<gray>当前乐器: </gray><white>{instrument}</white>"
+        - "<dark_gray>先选择区域，再统一改为当前乐器</dark_gray>"
+      custom-model-data: 0
+    cancel:
+      material: "BARRIER"
+      name: "<red>取消</red>"
+      custom-model-data: 0
+  
+  # GUI内部元素配置
+  gui:
+    empty-slot:
+      material: "GRAY_STAINED_GLASS_PANE"
+      name: "<gray>空位</gray>"
+      lore:
+        - "<gray>音高: </gray><white>{note}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<green>左键 </green><gray>添加音符</gray>"
+        - "<aqua>Shift+点击 </aqua><gray>开始/扩展选择</gray>"
+      custom-model-data: 0
+    empty-slot-selected:
+      material: "LIGHT_BLUE_STAINED_GLASS_PANE"
+      name: "<aqua>★ </aqua><gray>空位</gray> <aqua>(已选中)</aqua>"
+      lore:
+        - "<gray>音高: </gray><white>{note}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<aqua>已选中</aqua>"
+      custom-model-data: 0
+    playing-empty-slot:
+      material: "GREEN_STAINED_GLASS_PANE"
+      name: "<green>播放中</green>"
+      lore:
+        - "<gray>音高: </gray><white>{note}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<green>★ 正在播放</green>"
+      custom-model-data: 0
+    filled-note:
+      material: "NOTE_BLOCK"
+      # true 时音符图标使用该音符乐器对应的音符盒底部方块；false 时使用上方 material
+      use-instrument-material: true
+      name: "<green>{note}</green>"
+      lore:
+        - "<gray>乐器: </gray><white>{instrument}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<aqua>左键 </aqua><gray>编辑乐器</gray>"
+        - "<red>右键 </red><gray>删除音符</gray>"
+        - "<aqua>Shift+点击 </aqua><gray>开始/扩展选择</gray>"
+      custom-model-data: 0
+      glow: true
+    filled-note-selected:
+      material: "NOTE_BLOCK"
+      use-instrument-material: true
+      name: "<aqua>★ </aqua><green>{note}</green>"
+      lore:
+        - "<gray>乐器: </gray><white>{instrument}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<aqua>已选中</aqua>"
+        - "<aqua>左键 </aqua><gray>编辑乐器</gray>"
+        - "<red>右键 </red><gray>删除音符</gray>"
+      custom-model-data: 0
+      glow: true
+    multi-instrument:
+      material: "NOTE_BLOCK"
+      # 多乐器音符默认使用第一个乐器的对应方块
+      use-instrument-material: true
+      name: "<yellow>多重乐器</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>音符: </gray><white>{note}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<gray>乐器列表:</gray>"
+        - "{instruments}"
+        - "<aqua>左键 </aqua><gray>选择编辑</aqua>"
+        - "<red>右键 </red><gray>删除音符</gray>"
+        - "<aqua>Shift+点击 </aqua><gray>开始/扩展选择</gray>"
+      custom-model-data: 0
+    multi-instrument-selected:
+      material: "NOTE_BLOCK"
+      use-instrument-material: true
+      name: "<aqua>★ </aqua><yellow>多重乐器</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>音符: </gray><white>{note}</white>"
+        - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+        - "<gray>乐器列表:</gray>"
+        - "{instruments}"
+        - "<aqua>已选中</aqua>"
+        - "<aqua>左键 </aqua><gray>编辑乐器</aqua>"
+        - "<red>右键 </red><gray>删除音符</gray>"
+      custom-model-data: 0
+      glow: true
+    multi-instrument-list-format: "<gray>- </gray><green>{instrument}</green>"
+    playing-prefix: "<yellow>▶</yellow>"
+    warning-prefix: "<red>⚠</red>"
+    selected-prefix: "<aqua>★</aqua>"
+    extended-octave-warning: "<red>⚠ 扩展八度音符</red>"
+    extended-octave-area-warning: "<red>⚠ 扩展八度区域</red>"
+    enable-octave-hint: "<gray>需要启用 enable10octave</gray>"
+    can-only-delete-hint: "<gray>只能删除，无法编辑</gray>"
+    now-playing-text: "<yellow>★ 正在播放</yellow>"
+  
+  instrument-select:
+    # 玩家背包中的乐器选择布局；前三行映射到背包主体，第四行映射到快捷栏
+    layout: |
+      IIIIIIIII
+      IIIIIIIII
+      IIIIIIIII
+      N<XPX>X>B
+    button-mapping:
+      note-info: "N"
+      prev-page: "<"
+      play-preview: "P"
+      next-page: ">"
+      back: "B"
+      instrument: "I"
+    buttons:
+      note-info:
+        material: "NOTE_BLOCK"
+        name: "<white>音符 <yellow>{note}</yellow>"
+        lore:
+          - "<gray>拍位: </gray><yellow>{tick}</yellow>"
+          - "<gray>乐器数: </gray><yellow>{count}</yellow>"
+        custom-model-data: 0
+      prev-page:
+        material: "ARROW"
+        name: "<yellow>上一页</yellow>"
+        lore:
+          - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+        custom-model-data: 0
+      play-preview:
+        material: "JUKEBOX"
+        name: "<green>试听当前列</green>"
+        lore:
+          - "<gray>播放当前音符所在列</gray>"
+        custom-model-data: 0
+      next-page:
+        material: "ARROW"
+        name: "<yellow>下一页</yellow>"
+        lore:
+          - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+        custom-model-data: 0
+      back:
+        material: "BARRIER"
+        name: "<red>返回编辑</red>"
+        lore:
+          - "<gray>返回编辑模式</gray>"
+        custom-model-data: 0
+
+music-select:
+  title: "<gold>选择要编辑的音乐</gold>"
+  layout: |
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    X<XCXN>XX
+  button-mapping:
+    music-item: "M"
+    prev-page: "<"
+    close: "C"
+    create: "N"
+    next-page: ">"
+  buttons:
+    music-item:
+      material: "MUSIC_DISC_CAT"
+      name: "{modeColor}{name}"
+      lore:
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>拍号: </gray><yellow>{timeSignature}</yellow>"
+        - ""
+        - "<yellow>点击进入编辑</yellow>"
+      custom-model-data: 0
+    prev-page:
+      material: "ARROW"
+      name: "<yellow>上一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+    close:
+      material: "BARRIER"
+      name: "<red>关闭</red>"
+      lore:
+        - "<gray>关闭此界面</gray>"
+      custom-model-data: 0
+    create:
+      material: "EMERALD"
+      name: "<green>创建新音乐</green>"
+      lore:
+        - "<gray>点击创建一首新音乐</gray>"
+      custom-model-data: 0
+    next-page:
+      material: "ARROW"
+      name: "<yellow>下一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 编辑设置菜单
+# =====================================================
+
+settings-menu:
+  title: "<gold>音乐设置</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  layout: |
+    XBXSXTXNX
+    XXXPCXXXX
+    XXXWXRXXX
+  button-mapping:
+    bpm: "B"
+    subdivision: "S"
+    time-signature: "T"
+    name: "N"
+    clear: "C"
+    save-close: "W"
+    publish: "P"
+    back: "R"
+  buttons:
+    bpm:
+      material: "REPEATER"
+      name: "<gold>BPM 设置</gold>"
+      lore:
+        - "<gray>当前 BPM: </gray><yellow>{bpm}</yellow>"
+        - "<yellow>点击调整</yellow>"
+      custom-model-data: 0
+    subdivision:
+      material: "REDSTONE"
+      name: "<red>节拍细分</red>"
+      lore:
+        - "<gray>当前细分: </gray><yellow>{subdivision}</yellow>"
+        - "<yellow>点击切换</yellow>"
+      custom-model-data: 0
+    time-signature:
+      material: "CLOCK"
+      name: "<aqua>拍号</aqua>"
+      lore:
+        - "<gray>当前拍号: </gray><yellow>{timeSignature}</yellow>"
+        - "<yellow>点击切换</yellow>"
+      custom-model-data: 0
+    name:
+      material: "NAME_TAG"
+      name: "<yellow>音乐名称</yellow>"
+      lore:
+        - "<gray>当前名称: </gray><yellow>{name}</yellow>"
+        - "<yellow>点击重命名</yellow>"
+      custom-model-data: 0
+    clear:
+      material: "TNT"
+      name: "<red>清空音符</red>"
+      lore:
+        - "<gray>当前音符数: </gray><yellow>{notes}</yellow>"
+        - "<red>点击清空</red>"
+      custom-model-data: 0
+    save-close:
+      material: "LIME_WOOL"
+      name: "<green>保存并关闭</green>"
+      lore:
+        - "<gray>保存当前音乐并退出编辑</gray>"
+      custom-model-data: 0
+    publish:
+      material: "EMERALD"
+      name: "<green>发布/管理</green> <dark_gray>-</dark_gray> {status}"
+      lore:
+        - "<gray>当前状态: </gray>{status}"
+        - "<gray>保存当前音乐后打开发布列表</gray>"
+        - "{action}"
+        - "<dark_gray>需要 musicboxplus.shopmusic 权限</dark_gray>"
+      custom-model-data: 0
+    back:
+      material: "BARRIER"
+      name: "<red>返回编辑</red>"
+      lore:
+        - "<gray>返回音乐编辑器</gray>"
+      custom-model-data: 0
+
+bpm-settings:
+  title: "<gold>BPM 设置</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  layout: |
+    012345678
+    9XXXXXXXX
+    XXXXCXXXX
+    XXXRXBXXX
+  button-mapping:
+    current-bpm: "C"
+    reset: "R"
+    back: "B"
+  step-button:
+    increase-name: "<green>+{amount} BPM</green>"
+    decrease-name: "<red>-{amount} BPM</red>"
+    lore:
+      - "<gray>点击调整 BPM</gray>"
+      - "<gray>当前: </gray><yellow>{current}</yellow>"
+      - "<gray>调整后: </gray><yellow>{after}</yellow>"
+  buttons:
+    current-bpm:
+      material: "REPEATER"
+      name: "<yellow>当前 BPM: </yellow><green>{bpm}</green>"
+      lore:
+        - "<gray>点击上方按钮调整速度</gray>"
+      custom-model-data: 0
+    reset:
+      material: "REDSTONE"
+      name: "<red>重置为默认 BPM</red>"
+      lore:
+        - "<gray>恢复为 config.yml 中的默认 BPM</gray>"
+      custom-model-data: 0
+    back:
+      material: "BARRIER"
+      name: "<red>返回设置</red>"
+      lore:
+        - "<gray>返回设置菜单</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 发布系统 GUI 配置
+# =====================================================
+
+publish-gui:
+  title: "<gold>发布音乐</gold>"
+  layout: |
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    X<XCXR>XX
+  button-mapping:
+    music-item: "M"
+    prev-page: "<"
+    close: "C"
+    revenue: "R"
+    next-page: ">"
+  buttons:
+    music-item:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>状态: </gray>{status}"
+        - ""
+        - "{action}"
+        - "<dark_gray>已下架项目也可继续管理</dark_gray>"
+      custom-model-data: 0
+    music-item-published:
+      material: "MUSIC_DISC_MELLOHI"
+      glow: true
+    prev-page:
+      material: "ARROW"
+      name: "<yellow>上一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+    close:
+      material: "BARRIER"
+      name: "<red>关闭</red>"
+      lore:
+        - "<gray>关闭此界面</gray>"
+      custom-model-data: 0
+    revenue:
+      material: "EMERALD"
+      name: "<green>领取收益: </green><yellow>{amount}</yellow>"
+      lore:
+        - "<gray>点击领取待结算收益</gray>"
+      custom-model-data: 0
+    next-page:
+      material: "ARROW"
+      name: "<yellow>下一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+
+publish-confirm:
+  title: "<gold>发布: {name}</gold>"
+  layout: |
+    XXXIXXXXX
+    XPXDXTXCX
+    XXXXBXXXX
+  button-mapping:
+    info: "I"
+    price: "P"
+    description: "D"
+    tax-info: "T"
+    confirm: "C"
+    cancel: "B"
+  buttons:
+    info:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>拍号: </gray><yellow>{timeSignature}</yellow>"
+      custom-model-data: 0
+    price:
+      material: "GOLD_INGOT"
+      name: "<gold>售价: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>允许范围: </gray><yellow>{minPrice}</yellow><gray> - </gray><yellow>{maxPrice}</yellow>"
+        - "<gray>左键 +10，右键 -10</gray>"
+        - "<gray>Shift 点击调整 100</gray>"
+        - "<dark_gray>初始价格会自动限制在配置范围内</dark_gray>"
+      custom-model-data: 0
+    description:
+      material: "WRITABLE_BOOK"
+      name: "<aqua>描述</aqua>"
+      lore:
+        - "<gray>当前描述: </gray><white>{description}</white>"
+        - "<yellow>点击编辑描述</yellow>"
+        - "<dark_gray>发布后会显示在玩家音乐商店</dark_gray>"
+      custom-model-data: 0
+    tax-info:
+      material: "REDSTONE"
+      name: "<red>税费信息</red>"
+      lore:
+        - "<gray>税率: </gray><yellow>{taxRate}%</yellow>"
+        - "<gray>售价: </gray><yellow>{price}</yellow>"
+        - "<gray>预计收入: </gray><green>{revenue}</green>"
+      custom-model-data: 0
+    confirm:
+      material: "LIME_WOOL"
+      name: "<green>确认发布</green>"
+      lore:
+        - "<gray>点击上架到玩家音乐商店</gray>"
+        - "<gray>若已发布过，会更新同一条发布记录</gray>"
+      custom-model-data: 0
+    cancel:
+      material: "BARRIER"
+      name: "<red>返回</red>"
+      lore:
+        - "<gray>返回发布列表</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 删除确认界面
+# =====================================================
+delete-confirm:
+  title: "<red>确认删除: {name}</red>"
+  layout: |
+    XXXXIXXXX
+    XXCXXXBXX
+    XXXXXXXXX
+  button-mapping:
+    warning: "I"
+    confirm: "C"
+    cancel: "B"
+  buttons:
+    warning:
+      material: "RED_TERRACOTTA"
+      name: "<red>你确定要删除 </red><yellow>{name}</yellow><red> 吗？</red>"
+      lore:
+        - "<gray>此操作不可撤销</gray>"
+      custom-model-data: 0
+    confirm:
+      material: "GREEN_CONCRETE"
+      name: "<green>确认删除</green>"
+      lore:
+        - "<gray>点击确认删除</gray>"
+      custom-model-data: 0
+    cancel:
+      material: "RED_CONCRETE"
+      name: "<red>取消</red>"
+      lore:
+        - "<gray>返回上一步</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 购买确认界面
+# =====================================================
+purchase-confirm:
+  title: "<gold>购买: {name}</gold>"
+  layout: |
+    XXXIXXXXX
+    XPXXCXXXX
+    XXXXBXXXX
+  button-mapping:
+    info: "I"
+    price: "P"
+    confirm: "C"
+    back: "B"
+  buttons:
+    info:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>作者: </gray><yellow>{author}</yellow>"
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>拍号: </gray><yellow>{timeSignature}</yellow>"
+        - "<gray>销量: </gray><yellow>{sales}</yellow>"
+        - "<gray>发布时间: </gray><yellow>{publishedAt}</yellow>"
+      custom-model-data: 0
+    price:
+      material: "GOLD_INGOT"
+      name: "{priceColor}价格: <yellow>{price}</yellow>"
+      lore:
+        - "<gray>你的余额: </gray>{balanceColor}{balance}"
+      custom-model-data: 0
+    confirm:
+      material: "LIME_WOOL"
+      name: "<green>确认购买</green>"
+      lore:
+        - "<gray>点击支付并复制到你的音乐库</gray>"
+      custom-model-data: 0
+    no-money:
+      material: "RED_WOOL"
+      name: "<red>余额不足</red>"
+      lore:
+        - "<gray>还需要: </gray><yellow>{need}</yellow>"
+      custom-model-data: 0
+    back:
+      material: "BARRIER"
+      name: "<red>返回</red>"
+      lore:
+        - "<gray>返回玩家音乐商店</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 管理已发布界面
+# =====================================================
+manage-published:
+  title: "<gold>管理: {name}</gold>"
+  layout: |
+    XXXIXXXXX
+    XPXSXUXTX
+    XXXDXBXXX
+  button-mapping:
+    info: "I"
+    price: "P"
+    stats: "S"
+    update: "U"
+    toggle: "T"
+    delete: "D"
+    back: "B"
+  buttons:
+    info:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>信息</yellow>"
+      lore:
+        - "<gray>作者: </gray><yellow>{author}</yellow>"
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - ""
+        - "<gray>发布时间: </gray><yellow>{publishedAt}</yellow>"
+        - "<gray>更新时间: </gray><yellow>{updatedAt}</yellow>"
+      custom-model-data: 0
+    price:
+      material: "GOLD_INGOT"
+      name: "<gold>价格: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>销量: </gray><yellow>{sales}</yellow>"
+        - "<gray>总收入: </gray><green>{revenue}</green>"
+        - ""
+        - "<yellow>点击修改价格</yellow>"
+      custom-model-data: 0
+    stats:
+      material: "DIAMOND"
+      name: "<aqua>销售统计</aqua>"
+      lore:
+        - "<gray>总销量: </gray><yellow>{sales}</yellow>"
+        - "<gray>总收入: </gray><green>{revenue}</green>"
+        - "<gray>状态: {status}</gray>"
+      custom-model-data: 0
+    update:
+      material: "ANVIL"
+      name: "<yellow>同步更新</yellow>"
+      lore:
+        - "<gray>从编辑器同步最新版本</gray>"
+        - "<yellow>点击同步</yellow>"
+      custom-model-data: 0
+    toggle-unpublish:
+      material: "RED_WOOL"
+      name: "<red>下架</red>"
+      lore:
+        - "<gray>下架后玩家将无法购买</gray>"
+        - "<yellow>点击下架</yellow>"
+      custom-model-data: 0
+    toggle-republish:
+      material: "LIME_WOOL"
+      name: "<green>重新上架</green>"
+      lore:
+        - "<gray>重新上架后玩家可以购买</gray>"
+        - "<yellow>点击上架</yellow>"
+      custom-model-data: 0
+    delete:
+      material: "LAVA_BUCKET"
+      name: "<red>删除发布</red>"
+      lore:
+        - "<gray>删除后将无法恢复</gray>"
+        - "<red>Shift+点击删除</red>"
+      custom-model-data: 0
+    back:
+      material: "BARRIER"
+      name: "<red>返回</red>"
+      lore:
+        - "<gray>点击返回</gray>"
+      custom-model-data: 0
+
+# Admin review queue for the publish approval flow (open via /musicboxplus publish review)
+publish-review:
+  title: "<gold>发布审批</gold>"
+  layout: |
+    RRRRRRRRR
+    RRRRRRRRR
+    RRRRRRRRR
+    RRRRRRRRR
+    RRRRRRRRR
+    X<XCXFX>
+  button-mapping:
+    review-item: "R"
+    prev-page: "<"
+    close: "C"
+    refresh: "F"
+    next-page: ">"
+  buttons:
+    review-item:
+      material: "WRITABLE_BOOK"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>作者: </gray><yellow>{author}</yellow>"
+        - "<gray>价格: </gray><yellow>{price}</yellow>"
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - ""
+        - "<green>左键: 通过审批</green>"
+        - "<red>右键: 拒绝审批</red>"
+      custom-model-data: 0
+    prev-page:
+      material: "ARROW"
+      name: "<yellow>上一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+    close:
+      material: "BARRIER"
+      name: "<red>关闭</red>"
+      lore:
+        - "<gray>关闭此界面</gray>"
+      custom-model-data: 0
+    refresh:
+      material: "COMPASS"
+      name: "<aqua>刷新</aqua>"
+      lore:
+        - "<gray>重新加载待审批列表</gray>"
+      custom-model-data: 0
+    next-page:
+      material: "ARROW"
+      name: "<yellow>下一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 文字播放器编辑菜单
+# =====================================================
+text-player-edit:
+  title: "<gold>文字播放器</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  layout: |
+    XX+-XIFOX
+    XNSPTMQCY
+    XGXXBULXD
+  button-mapping:
+    info: "I"
+    toggle-name: "N"
+    toggle-song: "S"
+    toggle-progress: "P"
+    toggle-time: "T"
+    choose-song: "Q"
+    choose-playlist: "Y"
+    control: "C"
+    move-to-me: "M"
+    raise: "U"
+    lower: "L"
+    close: "B"
+    delete: "D"
+    range-up: "+"
+    range-down: "-"
+    toggle-billboard: "F"
+    set-facing: "O"
+    toggle-public-edit: "G"
+  buttons:
+    info:
+      material: "PAPER"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>当前歌曲: </gray><white>{song}</white>"
+        - "<gray>播放范围: </gray><white>{range}</white>"
+        - "<gray>右键浮动文字打开控制面板</gray>"
+        - "<gray>潜行右键打开此编辑菜单</gray>"
+      custom-model-data: 0
+    toggle-name:
+      material: "NAME_TAG"
+      name: "<yellow>名称: {status}</yellow>"
+      lore:
+        - "<gray>点击切换显示名称</gray>"
+      custom-model-data: 0
+    toggle-song:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>歌曲: {status}</yellow>"
+      lore:
+        - "<gray>点击切换显示歌曲</gray>"
+      custom-model-data: 0
+    toggle-progress:
+      material: "COMPARATOR"
+      name: "<yellow>进度: {status}</yellow>"
+      lore:
+        - "<gray>点击切换显示进度</gray>"
+      custom-model-data: 0
+    toggle-time:
+      material: "CLOCK"
+      name: "<yellow>时间: {status}</yellow>"
+      lore:
+        - "<gray>点击切换显示时间</gray>"
+      custom-model-data: 0
+    choose-song:
+      material: "JUKEBOX"
+      name: "<green>选择歌曲</green>"
+      lore:
+        - "<gray>打开歌曲选择器</gray>"
+      custom-model-data: 0
+    choose-playlist:
+      material: "CHEST"
+      name: "<green>选择播放列表</green>"
+      lore:
+        - "<gray>从你保存的播放列表中选择</gray>"
+        - "<gray>整张列表将顺序播放(配合循环按钮)</gray>"
+      custom-model-data: 0
+    control:
+      material: "REDSTONE_TORCH"
+      name: "<gold>控制面板</gold>"
+      lore:
+        - "<gray>打开播放控制</gray>"
+      custom-model-data: 0
+    move-to-me:
+      material: "ENDER_PEARL"
+      name: "<green>移动到我的位置</green>"
+      lore:
+        - "<gray>把浮动文字移动到你当前所在的位置</gray>"
+      custom-model-data: 0
+    raise:
+      material: "LIME_DYE"
+      name: "<aqua>升高</aqua>"
+      lore:
+        - "<gray>把浮动文字升高一点</gray>"
+      custom-model-data: 0
+    lower:
+      material: "GRAY_DYE"
+      name: "<aqua>降低</aqua>"
+      lore:
+        - "<gray>把浮动文字降低一点</gray>"
+      custom-model-data: 0
+    close:
+      material: "BARRIER"
+      name: "<red>关闭</red>"
+      lore:
+        - "<gray>关闭此菜单</gray>"
+      custom-model-data: 0
+    delete:
+      material: "TNT"
+      name: "<red>删除</red>"
+      lore:
+        - "<gray>删除此文字播放器</gray>"
+      custom-model-data: 0
+    range-up:
+      material: "LIME_DYE"
+      name: "<green>增大范围</green> <gray>(当前 {range})</gray>"
+      lore:
+        - "<gray>左键: 增大播放范围</gray>"
+        - "<gray>右键: 输入精确数值</gray>"
+      custom-model-data: 0
+    range-down:
+      material: "GRAY_DYE"
+      name: "<red>减小范围</red> <gray>(当前 {range})</gray>"
+      lore:
+        - "<gray>左键: 减小播放范围</gray>"
+        - "<gray>右键: 输入精确数值</gray>"
+      custom-model-data: 0
+    toggle-billboard:
+      material: "ITEM_FRAME"
+      name: "<yellow>固定朝向: {status}</yellow>"
+      lore:
+        - "<gray>启用后文字朝向固定(不再面向玩家)</gray>"
+        - "<gray>点击切换</gray>"
+      custom-model-data: 0
+    set-facing:
+      material: "COMPASS"
+      name: "<aqua>设置朝向</aqua>"
+      lore:
+        - "<gray>左键: 固定朝向并正面朝向你</gray>"
+        - "<gray>右键: 重置为默认朝向</gray>"
+      custom-model-data: 0
+    toggle-public-edit:
+      material: "WRITABLE_BOOK"
+      name: "<yellow>允许无权限编辑: {status}</yellow>"
+      lore:
+        - "<gray>开启后无权限玩家可编辑外观和歌曲</gray>"
+        - "<gray>(移动/范围/朝向/删除等仍仅管理员)</gray>"
+      custom-model-data: 0
+    edit-display:
+      material: "PAPER"
+      name: "<aqua>编辑显示</aqua>"
+      lore:
+        - "<gray>编辑浮动文字显示行</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 玩家音乐商店
+# =====================================================
+player-shop:
+  title: "<gold>玩家音乐商店</gold>"
+  layout: |
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    MMMMMMMMM
+    X<XCXSY>X
+  button-mapping:
+    music-item: "M"
+    prev-page: "<"
+    close: "C"
+    search: "S"
+    my-music: "Y"
+    next-page: ">"
+  buttons:
+    music-item:
+      material: "MUSIC_DISC_CAT"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>作者: </gray><yellow>{author}</yellow>"
+        - "<gray>音符数: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "{description}"
+        - "<gray>价格: </gray><yellow>{price}</yellow>"
+        - "<gray>销量: </gray><yellow>{sales}</yellow>"
+        - ""
+        - "{action}"
+      custom-model-data: 0
+    prev-page:
+      material: "ARROW"
+      name: "<yellow>上一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+    close:
+      material: "BARRIER"
+      name: "<red>关闭</red>"
+      lore:
+        - "<gray>关闭此界面</gray>"
+      custom-model-data: 0
+    search:
+      material: "COMPASS"
+      name: "<aqua>搜索</aqua>"
+      lore:
+        - "<gray>当前搜索: </gray>{query}"
+        - "<yellow>点击输入关键词</yellow>"
+      custom-model-data: 0
+    my-music:
+      material: "CHEST"
+      name: "<green>我的发布</green>"
+      lore:
+        - "<gray>管理你发布的音乐和收益</gray>"
+      custom-model-data: 0
+    next-page:
+      material: "ARROW"
+      name: "<yellow>下一页</yellow>"
+      lore:
+        - "<gray>第 </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow><gray> 页</gray>"
+      custom-model-data: 0
+
+# =====================================================
+# 搜索配置
+# =====================================================
+search:
+  title: "<gold>搜索</gold>"
+  placeholder: "<gray>输入搜索关键词...</gray>"
+  # 搜索索引关键词长度在 config.yml 的 search.maxKeywordLength 中配置
+
+# 控制面板进度条请在 gui.control-panel.progress-bar 中配置。
+# BossBar 外观请在 config.yml 的 bossbar 中配置。
+# 发布系统开关、价格范围和税率请在 config.yml 的 publish 中配置。
+
+exit-confirm:
+  title: "<red>未保存的更改</red>"
+  layout: |
+    XXXIXXXXX
+    XSXDXXXXX
+    XXXXCXXXX
+  button-mapping:
+    info: "I"
+    save: "S"
+    discard: "D"
+    cancel: "C"
+  buttons:
+    info:
+      material: "PAPER"
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>当前音乐有未保存的更改</gray>"
+        - "<gray>请选择退出方式</gray>"
+      custom-model-data: 0
+    save:
+      material: "LIME_STAINED_GLASS_PANE"
+      name: "<green>保存并退出</green>"
+      lore:
+        - "<gray>保存更改后关闭编辑器</gray>"
+      custom-model-data: 0
+    discard:
+      material: "RED_STAINED_GLASS_PANE"
+      name: "<red>放弃更改</red>"
+      lore:
+        - "<gray>不保存，直接关闭编辑器</gray>"
+      custom-model-data: 0
+    cancel:
+      material: "GRAY_STAINED_GLASS_PANE"
+      name: "<gray>取消</gray>"
+      lore:
+        - "<gray>返回编辑器</gray>"
+      custom-model-data: 0
