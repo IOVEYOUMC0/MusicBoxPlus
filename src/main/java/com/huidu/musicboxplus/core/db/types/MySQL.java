@@ -9,6 +9,7 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.logging.Level;
 
 public class MySQL extends AbstractBase {
     private final HikariDataSource dataSource;
@@ -40,11 +41,22 @@ public class MySQL extends AbstractBase {
         hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
         
+        HikariDataSource created = null;
         try {
-            this.dataSource = new HikariDataSource(hikariConfig);
+            created = new HikariDataSource(hikariConfig);
+            this.dataSource = created;
             this.afterInit();
         } catch (Exception e) {
             MusicBox.getInstance().getLogger().severe("MySQL 连接失败: " + e.getMessage());
+            // A pool allocated above but failing afterInit() would otherwise stay open, holding
+            // live connections on an instance this constructor is about to abandon.
+            if (created != null && !created.isClosed()) {
+                try {
+                    created.close();
+                } catch (Exception closeError) {
+                    MusicBox.getInstance().getLogger().log(Level.WARNING, "关闭 MySQL 连接池失败", closeError);
+                }
+            }
             throw new RuntimeException("无法连接到 MySQL 数据库", e);
         }
     }

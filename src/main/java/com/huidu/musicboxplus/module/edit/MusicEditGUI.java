@@ -1444,10 +1444,9 @@ public class MusicEditGUI implements InventoryHolder {
                     EditAction.NoteData oldData = action.getOldNotes().get(i);
                     MusicNote note = music.getNote(oldData.getPitch(), oldData.getTick());
                     if (note != null) {
-                        note.getInstruments().clear();
-                        for (MusicNote.NoteInstrument inst : oldData.getInstruments()) {
-                            note.addInstrument(inst);
-                        }
+                        // getInstruments() returns a copy, so clear()+re-add would merge onto the
+                        // real list instead of restoring it; setInstruments is the one that clears.
+                        note.setInstruments(new ArrayList<>(oldData.getInstruments()));
                     }
                 }
                 break;
@@ -1477,10 +1476,7 @@ public class MusicEditGUI implements InventoryHolder {
                     EditAction.NoteData newData = action.getNewNotes().get(i);
                     MusicNote note = music.getNote(newData.getPitch(), newData.getTick());
                     if (note != null) {
-                        note.getInstruments().clear();
-                        for (MusicNote.NoteInstrument inst : newData.getInstruments()) {
-                            note.addInstrument(inst);
-                        }
+                        note.setInstruments(new ArrayList<>(newData.getInstruments()));
                     }
                 }
                 break;

@@ -209,7 +209,10 @@ public class PlayerWrapper {
 
     public void destroy(boolean saveRecentSongs) {
         if (saveRecentSongs) {
-            saveRecentSongs();
+            // Persist immediately on the async executor. The throttled 30s flush scheduled below
+            // (if any) is cancelled right after teardown, so relying on saveRecentSongs() here
+            // would silently drop the player's most recent entries the moment the flush is killed.
+            flushRecentSongsBeforeTeardown();
         }
         this.destroyActivePlayer();
         Player localPlayer = getPlayer();
@@ -466,6 +469,26 @@ public class PlayerWrapper {
             return;
         }
         this.saveRecentSongsSync(player.getUniqueId(), new ArrayList<>(recentSongs));
+    }
+
+    // Called from destroy(boolean): writes the latest recent-songs snapshot straight to the DB
+    // on the async executor, so teardown does not lose it. DB work stays off whatever thread is
+    // tearing the wrapper down (reload/shutdown may be on the global region thread).
+    private void flushRecentSongsBeforeTeardown() {
+        Player player = getPlayer();
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        final java.util.UUID playerId = player.getUniqueId();
+        final List<MusicBoxSong> toSave;
+        synchronized (recentSaveLock) {
+            toSave = new ArrayList<>(recentSongs);
+        }
+        if (toSave.isEmpty()) {
+            return;
+        }
+        com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(
+                () -> saveRecentSongsSync(playerId, toSave));
     }
 
     public MusicBoxSong getRecentSong() {

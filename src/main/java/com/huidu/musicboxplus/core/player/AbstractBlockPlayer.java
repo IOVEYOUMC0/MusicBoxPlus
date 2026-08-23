@@ -284,7 +284,6 @@ implements PositionPlayer {
             this.rangePlayerModel.setAutoDestroyMillis(autoDestroySeconds * 1000);
         }
         this.loadStoredVolume();
-        PlayerManager.registerPlayer(this);
         // Already resolved by the super constructor and held on the cursor; resolving it a
         // second time re-entered the song's monitor for a value we have.
         this.compiledSong = getSong();
@@ -310,6 +309,10 @@ implements PositionPlayer {
         // half-initialised entry reachable between players.put and the model assignment.
         players.put(this.locationKey, this);
         indexChunk(this);
+        // Register last: activePlayers is read by PlayerManager.shutdown()/getActivePlayers(),
+        // which may destroy a registered player and dereference these fields, so this must not
+        // run until every field above (musicBoxModel, rangePlayerModel, tickTask, ...) is set.
+        PlayerManager.registerPlayer(this);
     }
 
     public static <T extends AbstractBlockPlayer> T findByLocation(Location location) {
