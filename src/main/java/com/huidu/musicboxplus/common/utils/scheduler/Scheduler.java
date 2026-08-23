@@ -55,6 +55,24 @@ public final class Scheduler {
         return MusicBox.getInstance();
     }
 
+    // Paper's schedulers reject new tasks once the plugin is disabled (onDisable), throwing
+    // IllegalPluginAccessException. The plugin is still enabled during a reload (), so only the
+    // real shutdown path is affected. See runIfOwnsRegion below for the safe fallback.
+    private static boolean pluginEnabled() {
+        Plugin plugin = plugin();
+        return plugin != null && plugin.isEnabled();
+    }
+
+    // Runs a region-owned task inline only when the calling thread already owns that location's
+    // region. Used while the plugin is disabled, when no new task can be scheduled: if we do not
+    // own the region, the work (e.g. removing entities) is skipped because the server itself
+    // clears the world state on shutdown / unload.
+    private static void runIfOwnsRegion(Location location, Runnable run) {
+        if (Bukkit.isOwnedByCurrentRegion(location)) {
+            run.run();
+        }
+    }
+
     private static Consumer<ScheduledTask> wrap(Runnable run) {
         return task -> run.run();
     }
@@ -78,15 +96,24 @@ public final class Scheduler {
     // ------------------------------------------------------------------
 
     public static void global(Runnable run) {
+        if (!pluginEnabled()) {
+            return;
+        }
         Bukkit.getGlobalRegionScheduler().execute(plugin(), run);
     }
 
     public static MbTask globalLater(Runnable run, long delayTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getGlobalRegionScheduler()
                 .runDelayed(plugin(), wrap(run), Math.max(1L, delayTicks)));
     }
 
     public static MbTask globalTimer(Runnable run, long initialDelayTicks, long periodTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getGlobalRegionScheduler()
                 .runAtFixedRate(plugin(), wrap(run), Math.max(1L, initialDelayTicks), Math.max(1L, periodTicks)));
     }
@@ -96,6 +123,10 @@ public final class Scheduler {
     // ------------------------------------------------------------------
 
     public static void region(Location location, Runnable run) {
+        if (!pluginEnabled()) {
+            runIfOwnsRegion(location, run);
+            return;
+        }
         Bukkit.getRegionScheduler().execute(plugin(), location, run);
     }
 
@@ -110,11 +141,17 @@ public final class Scheduler {
     }
 
     public static MbTask regionLater(Location location, Runnable run, long delayTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getRegionScheduler()
                 .runDelayed(plugin(), location, wrap(run), Math.max(1L, delayTicks)));
     }
 
     public static MbTask regionTimer(Location location, Runnable run, long initialDelayTicks, long periodTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getRegionScheduler()
                 .runAtFixedRate(plugin(), location, wrap(run), Math.max(1L, initialDelayTicks), Math.max(1L, periodTicks)));
     }
@@ -124,10 +161,22 @@ public final class Scheduler {
     // ------------------------------------------------------------------
 
     public static MbTask entity(Entity entity, Runnable run) {
+        if (!pluginEnabled()) {
+            if (Bukkit.isOwnedByCurrentRegion(entity)) {
+                run.run();
+            }
+            return MbTask.of(null);
+        }
         return MbTask.of(entity.getScheduler().run(plugin(), wrap(run), null));
     }
 
     public static MbTask entity(Entity entity, Runnable run, Runnable retired) {
+        if (!pluginEnabled()) {
+            if (Bukkit.isOwnedByCurrentRegion(entity)) {
+                run.run();
+            }
+            return MbTask.of(null);
+        }
         return MbTask.of(entity.getScheduler().run(plugin(), wrap(run), retired));
     }
 
@@ -142,10 +191,16 @@ public final class Scheduler {
     }
 
     public static MbTask entityLater(Entity entity, Runnable run, long delayTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(entity.getScheduler().runDelayed(plugin(), wrap(run), null, Math.max(1L, delayTicks)));
     }
 
     public static MbTask entityTimer(Entity entity, Runnable run, long initialDelayTicks, long periodTicks) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(entity.getScheduler()
                 .runAtFixedRate(plugin(), wrap(run), null, Math.max(1L, initialDelayTicks), Math.max(1L, periodTicks)));
     }
@@ -155,14 +210,23 @@ public final class Scheduler {
     // ------------------------------------------------------------------
 
     public static void async(Runnable run) {
+        if (!pluginEnabled()) {
+            return;
+        }
         Bukkit.getAsyncScheduler().runNow(plugin(), wrap(run));
     }
 
     public static MbTask asyncLater(Runnable run, long delay, TimeUnit unit) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getAsyncScheduler().runDelayed(plugin(), wrap(run), delay, unit));
     }
 
     public static MbTask asyncTimer(Runnable run, long initialDelay, long period, TimeUnit unit) {
+        if (!pluginEnabled()) {
+            return MbTask.of(null);
+        }
         return MbTask.of(Bukkit.getAsyncScheduler().runAtFixedRate(plugin(), wrap(run), initialDelay, period, unit));
     }
 
