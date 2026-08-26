@@ -22,6 +22,7 @@ import com.huidu.musicboxplus.module.textdisplay.TextDisplayHandle;
 import com.huidu.musicboxplus.module.textdisplay.TextDisplayPlayer;
 import com.huidu.musicboxplus.module.textdisplay.TextDisplayPlayerManager;
 import org.bukkit.entity.Player;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -89,14 +90,21 @@ public class TextDisplayPlayerEditGUI {
                 }
                 open(player);
             }));
-            addConfiguredItem("raise", createConfiguredItem("raise"), new ClickAction(() -> {
-                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(config.getHeightStep()));
-                open(player);
-            }));
-            addConfiguredItem("lower", createConfiguredItem("lower"), new ClickAction(() -> {
-                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(-config.getHeightStep()));
-                open(player);
-            }));
+            addConfiguredItem("adjust-x", createConfiguredItem("adjust-x",
+                    "{multiplier}", String.valueOf(config.getPositionShiftMultiplier())),
+                    new ClickAction(
+                            event -> adjustPosition(player, -positionStep(event), 0.0),
+                            event -> adjustPosition(player, positionStep(event), 0.0)));
+            addConfiguredItem("adjust-z", createConfiguredItem("adjust-z",
+                    "{multiplier}", String.valueOf(config.getPositionShiftMultiplier())),
+                    new ClickAction(
+                            event -> adjustPosition(player, 0.0, -positionStep(event)),
+                            event -> adjustPosition(player, 0.0, positionStep(event))));
+            addConfiguredItem("adjust-y", createConfiguredItem("adjust-y",
+                    "{multiplier}", String.valueOf(config.getPositionShiftMultiplier())),
+                    new ClickAction(
+                            event -> adjustHeight(player, -heightStep(event)),
+                            event -> adjustHeight(player, heightStep(event))));
             addConfiguredItem("range-up", createRangeItem("range-up", textPlayer.getRange()), new ClickAction(
                     () -> changeRange(player, config.getRangeStep()),
                     () -> promptRangeInput(player)));
@@ -120,6 +128,11 @@ public class TextDisplayPlayerEditGUI {
                         textPlayer.applyVisualOptions();
                         open(player);
                     }));
+            addConfiguredItem("toggle-double-sided", createToggleItem("toggle-double-sided", options.isDoubleSided()), new ClickAction(() -> {
+                options.setDoubleSided(!options.isDoubleSided());
+                textPlayer.applyVisualOptions();
+                open(player);
+            }));
             addConfiguredItem("toggle-public-edit", createToggleItem("toggle-public-edit", options.isAllowPublicEdit()), new ClickAction(() -> {
                 options.setAllowPublicEdit(!options.isAllowPublicEdit());
                 open(player);
@@ -181,6 +194,26 @@ public class TextDisplayPlayerEditGUI {
         int current = TextDisplayPlayerManager.get(this.name).map(TextDisplayHandle::getRange).orElse(16);
         TextDisplayPlayerManager.setRange(this.name, current + delta);
         open(player);
+    }
+
+    private void adjustPosition(Player player, double deltaX, double deltaZ) {
+        TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustPosition(deltaX, deltaZ));
+        open(player);
+    }
+
+    private void adjustHeight(Player player, double delta) {
+        TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(delta));
+        open(player);
+    }
+
+    private double heightStep(InventoryClickEvent event) {
+        double step = this.config.getHeightStep();
+        return event.getClick().isShiftClick() ? step * this.config.getPositionShiftMultiplier() : step;
+    }
+
+    private double positionStep(InventoryClickEvent event) {
+        double step = this.config.getPositionStep();
+        return event.getClick().isShiftClick() ? step * this.config.getPositionShiftMultiplier() : step;
     }
 
     private void promptRangeInput(Player player) {

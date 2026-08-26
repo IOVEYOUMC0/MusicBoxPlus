@@ -46,6 +46,11 @@ public class IdleTextDisplay implements TextDisplayHandle {
     }
 
     @Override
+    public void adjustPosition(double deltaX, double deltaZ) {
+        this.visual.adjustPosition(deltaX, deltaZ, this.location);
+    }
+
+    @Override
     public MusicBoxSong getDisplaySong() {
         return null;
     }

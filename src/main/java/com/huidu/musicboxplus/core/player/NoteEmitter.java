@@ -192,9 +192,14 @@ public final class NoteEmitter {
             } else if (widened) {
                 source.setX(at.getX() + leftX * fakeStereoWidth);
                 source.setZ(at.getZ() + leftZ * fakeStereoWidth);
-                play(listener, source, entry, sound, category, volume, pitch);
+                // Two full-volume sources make a mono song audibly louder than the same song
+                // in speaker mode. Keep the pair's combined level equal to the original note.
+                float widenedVolume = volume * 0.5F;
+                play(listener, source, entry, sound, category, widenedVolume, pitch);
                 source.setX(at.getX() - leftX * fakeStereoWidth);
                 source.setZ(at.getZ() - leftZ * fakeStereoWidth);
+                play(listener, source, entry, sound, category, widenedVolume, pitch);
+                continue;
             }
 
             play(listener, source, entry, sound, category, volume, pitch);

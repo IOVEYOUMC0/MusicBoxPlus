@@ -132,6 +132,11 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
         this.visual.adjustHeight(delta, this.getTargetLocation());
     }
 
+    @Override
+    public void adjustPosition(double deltaX, double deltaZ) {
+        this.visual.adjustPosition(deltaX, deltaZ, this.getTargetLocation());
+    }
+
     public static class DisplayOptions {
         private boolean showName = true;
         private boolean showSong = true;
@@ -139,10 +144,15 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
         private boolean showTime = true;
         // Extra vertical offset (blocks) applied on top of the default +1.8 display height.
         private double heightOffset = 0.0;
+        // Horizontal display-only offsets; the audio/range anchor remains unchanged.
+        private double xOffset = 0.0;
+        private double zOffset = 0.0;
         // When true the display uses a FIXED billboard (fixed orientation) instead of CENTER (faces players).
         private boolean billboardFixed = false;
         // Yaw used for the FIXED billboard orientation (ignored when not fixed).
         private float fixedYaw = 0.0f;
+        // Fixed displays can render a second copy facing the opposite direction.
+        private boolean doubleSided = false;
         // When true, players without musicboxplus.admin may open the (limited) edit menu for this display.
         private boolean allowPublicEdit = false;
 
@@ -157,8 +167,11 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
             copy.showProgress = this.showProgress;
             copy.showTime = this.showTime;
             copy.heightOffset = this.heightOffset;
+            copy.xOffset = this.xOffset;
+            copy.zOffset = this.zOffset;
             copy.billboardFixed = this.billboardFixed;
             copy.fixedYaw = this.fixedYaw;
+            copy.doubleSided = this.doubleSided;
             copy.allowPublicEdit = this.allowPublicEdit;
             return copy;
         }
@@ -169,6 +182,22 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
 
         public void setHeightOffset(double heightOffset) {
             this.heightOffset = heightOffset;
+        }
+
+        public double getXOffset() {
+            return xOffset;
+        }
+
+        public void setXOffset(double xOffset) {
+            this.xOffset = xOffset;
+        }
+
+        public double getZOffset() {
+            return zOffset;
+        }
+
+        public void setZOffset(double zOffset) {
+            this.zOffset = zOffset;
         }
 
         public boolean isShowName() {
@@ -217,6 +246,14 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
 
         public void setFixedYaw(float fixedYaw) {
             this.fixedYaw = fixedYaw;
+        }
+
+        public boolean isDoubleSided() {
+            return doubleSided;
+        }
+
+        public void setDoubleSided(boolean doubleSided) {
+            this.doubleSided = doubleSided;
         }
 
         public boolean isAllowPublicEdit() {

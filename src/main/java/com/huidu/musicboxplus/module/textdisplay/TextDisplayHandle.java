@@ -16,6 +16,9 @@ public interface TextDisplayHandle {
 
     void adjustHeight(double delta);
 
+    // Moves only the floating display, leaving the playback/location anchor unchanged.
+    void adjustPosition(double deltaX, double deltaZ);
+
     // The currently shown song; null when this is a song-less placeholder.
     MusicBoxSong getDisplaySong();
 

@@ -1851,10 +1851,12 @@ text-player-edit:
   title: "<gold>文字播放器</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
   range-step: 4
   height-step: 0.25
+  position-step: 0.25
+  position-shift-multiplier: 10
   layout: |
-    XX+-XIFOX
+    AE+-XIFOH
     XNSPTMQCY
-    XGXXBULXD
+    XGXXBUXXD
   button-mapping:
     info: "I"
     toggle-name: "N"
@@ -1865,14 +1867,16 @@ text-player-edit:
     choose-playlist: "Y"
     control: "C"
     move-to-me: "M"
-    raise: "U"
-    lower: "L"
+    adjust-y: "U"
+    adjust-x: "A"
+    adjust-z: "E"
     close: "B"
     delete: "D"
     range-up: "+"
     range-down: "-"
     toggle-billboard: "F"
     set-facing: "O"
+    toggle-double-sided: "H"
     toggle-public-edit: "G"
   buttons:
     info:
@@ -1933,17 +1937,29 @@ text-player-edit:
       lore:
         - "<gray>把浮动文字移动到你当前所在的位置</gray>"
       custom-model-data: 0
-    raise:
-      material: "LIME_DYE"
-      name: "<aqua>升高</aqua>"
+    adjust-y:
+      material: "COMPASS"
+      name: "<yellow>Y 轴调整</yellow>"
       lore:
-        - "<gray>把浮动文字升高一点</gray>"
+        - "<gray>左键: Y -</gray>"
+        - "<gray>右键: Y +</gray>"
+        - "<gray>Shift: {multiplier} 倍步长</gray>"
       custom-model-data: 0
-    lower:
-      material: "GRAY_DYE"
-      name: "<aqua>降低</aqua>"
+    adjust-x:
+      material: "COMPASS"
+      name: "<yellow>X 轴调整</yellow>"
       lore:
-        - "<gray>把浮动文字降低一点</gray>"
+        - "<gray>左键: X -</gray>"
+        - "<gray>右键: X +</gray>"
+        - "<gray>Shift: {multiplier} 倍步长</gray>"
+      custom-model-data: 0
+    adjust-z:
+      material: "COMPASS"
+      name: "<yellow>Z 轴调整</yellow>"
+      lore:
+        - "<gray>左键: Z -</gray>"
+        - "<gray>右键: Z +</gray>"
+        - "<gray>Shift: {multiplier} 倍步长</gray>"
       custom-model-data: 0
     close:
       material: "BARRIER"
@@ -1984,6 +2000,13 @@ text-player-edit:
       lore:
         - "<gray>左键: 固定朝向并正面朝向你</gray>"
         - "<gray>右键: 重置为默认朝向</gray>"
+      custom-model-data: 0
+    toggle-double-sided:
+      material: "PAINTING"
+      name: "<yellow>双面显示: {status}</yellow>"
+      lore:
+        - "<gray>固定朝向时在背面显示同样文字</gray>"
+        - "<gray>点击切换</gray>"
       custom-model-data: 0
     toggle-public-edit:
       material: "WRITABLE_BOOK"

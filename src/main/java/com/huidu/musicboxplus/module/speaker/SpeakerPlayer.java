@@ -209,13 +209,25 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         if (inRange && hasNotes) {
             int playbackVolume = resolvePlaybackVolume(player);
             if (this.volume > 0 && playbackVolume > 0 && this.getDistance() > 0) {
-                // The listener term is folded into playbackVolume here, so it stays neutral.
+                boolean ownerListener = this.ownerUuid != null
+                        && player.getUniqueId().equals(this.ownerUuid);
+                // The configured range must raise remote packets so the client can hear them at
+                // the edge, but it must not make the owner louder than radio mode at their own
+                // position.
+                float volumeDistance = ownerListener ? 16F : this.getDistance();
                 float baseVolume = NoteEmitter.baseVolume(this.volume, playbackVolume, 100,
-                    this.getDistance());
+                    volumeDistance);
                 // A speaker never leaves mono: channelMode defaults to MonoMode and only the
                 // radio player ever replaces it.
                 float stereoWidth = 0F;
-                NoteEmitter.emitTick(player, entityLocation, compiled, tick, baseVolume,
+                Location playbackLocation = entityLocation;
+                if (ownerListener) {
+                    // Radio mode emits at eye height. Match that local source position while
+                    // keeping the physical speaker position for other listeners.
+                    playbackLocation = entityLocation.clone();
+                    playbackLocation.setY(playbackLocation.getY() + player.getEyeHeight());
+                }
+                NoteEmitter.emitTick(player, playbackLocation, compiled, tick, baseVolume,
                     this.soundCategory, this.enable10Octave, stereoWidth);
             }
         }

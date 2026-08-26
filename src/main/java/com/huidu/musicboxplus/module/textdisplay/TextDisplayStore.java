@@ -339,8 +339,11 @@ public final class TextDisplayStore {
         options.setShowProgress(bool(stored, "showProgress", options.isShowProgress()));
         options.setShowTime(bool(stored, "showTime", options.isShowTime()));
         options.setHeightOffset(number(stored, "heightOffset", options.getHeightOffset()).doubleValue());
+        options.setXOffset(number(stored, "xOffset", options.getXOffset()).doubleValue());
+        options.setZOffset(number(stored, "zOffset", options.getZOffset()).doubleValue());
         options.setBillboardFixed(bool(stored, "billboardFixed", options.isBillboardFixed()));
         options.setFixedYaw(number(stored, "fixedYaw", options.getFixedYaw()).floatValue());
+        options.setDoubleSided(bool(stored, "doubleSided", options.isDoubleSided()));
         options.setAllowPublicEdit(bool(stored, "allowPublicEdit", options.isAllowPublicEdit()));
         return options;
     }
@@ -572,8 +575,11 @@ public final class TextDisplayStore {
         options.put("showProgress", displayOptions.isShowProgress());
         options.put("showTime", displayOptions.isShowTime());
         options.put("heightOffset", displayOptions.getHeightOffset());
+        options.put("xOffset", displayOptions.getXOffset());
+        options.put("zOffset", displayOptions.getZOffset());
         options.put("billboardFixed", displayOptions.isBillboardFixed());
         options.put("fixedYaw", (double) displayOptions.getFixedYaw());
+        options.put("doubleSided", displayOptions.isDoubleSided());
         options.put("allowPublicEdit", displayOptions.isAllowPublicEdit());
         entry.put("options", options);
         return entry;

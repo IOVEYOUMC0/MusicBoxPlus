@@ -19,7 +19,9 @@ final class TextDisplayVisual {
     private final String name;
     private final TextDisplayPlayer.DisplayOptions options;
     private TextDisplay display;
+    private TextDisplay backDisplay;
     private Interaction interaction;
+    private volatile Component renderedText;
     // The block anchor the display currently sits at; used to pick the owning region for
     // every scheduled entity mutation. Volatile because it is set/read across region threads.
     private volatile Location anchor;
@@ -29,30 +31,46 @@ final class TextDisplayVisual {
         this.options = options;
     }
 
-    private Location base(Location anchor) {
-        Location base = anchor.clone().add(0.0, 1.8 + options.getHeightOffset(), 0.0);
+    private Location base(Location anchor, float yawOffset) {
+        Location base = anchor.clone().add(options.getXOffset(),
+                1.8 + options.getHeightOffset(), options.getZOffset());
         if (options.isBillboardFixed()) {
-            base.setYaw(options.getFixedYaw());
+            base.setYaw(options.getFixedYaw() + yawOffset);
             base.setPitch(0.0f);
         }
         return base;
+    }
+
+    private boolean wantsBackDisplay() {
+        return options.isBillboardFixed() && options.isDoubleSided();
+    }
+
+    private TextDisplay spawnDisplay(Location location) {
+        return location.getWorld().spawn(location, TextDisplay.class, spawned -> {
+            spawned.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
+            spawned.setSeeThrough(true);
+            spawned.setShadowed(false);
+            spawned.setPersistent(false);
+            spawned.setGravity(false);
+            spawned.setDefaultBackground(false);
+            spawned.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
+            spawned.setLineWidth(220);
+            Component text = this.renderedText;
+            if (text != null) {
+                spawned.text(text);
+            }
+        });
     }
 
     void spawn(Location anchor) {
         this.anchor = anchor.clone();
         Scheduler.region(anchor, () -> {
             removeInternal();
-            Location base = base(this.anchor);
-            this.display = base.getWorld().spawn(base, TextDisplay.class, spawned -> {
-                spawned.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
-                spawned.setSeeThrough(true);
-                spawned.setShadowed(false);
-                spawned.setPersistent(false);
-                spawned.setGravity(false);
-                spawned.setDefaultBackground(false);
-                spawned.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
-                spawned.setLineWidth(220);
-            });
+            Location base = base(this.anchor, 0.0f);
+            this.display = spawnDisplay(base);
+            if (wantsBackDisplay()) {
+                this.backDisplay = spawnDisplay(base(this.anchor, 180.0f));
+            }
             this.interaction = base.getWorld().spawn(base, Interaction.class, spawned -> {
                 spawned.setPersistent(false);
                 spawned.setGravity(false);
@@ -65,6 +83,7 @@ final class TextDisplayVisual {
     }
 
     void render(Component component) {
+        this.renderedText = component;
         Location a = this.anchor;
         if (a == null) {
             return;
@@ -72,6 +91,9 @@ final class TextDisplayVisual {
         Scheduler.region(a, () -> {
             if (this.display != null && this.display.isValid()) {
                 this.display.text(component);
+            }
+            if (this.backDisplay != null && this.backDisplay.isValid()) {
+                this.backDisplay.text(component);
             }
         });
     }
@@ -82,6 +104,12 @@ final class TextDisplayVisual {
         teleport(anchor);
     }
 
+    void adjustPosition(double deltaX, double deltaZ, Location anchor) {
+        options.setXOffset(options.getXOffset() + deltaX);
+        options.setZOffset(options.getZOffset() + deltaZ);
+        teleport(anchor);
+    }
+
     void teleport(Location anchor) {
         this.anchor = anchor.clone();
         // The entities may still be owned by the OLD region (a relocation can cross a region
@@ -89,8 +117,10 @@ final class TextDisplayVisual {
         // region currently owns that entity, and let teleportAsync carry it to the new region.
         // Scheduling on the destination anchor's region would touch entities that thread does
         // not own and throw on Folia.
-        final Location base = base(this.anchor);
+        final Location base = base(this.anchor, 0.0f);
+        final Location backBase = base(this.anchor, 180.0f);
         final TextDisplay d = this.display;
+        final TextDisplay back = this.backDisplay;
         final Interaction i = this.interaction;
         if (d != null) {
             Scheduler.entity(d, () -> {
@@ -103,6 +133,13 @@ final class TextDisplayVisual {
             Scheduler.entity(i, () -> {
                 if (i.isValid()) {
                     i.teleportAsync(base);
+                }
+            });
+        }
+        if (back != null) {
+            Scheduler.entity(back, () -> {
+                if (back.isValid()) {
+                    back.teleportAsync(backBase);
                 }
             });
         }
@@ -120,6 +157,19 @@ final class TextDisplayVisual {
             this.display.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
             if (options.isBillboardFixed()) {
                 this.display.setRotation(options.getFixedYaw(), 0.0f);
+            }
+            boolean wantsBack = wantsBackDisplay();
+            if (wantsBack && (this.backDisplay == null || !this.backDisplay.isValid())) {
+                this.backDisplay = spawnDisplay(base(a, 180.0f));
+            } else if (!wantsBack && this.backDisplay != null) {
+                this.backDisplay.remove();
+                this.backDisplay = null;
+            }
+            if (this.backDisplay != null && this.backDisplay.isValid()) {
+                this.backDisplay.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
+                if (options.isBillboardFixed()) {
+                    this.backDisplay.setRotation(options.getFixedYaw() + 180.0f, 0.0f);
+                }
             }
         });
     }
@@ -148,6 +198,10 @@ final class TextDisplayVisual {
         if (this.display != null) {
             this.display.remove();
             this.display = null;
+        }
+        if (this.backDisplay != null) {
+            this.backDisplay.remove();
+            this.backDisplay = null;
         }
     }
 }
