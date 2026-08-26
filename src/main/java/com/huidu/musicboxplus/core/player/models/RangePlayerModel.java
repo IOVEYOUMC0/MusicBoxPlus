@@ -3,12 +3,15 @@ package com.huidu.musicboxplus.core.player.models;
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
+import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +29,7 @@ public class RangePlayerModel {
     private long lastNonEmptyTime = 0;
     private long lastRangeRefresh = 0;
     private long rangeRefreshIntervalMillis;
+    private int pendingFoliaScan;
 
     public RangePlayerModel(MusicBoxSongPlayer model) {
         this.model = model;
@@ -79,6 +83,9 @@ public class RangePlayerModel {
             }
             return;
         }
+        if (Scheduler.isFolia() && pendingFoliaScan > 0) {
+            return;
+        }
         lastRangeRefresh = now;
 
         PositionPlayer positionPlayer = model.getMusicBoxModel().getPositionPlayer();
@@ -90,6 +97,7 @@ public class RangePlayerModel {
         if (targetLocation == null) {
             return;
         }
+        targetLocation = targetLocation.clone();
 
         World world = targetLocation.getWorld();
         if (world == null) {
@@ -103,6 +111,11 @@ public class RangePlayerModel {
         double tz = targetLocation.getZ();
 
         currentInRangeBuffer.clear();
+
+        if (Scheduler.isFolia()) {
+            startFoliaScan(targetLocation, world, tx, ty, tz, rangeSquared);
+            return;
+        }
 
         // Filter the world's player list by squared distance rather than calling
         // world.getNearbyPlayers(range, ...): that walks the chunk entity sections inside the range
@@ -167,9 +180,101 @@ public class RangePlayerModel {
         model.addPlayer(player);
     }
 
+    private void onPlayerEnterRange(UUID uuid) {
+        if (destroyed) return;
+        if (model instanceof MusicBoxSongPlayerModel playerModel) {
+            playerModel.addPlayer(uuid);
+        } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
+            enginePlayer.addPlayer(uuid);
+        }
+    }
+
     private void onPlayerLeaveRange(Player player) {
         if (destroyed) return;
         model.removePlayer(player);
+    }
+
+    private void onPlayerLeaveRange(UUID uuid) {
+        if (destroyed) return;
+        if (model instanceof MusicBoxSongPlayerModel playerModel) {
+            playerModel.removePlayer(uuid);
+        } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
+            enginePlayer.removePlayer(uuid);
+        }
+    }
+
+    private void startFoliaScan(Location targetLocation, World world, double tx, double ty, double tz,
+                                double rangeSquared) {
+        List<Player> players = new ArrayList<>(world.getPlayers());
+        pendingFoliaScan = players.size();
+        if (pendingFoliaScan == 0) {
+            finishRangeScan(System.currentTimeMillis());
+            return;
+        }
+
+        for (Player player : players) {
+            UUID uuid = player.getUniqueId();
+            try {
+                Scheduler.entity(player, () -> {
+                    boolean inRange = false;
+                    try {
+                        if (player.isOnline() && player.getWorld() == world) {
+                            double dx = player.getX() - tx;
+                            double dy = player.getY() - ty;
+                            double dz = player.getZ() - tz;
+                            inRange = dx * dx + dy * dy + dz * dz <= rangeSquared;
+                        }
+                    } finally {
+                        submitFoliaResult(targetLocation, uuid, inRange);
+                    }
+                }, () -> submitFoliaResult(targetLocation, uuid, false));
+            } catch (RuntimeException ignored) {
+                submitFoliaResult(targetLocation, uuid, false);
+            }
+        }
+    }
+
+    private void submitFoliaResult(Location targetLocation, UUID uuid, boolean inRange) {
+        Scheduler.region(targetLocation, () -> {
+            if (destroyed || pendingFoliaScan <= 0) {
+                return;
+            }
+            playerInRangeCache.put(uuid, inRange);
+            if (inRange) {
+                currentInRangeBuffer.add(uuid);
+                if (!activePlayers.contains(uuid)) {
+                    onPlayerEnterRange(uuid);
+                }
+            }
+            pendingFoliaScan--;
+            if (pendingFoliaScan == 0) {
+                finishRangeScan(System.currentTimeMillis());
+            }
+        });
+    }
+
+    private void finishRangeScan(long now) {
+        for (UUID uuid : activePlayers) {
+            if (!currentInRangeBuffer.contains(uuid)) {
+                onPlayerLeaveRange(uuid);
+                playerInRangeCache.remove(uuid);
+            }
+        }
+
+        Set<UUID> swap = activePlayers;
+        activePlayers = currentInRangeBuffer;
+        currentInRangeBuffer = swap;
+        currentInRangeBuffer.clear();
+
+        if (autoDestroyMillis > 0 && activePlayers.isEmpty()) {
+            if (lastNonEmptyTime == 0) {
+                lastNonEmptyTime = now;
+            } else if (now - lastNonEmptyTime > autoDestroyMillis) {
+                model.destroy();
+            }
+        } else if (!activePlayers.isEmpty()) {
+            lastNonEmptyTime = 0;
+        }
     }
 
     // The listener interface only takes a Player, which is exactly what is unavailable here, so
@@ -198,7 +303,8 @@ public class RangePlayerModel {
         }
 
         Location targetLocation = positionPlayer.getLocation();
-        if (targetLocation == null || !targetLocation.getWorld().equals(player.getWorld())) {
+        World targetWorld = targetLocation == null ? null : targetLocation.getWorld();
+        if (targetWorld == null || targetWorld != player.getWorld()) {
             playerInRangeCache.put(player.getUniqueId(), false);
             return false;
         }

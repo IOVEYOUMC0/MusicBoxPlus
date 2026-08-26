@@ -8,6 +8,7 @@ import com.huidu.musicboxplus.common.utils.MessageUtils;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
 import com.huidu.musicboxplus.module.edit.PlayerMusic;
 import com.huidu.musicboxplus.module.edit.PlayerMusicManager;
+import com.huidu.musicboxplus.module.edit.MusicEditGUI;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -28,8 +29,6 @@ public class BPMSettingsGUI implements InventoryHolder {
     private final GUIConfigManager.BPMSettingsConfig config;
     private boolean handledClose = false;
 
-    private static final int[] BPM_STEPS = {-50, -20, -10, -5, -1, 1, 5, 10, 20, 50};
-
     private int getMaxBpm() {
         return MusicBox.getInstance().getConfigObject().getEditor().getMaxBpm();
     }
@@ -44,7 +43,8 @@ public class BPMSettingsGUI implements InventoryHolder {
         this.parentGUI = parentGUI;
         this.config = GUIConfigManager.getInstance().getBPMSettingsConfig();
         String title = config.getTitle().replace("{name}", music.getName());
-        this.inventory = Bukkit.createInventory(this, 36, MiniMessageUtils.processComponent(title));
+        int rows = GUIConfigManager.getRowsForLayout(config.getLayout(), 4);
+        this.inventory = Bukkit.createInventory(this, rows * 9, MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -53,7 +53,7 @@ public class BPMSettingsGUI implements InventoryHolder {
         List<Integer> stepSlots = config.getSlotsForChars("0123456789");
         if (stepSlots.isEmpty()) {
             stepSlots = new ArrayList<>();
-            for (int i = 0; i < BPM_STEPS.length; i++) {
+            for (int i = 0; i < config.getSteps().size(); i++) {
                 stepSlots.add(i);
             }
         }
@@ -66,13 +66,14 @@ public class BPMSettingsGUI implements InventoryHolder {
                 for (String line : currentConfig.getLore()) {
                     lore.add(line.replace("{bpm}", String.valueOf(music.getBpm())));
                 }
-                ItemStack currentBpmItem = ItemUtils.createStack(currentConfig.getMaterial(), currentConfig.getName().replace("{bpm}", String.valueOf(music.getBpm())), lore, currentConfig.getCustomModelData());
+                ItemStack currentBpmItem = ItemUtils.createStack(currentConfig.getMaterial(), currentConfig.getName().replace("{bpm}", String.valueOf(music.getBpm())), lore,
+                        currentConfig.getCustomModelData(), currentConfig.getItemModel(), currentConfig.getCraftEngineItem());
                 inventory.setItem(currentSlot, currentBpmItem);
             }
         }
 
-        for (int i = 0; i < BPM_STEPS.length && i < stepSlots.size(); i++) {
-            int step = BPM_STEPS[i];
+        for (int i = 0; i < config.getSteps().size() && i < stepSlots.size(); i++) {
+            int step = config.getSteps().get(i);
             ItemStack stepItem = createBpmStepItem(step);
             inventory.setItem(stepSlots.get(i), stepItem);
         }
@@ -148,14 +149,14 @@ public class BPMSettingsGUI implements InventoryHolder {
         List<Integer> stepSlots = config.getSlotsForChars("0123456789");
         if (stepSlots.isEmpty()) {
             stepSlots = new ArrayList<>();
-            for (int i = 0; i < BPM_STEPS.length; i++) {
+            for (int i = 0; i < config.getSteps().size(); i++) {
                 stepSlots.add(i);
             }
         }
 
         int stepIndex = stepSlots.indexOf(slot);
-        if (stepIndex >= 0 && stepIndex < BPM_STEPS.length) {
-            int step = BPM_STEPS[stepIndex];
+        if (stepIndex >= 0 && stepIndex < config.getSteps().size()) {
+            int step = config.getSteps().get(stepIndex);
             int newBpm = music.getBpm() + step;
             newBpm = Math.max(getMinBpm(), Math.min(getMaxBpm(), newBpm));
             music.setBpm(newBpm);
@@ -164,8 +165,11 @@ public class BPMSettingsGUI implements InventoryHolder {
     }
 
     private void saveAndUpdate() {
+        MusicEditGUI editor = parentGUI.getParentGUI();
+        long version = editor.markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
             if (success) {
+                editor.clearUnsavedChangesIfVersion(version);
                 player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.0f);
                 updateInventory();
             } else {

@@ -2,7 +2,6 @@ package com.huidu.musicboxplus.module.sign;
 
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
-import com.huidu.musicboxplus.common.utils.BukkitUtils;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
 import com.huidu.musicboxplus.common.utils.SignUtils;
 import com.huidu.musicboxplus.core.player.playlist.ListPlaylist;
@@ -10,6 +9,7 @@ import com.huidu.musicboxplus.core.playback.SongUtils;
 import com.huidu.musicboxplus.core.song.MusicBoxSongManager;
 import com.huidu.musicboxplus.core.song.songContainers.types.SongContainer;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -62,7 +62,9 @@ public final class SignPlaylistUtils {
     }
 
     public static void setPlayListInfo(Location signLocation, IPlayList list) {
-        BukkitUtils.checkPrimary();
+        if (signLocation == null || signLocation.getWorld() == null || !Bukkit.isOwnedByCurrentRegion(signLocation)) {
+            return;
+        }
         Block block = signLocation.getBlock();
         if (block.getState() instanceof Sign sign) {
             List<String> signText = SongUtils.generateCompactPlaylistLore(list, 1, 2);

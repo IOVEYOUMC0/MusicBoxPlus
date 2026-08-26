@@ -24,7 +24,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     private final String name;
     private final Map<String, String> hoverMap = new HashMap<String, String>();
     private final MusicBoxSongContainer container;
-    private final short length;
+    private final int length;
     private final float speed;
     private final int duration;
     private final int hash;
@@ -75,7 +75,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
             throw new SongNullException("Song can't be loaded: " + e.getMessage());
         }
         this.name = StringUtils.t(StringUtils.getOrEmpty(song.title(), () -> FileUtils.getFilename(this.file.getName())));
-        this.length = (short) Math.max(1, song.lengthTicks());
+        this.length = Math.max(1, song.lengthTicks());
         this.speed = song.ticksPerSecond();
         this.duration = this.speed == 0.0f ? 0 : (int)Math.floor((float)this.length / this.speed);
         String time = StringUtils.toHumanTime(this.duration);
@@ -95,7 +95,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         this.hash = ("player_music:" + music.getUniqueId()).hashCode();
         this.name = StringUtils.t(StringUtils.getOrEmpty(music.getName(), () -> music.getUniqueId().toString()));
         this.speed = Math.max(0.1f, music.getBpm() * Math.max(1, music.getBeatSubdivision()) / 60.0f);
-        this.length = (short) Math.max(1, music.getMaxTick() + 1);
+        this.length = Math.max(1, music.getMaxTick() + 1);
         this.duration = this.speed == 0.0f ? 0 : (int) Math.floor((float) this.length / this.speed);
         this.hoverMap.put("{length}", StringUtils.toHumanTime(this.duration));
         this.hoverMap.put("{author}", music.getAuthor());
@@ -263,7 +263,10 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     public ItemStack getSongStack(Material material, String itemName, List<String> extraLines, boolean glow) {
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
         GUIConfigManager.SongItemConfig songItemConfig = guiConfig.getSongItemConfig();
-        Material finalMaterial = material;
+        Material finalMaterial = material != null ? material : resolveConfiguredMaterial(songItemConfig);
+        if (finalMaterial == null) {
+            finalMaterial = songItemConfig.getCustomMaterial();
+        }
         if (this.customMaterial != null && !this.customMaterial.isEmpty()) {
             Material customMat = Material.matchMaterial(this.customMaterial);
             if (customMat != null) {
@@ -373,21 +376,17 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     }
 
     public ItemStack getSongStack() {
-        GUIConfigManager.SongItemConfig songItemConfig = GUIConfigManager.getInstance().getSongItemConfig();
-        Material material;
-        if (songItemConfig.isCustomEnabled()) {
-            material = songItemConfig.getCustomMaterial();
-        } else if (songItemConfig.isUseRandomDisc()) {
-            List<Material> availableDiscs = songItemConfig.getAvailableDiscs();
-            if (availableDiscs != null && !availableDiscs.isEmpty()) {
-                material = com.huidu.musicboxplus.common.utils.ArrayUtils.getRandom(availableDiscs);
-            } else {
-                material = BukkitUtils.getRandomDisc();
-            }
-        } else {
-            material = songItemConfig.getCustomMaterial();
+        return this.getSongStack(resolveConfiguredMaterial(GUIConfigManager.getInstance().getSongItemConfig()));
+    }
+
+    private static Material resolveConfiguredMaterial(GUIConfigManager.SongItemConfig config) {
+        if (config.isCustomEnabled() || !config.isUseRandomDisc()) {
+            return config.getCustomMaterial();
         }
-        return this.getSongStack(material);
+        List<Material> availableDiscs = config.getAvailableDiscs();
+        return availableDiscs != null && !availableDiscs.isEmpty()
+                ? com.huidu.musicboxplus.common.utils.ArrayUtils.getRandom(availableDiscs)
+                : BukkitUtils.getRandomDisc();
     }
 
     public File getFile() {
@@ -406,7 +405,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         return this.container;
     }
 
-    public short getLength() {
+    public int getLength() {
         return this.length;
     }
 

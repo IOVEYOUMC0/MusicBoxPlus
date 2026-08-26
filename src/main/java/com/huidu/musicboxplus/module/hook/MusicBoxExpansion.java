@@ -186,7 +186,7 @@ extends PlaceholderExpansion {
         if (player == null || player.getMusicBoxSong() == null) {
             return "0";
         }
-        short length = player.getMusicBoxSong().getLength();
+        int length = player.getMusicBoxSong().getLength();
         if (length <= 0) {
             return "0";
         }

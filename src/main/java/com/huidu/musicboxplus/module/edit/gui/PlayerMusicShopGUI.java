@@ -39,7 +39,9 @@ public class PlayerMusicShopGUI implements InventoryHolder {
         this.player = player;
         this.config = GUIConfigManager.getInstance().getPlayerShopConfig();
         String title = config.getTitle();
-        this.inventory = Bukkit.createInventory(this, 54, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 6) * 9,
+                MiniMessageUtils.processComponent(title));
         loadMusicList();
         updateInventory();
     }
@@ -59,7 +61,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
         slotMusicMap.clear();
 
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
-        int itemsPerPage = musicSlots.size();
+        int itemsPerPage = Math.max(1, musicSlots.size());
         int startIndex = page * itemsPerPage;
         int endIndex = Math.min(startIndex + itemsPerPage, musicList.size());
 
@@ -95,7 +97,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
             }
             
             String name = musicConfig.getName().replace("{name}", music.getName());
-            ItemStack item = ItemUtils.createStack(musicConfig.getMaterial(), name, lore, musicConfig.getCustomModelData());
+            ItemStack item = ItemUtils.createStack(musicConfig.getMaterial(), name, lore, musicConfig.getCustomModelData(), musicConfig.getItemModel(), musicConfig.getCraftEngineItem());
             inventory.setItem(slot, item);
             slotMusicMap.put(slot, music);
         }
@@ -109,7 +111,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
                         .replace("{totalPages}", String.valueOf(totalPages)));
             }
-            ItemStack prevButton = ItemUtils.createStack(prevConfig.getMaterial(), prevConfig.getName(), lore, prevConfig.getCustomModelData());
+            ItemStack prevButton = ItemUtils.createStack(prevConfig.getMaterial(), prevConfig.getName(), lore, prevConfig.getCustomModelData(), prevConfig.getItemModel(), prevConfig.getCraftEngineItem());
             inventory.setItem(prevSlot, prevButton);
         }
 
@@ -122,7 +124,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
                         .replace("{totalPages}", String.valueOf(totalPages)));
             }
-            ItemStack nextButton = ItemUtils.createStack(nextConfig.getMaterial(), nextConfig.getName(), lore, nextConfig.getCustomModelData());
+            ItemStack nextButton = ItemUtils.createStack(nextConfig.getMaterial(), nextConfig.getName(), lore, nextConfig.getCustomModelData(), nextConfig.getItemModel(), nextConfig.getCraftEngineItem());
             inventory.setItem(nextSlot, nextButton);
         }
 
@@ -141,7 +143,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
             for (String line : searchConfig.getLore()) {
                 lore.add(line.replace("{query}", queryDisplay));
             }
-            ItemStack searchButton = ItemUtils.createStack(searchConfig.getMaterial(), searchConfig.getName(), lore, searchConfig.getCustomModelData());
+            ItemStack searchButton = ItemUtils.createStack(searchConfig.getMaterial(), searchConfig.getName(), lore, searchConfig.getCustomModelData(), searchConfig.getItemModel(), searchConfig.getCraftEngineItem());
             inventory.setItem(searchSlot, searchButton);
         }
 
@@ -155,7 +157,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
 
     public void handleClick(int slot, boolean isShiftClick) {
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
-        int itemsPerPage = musicSlots.size();
+        int itemsPerPage = Math.max(1, musicSlots.size());
         int prevSlot = config.getSlotForButton("prev-page");
         int nextSlot = config.getSlotForButton("next-page");
         int closeSlot = config.getSlotForButton("close");

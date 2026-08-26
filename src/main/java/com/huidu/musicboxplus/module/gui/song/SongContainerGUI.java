@@ -1,8 +1,6 @@
 package com.huidu.musicboxplus.module.gui.song;
 
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
-import com.huidu.musicboxplus.common.utils.BukkitUtils;
-import com.huidu.musicboxplus.common.utils.classes.PeekList;
 import com.huidu.musicboxplus.core.playback.PlayerWrapper;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
 import com.huidu.musicboxplus.core.song.songContainers.types.FullSongContainer;
@@ -12,7 +10,6 @@ import com.huidu.musicboxplus.module.gui.layout.LayoutParser;
 import com.huidu.musicboxplus.module.gui.minecraft.GUI;
 import com.huidu.musicboxplus.module.gui.minecraft.InventoryAction;
 import com.huidu.musicboxplus.module.gui.minecraft.actions.ClickAction;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.Nullable;
 
@@ -34,6 +31,7 @@ public class SongContainerGUI {
     private int currentPage = 0;
     private SongGUIParams currentParams;
     private String currentGuiType = "song-list";
+    private Runnable backAction;
 
     public SongContainerGUI(FullSongContainer container, PlayerWrapper wrapper) {
         this.container = container;
@@ -52,16 +50,26 @@ public class SongContainerGUI {
     }
 
     public void openPage(int page, SongGUIParams params, String guiType) {
+        this.openPage(page, params, guiType, this.backAction);
+    }
+
+    public void openPage(int page, SongGUIParams params, String guiType, Runnable backAction) {
+        if (this.container == null || this.wrapper == null || this.wrapper.getPlayer() == null) {
+            return;
+        }
         if (params == null) {
             params = SongGUIParams.builder().build();
         }
         this.refreshItems(params);
         this.currentPage = page;
         this.currentParams = params;
+        this.backAction = backAction;
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
         guiType = guiConfig.hasGUIConfig(guiType) ? guiType : "song-list";
         this.currentGuiType = guiType;
         int pageCount = this.getPageCount(guiType);
+        page = Math.max(0, Math.min(page, pageCount - 1));
+        this.currentPage = page;
         String title = guiConfig.getGUITitle(guiType).replace("{container}", this.container.getName()).replace("{page}", String.valueOf(page + 1)).replace("{last_page}", String.valueOf(pageCount));
         GUI gui = this.createGUI(title);
         this.currentGUI = gui;
@@ -108,7 +116,9 @@ public class SongContainerGUI {
             layoutParser.registerSimpleButton(mapping.getNext(), "next", () -> this.openPage(page + 1, params, guiType));
         }
         if (this.container.getParentContainer() != null && (parent = this.container.getParentContainer()) instanceof FullSongContainer) {
-            layoutParser.registerSimpleButton(mapping.getParent(), "parent", () -> new SongContainerGUI((FullSongContainer)parent, this.wrapper).openPage(0, params, guiType));
+            layoutParser.registerSimpleButton(mapping.getParent(), "parent", () -> new SongContainerGUI((FullSongContainer)parent, this.wrapper).openPage(0, params, guiType, this.backAction));
+        } else if (this.backAction != null) {
+            layoutParser.registerSimpleButton(mapping.getParent(), "parent", this.backAction);
         }
         if (params.getButtonMap() != null) {
             Map<Character, BarButton> buttonMap = params.getButtonMap();
@@ -172,7 +182,9 @@ public class SongContainerGUI {
         boolean hasParent = parent instanceof FullSongContainer;
         if (hasParent) {
             FullSongContainer parentContainer = (FullSongContainer) parent;
-            this.updateSimpleButton(layoutParser, mapping.getParent(), true, "parent", () -> new SongContainerGUI(parentContainer, this.wrapper).openPage(0, params, guiType));
+            this.updateSimpleButton(layoutParser, mapping.getParent(), true, "parent", () -> new SongContainerGUI(parentContainer, this.wrapper).openPage(0, params, guiType, this.backAction));
+        } else if (this.backAction != null) {
+            this.updateSimpleButton(layoutParser, mapping.getParent(), true, "parent", this.backAction);
         } else {
             this.clearSlots(layoutParser.getSlotsForChar(mapping.getParent()));
         }
@@ -222,7 +234,6 @@ public class SongContainerGUI {
     private void renderSongSlots(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping,
             int page, SongGUIParams params, String guiType, int skipElements, boolean updateMode) {
         List<SongGUIItem> items = this.getItems();
-        PeekList<Material> list = new PeekList<Material>(BukkitUtils.DISCS);
         MusicBoxSong playerSong = this.wrapper.getActivePlayer() != null ? (MusicBoxSong) this.wrapper.getActivePlayer().getMusicBoxSong() : null;
         List<Integer> songSlots = layoutParser.getSlotsForChar(mapping.getSongs());
         int itemIndex = skipElements;
@@ -241,7 +252,7 @@ public class SongContainerGUI {
                 List<String> extraLines = params.getExtraContainerLore() != null ? params.getExtraContainerLore().apply(data) : Collections.emptyList();
                 ItemStack containerStack = chest.getItemStack(extraLines);
                 Runnable containerConsumer = params.getOnContainerRightClick() != null ? () -> params.getOnContainerRightClick().accept(this.wrapper, data) : null;
-                ClickAction containerAction = new ClickAction(() -> new SongContainerGUI(chest, this.wrapper).openPage(0, params, guiType), containerConsumer);
+                ClickAction containerAction = new ClickAction(() -> new SongContainerGUI(chest, this.wrapper).openPage(0, params, guiType, this.backAction), containerConsumer);
                 if (updateMode) {
                     gui.updateItem(slot, containerStack, containerAction);
                 } else {
@@ -259,7 +270,7 @@ public class SongContainerGUI {
             SongGUIData<MusicBoxSong> data = new SongGUIData<MusicBoxSong>(this, song, params, page, guiType);
             List<String> extraLines = params.getExtraSongLore() != null ? params.getExtraSongLore().apply(data) : Collections.emptyList();
             boolean enchanted = playerSong != null && song.equals(playerSong);
-            ItemStack stack = song.getSongStack(list.getAndNext(), extraLines, enchanted);
+            ItemStack stack = song.getSongStack(null, extraLines, enchanted);
             ClickAction songAction = new ClickAction(() -> {
                 if (params.getOnSongLeftClick() != null) {
                     params.getOnSongLeftClick().accept(this.wrapper, data);

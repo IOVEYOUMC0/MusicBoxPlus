@@ -5,10 +5,8 @@ import com.huidu.musicboxplus.core.db.RuntimeDatabaseUtils;
 import com.huidu.musicboxplus.core.db.model.PlayerPlayListModel;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
-import com.huidu.musicboxplus.common.utils.BukkitUtils;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
-import com.huidu.musicboxplus.common.utils.classes.PeekList;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.core.playback.PlayerWrapper;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
@@ -56,7 +54,7 @@ public class PlayListEditorGUI {
             .replace("{page}", String.valueOf(clampedPage + 1))
             .replace("{last_page}", String.valueOf(last));
 
-        GUI gui = new GUI(title);
+        GUI gui = new GUI(title, this.configManager.getGUIRows("playlist-editor"));
         this.currentGUI = gui;
         this.currentPage = clampedPage;
 
@@ -169,7 +167,6 @@ public class PlayListEditorGUI {
             slotsPerPage = 36;
         }
         int start = slotsPerPage * this.currentPage;
-        PeekList<Material> list = new PeekList<>(BukkitUtils.DISCS);
         List<MusicBoxSong> songs = this.model.getSongs();
 
         int itemIndex = 0;
@@ -179,7 +176,7 @@ public class PlayListEditorGUI {
             if (arrayIndex < songs.size()) {
                 MusicBoxSong song = songs.get(arrayIndex);
                 List<String> songLore = this.configManager.getPlaylistItemConfig().getItemLore();
-                ItemStack stack = song.getSongStack(list.getAndNext(), songLore, false);
+                ItemStack stack = song.getSongStack(null, songLore, false);
                 // Capture the song, not its index: the list shifts under an in-flight removal and
                 // removeSong resolves by identity anyway.
                 this.currentGUI.addItem(slot, stack, new ClickAction(null, () -> this.removeSongAsync(song)));

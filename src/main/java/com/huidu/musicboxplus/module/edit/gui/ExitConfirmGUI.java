@@ -32,7 +32,9 @@ public class ExitConfirmGUI implements InventoryHolder {
         this.onCancel = onCancel;
         this.config = GUIConfigManager.getInstance().getExitConfirmConfig();
         String title = config.getTitle().replace("{name}", musicName);
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -46,7 +48,7 @@ public class ExitConfirmGUI implements InventoryHolder {
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{name}", musicName));
             }
-            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), infoConfig.getName().replace("{name}", musicName), lore, infoConfig.getCustomModelData());
+            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), infoConfig.getName().replace("{name}", musicName), lore, infoConfig.getCustomModelData(), infoConfig.getItemModel(), infoConfig.getCraftEngineItem());
             inventory.setItem(infoSlot, infoItem);
         }
 

@@ -18,8 +18,10 @@ import org.jetbrains.annotations.Nullable;
 // being torn down.
 //
 // Thread: dispatched on the region thread that owns the player's block/entity (the main
-// thread on plain Paper). Listeners must not assume they are on the main thread and must
-// not reach across regions to touch blocks or entities elsewhere.
+// thread on plain Paper). If destruction was initiated from another region, delivery is queued
+// and the player may already be marked destroyed by the time listeners run. Listeners must not
+// assume they are on the main thread and must not reach across regions to touch blocks or entities
+// elsewhere.
 //
 // Location: getLocation() is a snapshot taken at construction. It is never null for block
 // players and null for non-positional players such as a player's personal music player.

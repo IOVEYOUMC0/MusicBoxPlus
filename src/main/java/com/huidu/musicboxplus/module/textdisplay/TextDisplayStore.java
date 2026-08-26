@@ -3,6 +3,7 @@ package com.huidu.musicboxplus.module.textdisplay;
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.common.utils.StorageAccess;
+import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
 import com.huidu.musicboxplus.common.utils.scheduler.MbTask;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.api.player.loop.LoopMode;
@@ -22,7 +23,9 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.logging.Level;
 
@@ -82,6 +85,9 @@ public final class TextDisplayStore {
     private static volatile boolean backedUpThisSession = false;
     private static volatile boolean warnedUnwritable = false;
     private static volatile MbTask autoSaveTask;
+    private static volatile boolean saveClosed = false;
+    private static CompletableFuture<Void> saveChain = CompletableFuture.completedFuture(null);
+    private static final AtomicLong saveGeneration = new AtomicLong();
 
     private TextDisplayStore() {
     }
@@ -359,6 +365,8 @@ public final class TextDisplayStore {
     // playlist) additionally call saveSoon so they are not left to the timer.
     public static void startAutoSave(long intervalSeconds) {
         stopAutoSave();
+        saveClosed = false;
+        saveGeneration.incrementAndGet();
         autoSaveTask = Scheduler.asyncTimer(TextDisplayStore::saveIfChanged,
                 intervalSeconds, intervalSeconds, TimeUnit.SECONDS);
     }
@@ -373,29 +381,48 @@ public final class TextDisplayStore {
 
     // Fire-and-forget save for a change that must not wait for the next tick of the timer.
     public static void saveSoon() {
-        if (!loaded) {
+        if (!loaded || saveClosed) {
             return;
         }
         com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(TextDisplayStore::saveIfChanged);
     }
 
-    private static void saveIfChanged() {
+    private static synchronized void saveIfChanged() {
+        if (!loaded || saveClosed) {
+            return;
+        }
+        long generation = saveGeneration.get();
+        // Queue saves so a slower region snapshot cannot finish after a newer one and overwrite it.
+        saveChain = saveChain.handle((ignored, failure) -> null)
+                .thenCompose(ignored -> serializeAsync())
+                .thenAccept(serialized -> writeIfChanged(serialized, generation))
+                .exceptionally(failure -> {
+                    MusicBox.getInstance().getLogger().log(Level.WARNING,
+                            "Failed to save text displays", failure);
+                    return null;
+                });
+    }
+
+    // Writes immediately. Used on disable, where it has to run before the block players are torn
+    // down. Folia's global thread cannot synchronously read every region, so use the last complete
+    // records captured while the plugin was running instead of blocking or reading foreign state.
+    // ponytail: a capture still in flight is left to the next normal save; waiting here can deadlock.
+    public static synchronized void saveNow() {
+        saveClosed = true;
+        saveGeneration.incrementAndGet();
         try {
-            String serialized = serialize();
-            if (serialized.equals(LAST_WRITTEN.get())) {
-                return;
-            }
-            write(serialized);
+            write(toYaml(snapshotRecords()));
         } catch (Exception e) {
             MusicBox.getInstance().getLogger().log(Level.WARNING, "Failed to save text displays", e);
         }
     }
 
-    // Writes immediately. Used on disable, where it has to run before the block players are torn
-    // down: a destroyed display stops being readable and its record would go out stale.
-    public static void saveNow() {
+    private static synchronized void writeIfChanged(String serialized, long generation) {
+        if (saveClosed || generation != saveGeneration.get() || serialized.equals(LAST_WRITTEN.get())) {
+            return;
+        }
         try {
-            write(serialize());
+            write(serialized);
         } catch (Exception e) {
             MusicBox.getInstance().getLogger().log(Level.WARNING, "Failed to save text displays", e);
         }
@@ -440,25 +467,82 @@ public final class TextDisplayStore {
         LAST_WRITTEN.set(serialized);
     }
 
-    // Refreshes every record that has a live handle, then emits all of them. Records without a live
-    // handle go out unchanged -- that is the whole point; see the class comment.
-    private static String serialize() {
+    // Captures each live display on the region that owns it, then serialises the merged records off
+    // those region threads. Records without a live handle go out unchanged -- that is the whole
+    // point; see the class comment.
+    private static CompletableFuture<String> serializeAsync() {
+        List<CompletableFuture<Map<String, Object>>> captures = new ArrayList<>();
         for (String name : TextDisplayPlayerManager.getNames()) {
             if (INCOMPLETE.contains(key(name))) {
                 continue;
             }
             TextDisplayPlayerManager.get(name).ifPresent(handle -> {
-                try {
-                    RECORDS.put(key(handle.getName()), serializeHandle(handle));
-                } catch (Exception e) {
-                    // Keeps the previous record rather than losing the display. Reading a handle can
-                    // fail while its world is going away, which is exactly when the record matters.
-                    MusicBox.getInstance().getLogger().log(Level.FINE,
-                            "Keeping the stored copy of text display '" + name + "'", e);
-                }
+                CompletableFuture<Map<String, Object>> capture = new CompletableFuture<>();
+                captures.add(capture);
+                captureHandle(name, handle, capture);
             });
         }
-        return toYaml(snapshotRecords());
+        if (captures.isEmpty()) {
+            return CompletableFuture.completedFuture(toYaml(snapshotRecords()));
+        }
+        CompletableFuture<?>[] futures = captures.toArray(CompletableFuture<?>[]::new);
+        return CompletableFuture.allOf(futures).thenApplyAsync(ignored -> {
+            for (CompletableFuture<Map<String, Object>> capture : captures) {
+                Map<String, Object> entry = capture.join();
+                if (entry != null) {
+                    RECORDS.put(key(string(entry, "name", "")), entry);
+                }
+            }
+            return toYaml(snapshotRecords());
+        }, AsyncTaskManager.getInstance().getAsyncExecutor());
+    }
+
+    private static void captureHandle(String name, TextDisplayHandle handle,
+                                      CompletableFuture<Map<String, Object>> result) {
+        Location location;
+        try {
+            location = handle.getLocation();
+        } catch (Exception e) {
+            keepStoredRecord(name, e, result);
+            return;
+        }
+        if (location == null || location.getWorld() == null) {
+            result.complete(null);
+            return;
+        }
+        try {
+            Scheduler.region(location, () -> {
+                if (result.isDone()) {
+                    return;
+                }
+                try {
+                    if (TextDisplayPlayerManager.get(name).orElse(null) != handle) {
+                        result.complete(null);
+                        return;
+                    }
+                    Location current = handle.getLocation();
+                    if (current == null || current.getWorld() == null) {
+                        result.complete(null);
+                    } else if (!Scheduler.ownsRegion(current)) {
+                        // The display moved between routing and execution; retry against its new owner.
+                        captureHandle(name, handle, result);
+                    } else {
+                        result.complete(serializeHandle(handle));
+                    }
+                } catch (Exception e) {
+                    keepStoredRecord(name, e, result);
+                }
+            });
+        } catch (Exception e) {
+            keepStoredRecord(name, e, result);
+        }
+    }
+
+    private static void keepStoredRecord(String name, Exception error,
+                                          CompletableFuture<Map<String, Object>> result) {
+        MusicBox.getInstance().getLogger().log(Level.FINE,
+                "Keeping the stored copy of text display '" + name + "'", error);
+        result.complete(null);
     }
 
     private static Map<String, Object> serializeHandle(TextDisplayHandle handle) {

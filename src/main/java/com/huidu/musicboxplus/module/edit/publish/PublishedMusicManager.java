@@ -113,6 +113,7 @@ public class PublishedMusicManager {
         ensurePublishedFolder();
         publishedMusicCache.clear();
         authorMusicCache.clear();
+        invalidateAvailableCache();
 
         File[] authorFolders = publishedFolder.listFiles(File::isDirectory);
         if (authorFolders == null) {
@@ -155,6 +156,7 @@ public class PublishedMusicManager {
         }
 
         authorMusicCache.put(authorUUID, musicList);
+        invalidateAvailableCache();
     }
 
     public PublishResult publishMusic(PlayerMusic music, double price, Player publisher) {
@@ -566,8 +568,12 @@ public class PublishedMusicManager {
             return;
         }
         Player author = Bukkit.getPlayer(published.getAuthorUUID());
-        if (author != null && author.isOnline()) {
-            MessageUtils.send(author, message, "{name}", published.getName());
+        if (author != null) {
+            com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(author, () -> {
+                if (author.isOnline()) {
+                    MessageUtils.send(author, message, "{name}", published.getName());
+                }
+            });
         }
     }
 

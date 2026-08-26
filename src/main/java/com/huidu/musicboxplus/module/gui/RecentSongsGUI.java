@@ -2,16 +2,13 @@ package com.huidu.musicboxplus.module.gui;
 
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
-import com.huidu.musicboxplus.common.utils.BukkitUtils;
 import com.huidu.musicboxplus.common.utils.EconomyUtils;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
-import com.huidu.musicboxplus.common.utils.classes.PeekList;
 import com.huidu.musicboxplus.core.playback.PlayerWrapper;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
 import com.huidu.musicboxplus.module.gui.layout.LayoutParser;
 import com.huidu.musicboxplus.module.gui.minecraft.GUI;
 import com.huidu.musicboxplus.module.gui.minecraft.actions.ClickAction;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -34,12 +31,15 @@ public class RecentSongsGUI {
     }
 
     public void openPage(int page) {
+        if (this.wrapper == null || this.wrapper.getPlayer() == null) {
+            return;
+        }
         String layout;
         List<MusicBoxSong> recentSongs = this.wrapper.getRecentSongs();
         if (!this.buyMode) {
             recentSongs = recentSongs.stream().filter(song -> !song.shouldUseVanillaJukeboxPlayback()).toList();
         }
-        int indexLimit = 36;
+        int indexLimit = this.configManager.getGUIRows("recent-songs") * 9;
         layout = this.configManager.getGUILayout("recent-songs");
         if (layout != null && !layout.isEmpty()) {
             int count = 0;
@@ -56,7 +56,7 @@ public class RecentSongsGUI {
         int lastPage = this.getLastPage(recentSongs, indexLimit);
         int clampedPage = Math.max(0, Math.min(page, lastPage - 1));
         String title = (this.buyMode ? Lang.RECENT_SONGS_BUY_TITLE : Lang.RECENT_SONGS_TITLE).toString().replace("{page}", String.valueOf(clampedPage + 1)).replace("{last_page}", String.valueOf(lastPage));
-        GUI gui = new GUI(title);
+        GUI gui = new GUI(title, this.configManager.getGUIRows("recent-songs"));
         LayoutParser layoutParser = new LayoutParser(gui, "recent-songs");
         GUIConfigManager.GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");
         GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getButtonMapping();
@@ -77,14 +77,13 @@ public class RecentSongsGUI {
             layoutParser.parseAndApply(layout);
         }
         int skipElements = clampedPage * indexLimit;
-        PeekList<Material> discList = new PeekList<Material>(BukkitUtils.DISCS);
         List<Integer> songSlots = layoutParser.getSlotsForChar(mapping.getSongs());
         int itemIndex = skipElements;
         for (int slot : songSlots) {
             if (itemIndex >= recentSongs.size()) break;
             MusicBoxSong song = recentSongs.get(itemIndex);
             ++itemIndex;
-            ItemStack stack = song.getSongStack(discList.getAndNext(), null, false);
+            ItemStack stack = song.getSongStack(null, null, false);
             if (this.buyMode) {
                 double price = EconomyUtils.getDiscPrice();
                 List<String> lore = new java.util.ArrayList<>();

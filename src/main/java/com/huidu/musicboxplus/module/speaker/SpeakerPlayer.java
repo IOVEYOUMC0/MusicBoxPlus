@@ -24,12 +24,17 @@ import org.bukkit.metadata.MetadataValue;
 import org.bukkit.plugin.IllegalPluginAccessException;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.UUID;
+
 public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEnginePlayer
         implements PlayerSongPlayer, PositionPlayer {
     private final MusicBoxSongPlayerModel musicBoxModel;
     private final PlayerPlayerModel model;
     private final RangePlayerModel rangeModel;
     private final PlayerWrapper owner;
+    // The owner's id, captured at construction. Comparing the UUID each tick is cheaper than
+    // calling back through the wrapper (weak ref + equals) to see if a player is the owner.
+    private final UUID ownerUuid;
     // Cross-thread (playback thread writes, main thread reads) -> volatile.
     private volatile boolean destroyed = false;
     // Range/particle work follows the speaker owner across regions, so it runs on the owner
@@ -62,6 +67,7 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         this.rangeModel = new RangePlayerModel(this.musicBoxModel);
         this.owner = wrapper;
         Player ownerPlayer = wrapper.getPlayer();
+        this.ownerUuid = ownerPlayer == null ? null : ownerPlayer.getUniqueId();
         if (ownerPlayer != null && Bukkit.isOwnedByCurrentRegion(ownerPlayer)) {
             this.ownerLocationSnapshot = ownerPlayer.getLocation();
             this.ownerDeadSnapshot = ownerPlayer.isDead();
@@ -213,7 +219,7 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
                     this.soundCategory, this.enable10Octave, stereoWidth);
             }
         }
-        if (player.equals(this.model.getWrapper().getPlayer())) {
+        if (this.ownerUuid != null && player.getUniqueId().equals(this.ownerUuid)) {
             this.model.nextTick(compiled != null ? compiled.lengthTicks() : 0, tick);
             if (!this.isPlayerVanished(player) && hasNotes) {
                 this.spawnNote(player);
@@ -232,30 +238,22 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         }
     }
 
+    // Vanishing is signalled by several popular plugins under a handful of metadata keys. All
+    // of them flag in-band with a boolean value except sv_invisible, which just has to exist.
+    private static final String[] BOOLEAN_VANISH_KEYS = { "vanished", "isVanished", "essentials_vanish" };
+
     private boolean isPlayerVanished(Player player) {
-        if (player.hasMetadata("vanished")) {
-            for (MetadataValue meta : player.getMetadata("vanished")) {
-                if (meta.asBoolean()) {
-                    return true;
-                }
-            }
-        }
-        if (player.hasMetadata("isVanished")) {
-            for (MetadataValue meta : player.getMetadata("isVanished")) {
-                if (meta.asBoolean()) {
-                    return true;
+        for (String key : BOOLEAN_VANISH_KEYS) {
+            if (player.hasMetadata(key)) {
+                for (MetadataValue meta : player.getMetadata(key)) {
+                    if (meta.asBoolean()) {
+                        return true;
+                    }
                 }
             }
         }
         if (player.hasMetadata("sv_invisible")) {
             return true;
-        }
-        if (player.hasMetadata("essentials_vanish")) {
-            for (MetadataValue meta : player.getMetadata("essentials_vanish")) {
-                if (meta.asBoolean()) {
-                    return true;
-                }
-            }
         }
         return player.getGameMode() == GameMode.SPECTATOR;
     }

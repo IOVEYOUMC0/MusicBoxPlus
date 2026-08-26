@@ -728,56 +728,56 @@ buttons:
     lore:
       - "<yellow>当前音量: {volume}%</yellow>"
       - "<reset>"
-      - "<green>左键: 增加音量 (+10%)</green>"
-      - "<red>右键: 减少音量 (-10%)</red>"
+      - "<green>左键: 增加音量 (+{step})</green>"
+      - "<red>右键: 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level:
     material: "NOTE_BLOCK"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level-muted:
     material: "BARRIER"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level-low:
     material: "RED_WOOL"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level-medium:
     material: "ORANGE_WOOL"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level-high:
     material: "YELLOW_WOOL"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   volume-level-full:
     material: "GREEN_WOOL"
     name: "<yellow>音量：{volume}%</yellow>"
     lore:
-      - "<green>左键 增加音量 (+10%)</green>"
-      - "<red>右键 减少音量 (-10%)</red>"
+      - "<green>左键 增加音量 (+{step})</green>"
+      - "<red>右键 减少音量 (-{step})</red>"
     custom-model-data: 0
 
   # 播放速度按钮
@@ -921,6 +921,10 @@ shop-container-purchase-confirm:
 # =====================================================
 
 playlist-item:
+  material: "PAPER"
+  custom-model-data: 0
+  item-model: ""
+  craft-engine-item: ""
   name-format: "<gold>{playlist}</gold>"
   lore-format:
     - "<gold>歌曲数: </gold><yellow>{count}</yellow>"
@@ -962,21 +966,6 @@ recent-songs:
     - "<gray>查看最近播放的歌曲</gray>"
 
 # =====================================================
-# 文件夹物品配置
-# =====================================================
-
-folder-item:
-  material: "CHEST"
-  custom-model-data: 0
-  name-format: "<gold>{folder}</gold>"
-  # {description} expands to the folder's info.txt / folder.yml (display.description) content.
-  # If you remove this placeholder the description is still appended after the lore.
-  lore-format:
-    - "<gray>包含 </gray><yellow>{count}</yellow> <gray>首歌曲</gray>"
-    - "{description}"
-    - ""
-    - "<yellow>点击打开</yellow>"
-
 # =====================================================
 # 音量控制配置
 # =====================================================
@@ -1489,6 +1478,7 @@ bpm-settings:
     current-bpm: "C"
     reset: "R"
     back: "B"
+  steps: [-50, -20, -10, -5, -1, 1, 5, 10, 20, 50]
   step-button:
     increase-name: "<green>+{amount} BPM</green>"
     decrease-name: "<red>-{amount} BPM</red>"
@@ -1859,6 +1849,8 @@ publish-review:
 # =====================================================
 text-player-edit:
   title: "<gold>文字播放器</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  range-step: 4
+  height-step: 0.25
   layout: |
     XX+-XIFOX
     XNSPTMQCY

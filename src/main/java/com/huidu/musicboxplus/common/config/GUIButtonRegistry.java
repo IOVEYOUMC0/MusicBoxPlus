@@ -69,7 +69,9 @@ final class GUIButtonRegistry {
             buttonConfig.getMaterial(),
             buttonConfig.getName(),
             buttonConfig.getLore(),
-            buttonConfig.getCustomModelData()
+            buttonConfig.getCustomModelData(),
+            buttonConfig.getItemModel(),
+            buttonConfig.getCraftEngineItem()
         );
     }
 
@@ -98,7 +100,8 @@ final class GUIButtonRegistry {
             }
         }
 
-        return ItemUtils.createStack(buttonConfig.getMaterial(), name, lore, buttonConfig.getCustomModelData());
+        return ItemUtils.createStack(buttonConfig.getMaterial(), name, lore, buttonConfig.getCustomModelData(),
+                buttonConfig.getItemModel(), buttonConfig.getCraftEngineItem());
     }
 
     int getButtonSlot(String guiName, String buttonName) {
@@ -126,6 +129,8 @@ final class GUIButtonRegistry {
             buttonConfig.customModelData = buttonSection.getInt("custom-model-data", 0);
             buttonConfig.name = StringUtils.t(buttonSection.getString("name", "<white>Button"));
             buttonConfig.lore = StringUtils.t(buttonSection.getStringList("lore"));
+            buttonConfig.itemModel = buttonSection.getString("item-model", "");
+            buttonConfig.craftEngineItem = buttonSection.getString("craft-engine-item", "");
             this.buttonConfigs.put("global." + buttonName, buttonConfig);
         }
     }
@@ -154,6 +159,8 @@ final class GUIButtonRegistry {
                     guiButtonConfig.customModelData = globalConfig.customModelData;
                     guiButtonConfig.name = globalConfig.name;
                     guiButtonConfig.lore = globalConfig.lore;
+                    guiButtonConfig.itemModel = globalConfig.itemModel;
+                    guiButtonConfig.craftEngineItem = globalConfig.craftEngineItem;
                     this.buttonConfigs.put(guiName + "." + buttonName, guiButtonConfig);
                     continue;
                 }

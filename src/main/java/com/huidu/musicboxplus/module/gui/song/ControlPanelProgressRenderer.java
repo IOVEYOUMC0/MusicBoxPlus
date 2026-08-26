@@ -56,7 +56,7 @@ final class ControlPanelProgressRenderer {
         }
 
         int totalSlots = progressSlots.size();
-        if (musicPlayer == null || musicPlayer.getMusicBoxSong() == null) {
+        if (musicPlayer == null || musicPlayer.getMusicBoxSong() == null || musicPlayer.getMusicBoxSong().getLength() <= 0) {
             ItemStack idleItem = createProgressBarItem(
                 progressBarConfig.getMaterialUnplayed(),
                 progressBarConfig.getMaterialUnplayedModelData(),
@@ -69,7 +69,7 @@ final class ControlPanelProgressRenderer {
             return;
         }
 
-        short allTicks = musicPlayer.getMusicBoxSong().getLength();
+        int allTicks = musicPlayer.getMusicBoxSong().getLength();
         short currentTick = musicPlayer.getTick();
         int chunkSizeInt = (int) Math.ceil((double) allTicks / (double) totalSlots);
         double progress = (double) currentTick / (double) allTicks;

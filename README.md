@@ -91,6 +91,26 @@ plugins/MusicBoxPlus/
 └── data.db              # SQLite database (default)
 ```
 
+Each song folder can define its own folder item in `folder.yml`; no separate GUI entry is needed:
+
+```yaml
+display:
+  item: CHEST
+  custom-model-data: 0
+  item-model: ""
+  craft-engine-item: ""
+  name: "<gold>{folder}</gold>"
+  lore:
+    - "<gray>Songs: {count}</gray>"
+    - "{description}"
+  description:
+    - "Description for this folder"
+  glow: false
+  skull-owner: ""
+```
+
+`display.description` and `display.lore` may also be a single string. Legacy `custom_model_data` and `skull_owner` keys remain supported. Without `folder.yml`, the folder's `info.txt` is still used as lore and is automatically migrated to an equivalent `folder.yml` when the directory is writable (`info.txt` is kept).
+
 MySQL is supported (see `db/MySQL.sql`). Optional integrations: Vault (economy), PlaceholderAPI (placeholders), CraftEngine (item models).
 
 ## Building

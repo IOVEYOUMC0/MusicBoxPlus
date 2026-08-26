@@ -171,7 +171,13 @@ implements Listener {
     }
 
     public void requestSearchInput(final PlayerWrapper wrapper, final com.huidu.musicboxplus.module.gui.song.SongContainerGUI sourceGui, final com.huidu.musicboxplus.module.gui.song.SongContainerGUI.SongGUIParams params, final String guiType, final Runnable backAction) {
+        if (wrapper == null) {
+            return;
+        }
         Player player = wrapper.getPlayer();
+        if (player == null) {
+            return;
+        }
         player.closeInventory();
         player.sendMessage(Lang.SEARCH_FILTER_HINT.toComponent());
         this.requestInput(player, InputType.SEARCH_QUERY, Lang.SEARCH_PLACEHOLDER.toComponent(), new InputCallback(){
@@ -195,7 +201,13 @@ implements Listener {
     }
 
     public void requestPlaylistNameInput(PlayerWrapper wrapper) {
+        if (wrapper == null) {
+            return;
+        }
         Player player = wrapper.getPlayer();
+        if (player == null) {
+            return;
+        }
         player.closeInventory();
         this.requestInput(player, InputType.PLAYLIST_NAME, Lang.CREATE_PLAYLIST_INPUT.toComponent(), new InputCallback(){
 

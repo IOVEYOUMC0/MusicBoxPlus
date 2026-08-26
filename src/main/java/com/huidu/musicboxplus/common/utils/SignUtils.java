@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.common.utils;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
@@ -69,7 +70,9 @@ public final class SignUtils {
     }
 
     public static Optional<Sign> findSign(Location startLoc) {
-        BukkitUtils.checkPrimary();
+        if (startLoc == null || startLoc.getWorld() == null || !Bukkit.isOwnedByCurrentRegion(startLoc)) {
+            return Optional.empty();
+        }
 
         Sign emptySign = null;
         Sign contentSign = null;
@@ -145,7 +148,10 @@ public final class SignUtils {
     }
 
     public static void clearInfoSign(Location signLocation) {
-        BukkitUtils.checkPrimary();
+        if (signLocation == null || signLocation.getWorld() == null
+                || !Bukkit.isOwnedByCurrentRegion(signLocation)) {
+            return;
+        }
         Block block = signLocation.getBlock();
         if (block.getState() instanceof Sign sign) {
             for (int i = 0; i < 4; ++i) {

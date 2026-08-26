@@ -173,7 +173,8 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
                 this.refresh();
             }
         }) : () -> null);
-        this.layoutParser.registerButton(mapping.getVolume(), () -> ControlPanelButtonFactory.createVolumeButton(this.configManager, this.getCurrentMusicPlayer(), this.viewer), () -> new ClickAction(() -> this.adjustVolume(10), () -> this.adjustVolume(-10)));
+        int volumeStep = MusicBox.getInstance().getConfigObject().getVolume().getStep();
+        this.layoutParser.registerButton(mapping.getVolume(), () -> ControlPanelButtonFactory.createVolumeButton(this.configManager, this.getCurrentMusicPlayer(), this.viewer), () -> new ClickAction(() -> this.adjustVolume(volumeStep), () -> this.adjustVolume(-volumeStep)));
         this.layoutParser.registerButton(mapping.getSpeed(), () -> ControlPanelButtonFactory.createSpeedButton(this.configManager, this.getCurrentMusicPlayer()), this.canControlSpeed() ? () -> new ClickAction(() -> this.adjustSpeed(MusicBox.getInstance().getConfigObject().getSpeed().getStep()), () -> this.adjustSpeed(-MusicBox.getInstance().getConfigObject().getSpeed().getStep())) : () -> null);
         String layout = this.configManager.getGUILayout("control-panel");
         if (layout != null && !layout.isEmpty()) {
@@ -647,11 +648,12 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
                 }
             }) : null);
         }
+        int volumeStep = MusicBox.getInstance().getConfigObject().getVolume().getStep();
         if ((volumeSlot = this.layoutParser.getSlot(mapping.getVolume())) >= 0) {
             this.gui.addItem(volumeSlot, ControlPanelButtonFactory.createVolumeButton(this.configManager, this.getCurrentMusicPlayer(), this.viewer), new ClickAction(() -> {
-                this.adjustVolume(10);
+                this.adjustVolume(volumeStep);
             }, () -> {
-                this.adjustVolume(-10);
+                this.adjustVolume(-volumeStep);
             }));
         }
         if ((speedSlot = this.layoutParser.getSlot(mapping.getSpeed())) >= 0) {

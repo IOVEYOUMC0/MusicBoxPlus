@@ -68,15 +68,16 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         // Not getNearbyPlayers: it walks the chunks in the radius, and on Folia a 64-block box
         // reaches chunks owned by a neighbouring region, which throws. getPlayers() is a plain
         // per-world list with no chunk access, and cheaper at realistic player counts anyway.
-        Location center = box.getLocation();
+        Location center = box.getLocation().clone();
         double radiusSquared = 64.0 * 64.0;
         for (Player player : center.getWorld().getPlayers()) {
-            double dx = player.getX() - center.getX();
-            double dy = player.getY() - center.getY();
-            double dz = player.getZ() - center.getZ();
-            if (dx * dx + dy * dy + dz * dz <= radiusSquared) {
-                player.sendActionBar(msg);
-            }
+            com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, () -> {
+                if (!player.isOnline() || player.getWorld() != center.getWorld()) return;
+                double dx = player.getX() - center.getX();
+                double dy = player.getY() - center.getY();
+                double dz = player.getZ() - center.getZ();
+                if (dx * dx + dy * dy + dz * dz <= radiusSquared) player.sendActionBar(msg);
+            });
         }
     }
 

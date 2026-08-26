@@ -43,11 +43,11 @@ public class PlayListListGUI {
     }
 
     public static void openAsync(PlayerWrapper wrapper, Function<SongContainer, InventoryAction> onSelect, Function<PlayerPlayListModel, List<String>> extraLore, Runnable backAction) {
-        PlayListListGUI gui = new PlayListListGUI(wrapper);
-        Player player = wrapper.getPlayer();
-        if (player == null) {
+        if (wrapper == null || wrapper.getPlayer() == null) {
             return;
         }
+        PlayListListGUI gui = new PlayListListGUI(wrapper);
+        Player player = wrapper.getPlayer();
         UUID playerId = player.getUniqueId();
 
         AsyncTaskManager.runAsync(() -> {
@@ -86,7 +86,7 @@ public class PlayListListGUI {
         }
         title = title.replace("{page}", String.valueOf(clampedPage + 1)).replace("{last_page}", String.valueOf(lastPage));
 
-        GUI gui = new GUI(title);
+        GUI gui = new GUI(title, this.configManager.getGUIRows("playlist-list"));
         LayoutParser layoutParser = new LayoutParser(gui, "playlist-list");
         layoutParser.registerSimpleButton(mapping.getBack(), "back", backAction != null ? backAction : () -> GUIActions.openDefaultInventory(this.wrapper));
 
@@ -136,7 +136,8 @@ public class PlayListListGUI {
             }
 
             String playlistName = playlistConfig.getNameFormat().replace("{playlist}", element.getName());
-            ItemStack stack = ItemUtils.createStack(Material.PAPER, playlistName, lore);
+            ItemStack stack = ItemUtils.createStack(playlistConfig.getMaterial(), playlistName, lore,
+                    playlistConfig.getCustomModelData(), playlistConfig.getItemModel(), playlistConfig.getCraftEngineItem());
             gui.addItem(slot, stack, onSelect != null ? onSelect.apply(element) : null);
             ++itemIndex;
         }

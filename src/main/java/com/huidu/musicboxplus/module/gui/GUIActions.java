@@ -105,13 +105,16 @@ public final class GUIActions {
         buttonMap.put(Character.valueOf(songListMapping.getSpeed()), ButtonFactory.createSpeedButton());
         buttonMap.put(Character.valueOf(songListMapping.getControlPanel()), ButtonFactory.createControlPanelButton());
         buttonMap.put(Character.valueOf(songListMapping.getStop()), ButtonFactory.createStopButton());
-        buttonMap.put(Character.valueOf(songListMapping.getPlaylist()), ButtonFactory.createPlaylistButton());
+        buttonMap.put(Character.valueOf(songListMapping.getPlaylist()), ButtonFactory.createPlaylistButton(true));
         buttonMap.put(Character.valueOf(songListMapping.getPlayPause()), ButtonFactory.createPlayPauseButton());
         buttonMap.put(Character.valueOf(songListMapping.getRecentSongs()), ButtonFactory.createRecentSongsButton(true, null));
         SHOP_MODE = SongContainerGUI.SongGUIParams.builder().onSongLeftClick(GUIActions::playerBuyMusic).extraSongLore(GUIActions::playerBuySongLore).extraContainerLore(GUIActions::playerBuyAllContainerLore).onContainerRightClick(GUIActions::buyAllContainer).buttonMap(buttonMap).build();
         GET_MODE_SINGLE = SongContainerGUI.SongGUIParams.builder().onSongLeftClick((wrapper, data) -> {
             GUIActions.giveDisc(wrapper, data);
-            wrapper.getPlayer().closeInventory();
+            Player player = wrapper != null ? wrapper.getPlayer() : null;
+            if (player != null) {
+                player.closeInventory();
+            }
         }).extraSongLore(GUIActions::playerGetSongLore).build();
         GET_MODE_MANY = SongContainerGUI.SongGUIParams.builder().onSongLeftClick(GUIActions::giveDisc).extraSongLore(GUIActions::playerGetSongLore).onContainerRightClick(GUIActions::getAllContainer).extraContainerLore(GUIActions::playerGetAllContainerLore).build();
     }
@@ -156,6 +159,10 @@ public final class GUIActions {
             return;
         }
         if (data.getData().getAllSongs().isEmpty()) {
+            Player player = wrapper.getPlayer();
+            if (player != null) {
+                MessageUtils.send(player, Lang.ERROR, "{message}", Lang.CONTAINER_HAS_NO_SONGS.toString());
+            }
             return;
         }
         wrapper.play(data.getData(), data::refreshInventory);
@@ -233,7 +240,15 @@ public final class GUIActions {
         if (wrapper == null || data == null || data.getData() == null) {
             return;
         }
-        for (MusicBoxSong song : data.getData().getAllSongs()) {
+        List<MusicBoxSong> songs = data.getData().getAllSongs();
+        if (songs.isEmpty()) {
+            Player player = wrapper.getPlayer();
+            if (player != null) {
+                MessageUtils.send(player, Lang.ERROR, "{message}", Lang.CONTAINER_HAS_NO_SONGS.toString());
+            }
+            return;
+        }
+        for (MusicBoxSong song : songs) {
             GUIActions.giveDisc(wrapper, song);
         }
     }
@@ -350,4 +365,3 @@ public final class GUIActions {
         }
     }
 }
-

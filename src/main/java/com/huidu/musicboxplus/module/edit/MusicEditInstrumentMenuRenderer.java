@@ -42,7 +42,7 @@ final class MusicEditInstrumentMenuRenderer {
                         .replace("{tick}", String.valueOf(selectedNote.getTick()))
                         .replace("{count}", String.valueOf(selectedNote.getInstrumentCount())));
                 }
-                ItemStack noteInfo = ItemUtils.createStack(noteInfoConfig.getMaterial(), noteInfoConfig.getName(), noteInfoLore, noteInfoConfig.getCustomModelData());
+                ItemStack noteInfo = ItemUtils.createStack(noteInfoConfig.getMaterial(), noteInfoConfig.getName(), noteInfoLore, noteInfoConfig.getCustomModelData(), noteInfoConfig.getItemModel(), noteInfoConfig.getCraftEngineItem());
                 player.getInventory().setItem(noteInfoSlot, noteInfo);
             }
         }
@@ -190,7 +190,7 @@ final class MusicEditInstrumentMenuRenderer {
         for (String line : config.getLore()) {
             lore.add(line.replace("{page}", String.valueOf(pageOffset + 1)).replace("{totalPages}", String.valueOf(totalPages)));
         }
-        ItemStack button = ItemUtils.createStack(config.getMaterial(), config.getName(), lore, config.getCustomModelData());
+        ItemStack button = ItemUtils.createStack(config.getMaterial(), config.getName(), lore, config.getCustomModelData(), config.getItemModel(), config.getCraftEngineItem());
         player.getInventory().setItem(slot, button);
     }
 

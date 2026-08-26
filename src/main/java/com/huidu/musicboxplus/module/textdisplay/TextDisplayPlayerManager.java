@@ -17,7 +17,6 @@ public final class TextDisplayPlayerManager {
 
     public static final int MIN_RANGE = 1;
     public static final int MAX_RANGE = 64;
-    public static final int RANGE_STEP = 4;
 
     private TextDisplayPlayerManager() {
     }

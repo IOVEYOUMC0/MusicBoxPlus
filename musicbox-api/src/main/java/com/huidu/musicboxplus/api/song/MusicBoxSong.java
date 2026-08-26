@@ -22,7 +22,7 @@ public interface MusicBoxSong {
 
     int getDuration();
 
-    short getLength();
+    int getLength();
 
     String getLengthFormatted();
 

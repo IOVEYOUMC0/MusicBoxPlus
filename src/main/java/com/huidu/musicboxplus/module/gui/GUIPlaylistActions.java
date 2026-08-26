@@ -55,6 +55,6 @@ final class GUIPlaylistActions {
             }
             return playlistConfig.getAddSongLore();
         }).extraContainerLore(data -> playlistConfig.getAddContainerLore()).build();
-        gui.openPage(0, params);
+        gui.openPage(0, params, "song-list", () -> editorGUI.openPage(0));
     }
 }

@@ -368,77 +368,104 @@ public final class MusicBox extends JavaPlugin {
         
         long startTime = System.currentTimeMillis();
         loaded = false;
-        ReloadPlaybackState.Snapshot playbackSnapshot = reloadPlaybackState.capture();
+        CompletableFuture<Void> completion = new CompletableFuture<>();
+        reloadPlaybackState.captureAsync().whenComplete((playbackSnapshot, captureError) ->
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() -> {
+                    if (captureError != null) {
+                        failReload(completion, captureError);
+                        return;
+                    }
+                    continueReload(playbackSnapshot, startTime, completion);
+                }));
+        return completion;
+    }
 
-        closeAllGUIs();
-        reloadPlaybackState.stopPlayers();
-        CacheUtils.clearAllCaches();
-
+    private void continueReload(ReloadPlaybackState.Snapshot playbackSnapshot, long startTime,
+                                CompletableFuture<Void> completion) {
         try {
+            closeAllGUIs();
+            reloadPlaybackState.stopPlayers();
+            CacheUtils.clearAllCaches();
             reloadMainConfig();
             reloadLanguageConfig();
             moduleRuntimeSync.syncAll();
-            reloadDatabaseOffThread();
-            if (usesPublishedMusicLibrary()) {
-                PublishedMusicManager.getInstance().loadAllPublishedMusic();
-            }
-        } catch (Exception e) {
-            reloadLock.lock();
-            try {
-                reloading = false;
-                reloadCondition.signalAll();
-            } finally {
-                reloadLock.unlock();
-            }
-            loaded = false;
-            return CompletableFuture.failedFuture(e);
-        }
-        CompletableFuture<Void> playerMusicReload = usesPlayerMusicLibrary()
-                ? PlayerMusicManager.getInstance().reloadAsync()
-                : CompletableFuture.completedFuture(null);
-        LanguageConfig.getInstance().reload();
-        ConfigManager.getInstance().reload();
-        PlayerWrapper.clearAll();
-
-        CompletableFuture<Void> songReload = reloadSongs();
-        CompletableFuture<Void> completion = new CompletableFuture<>();
-
-        CompletableFuture.allOf(songReload, playerMusicReload).whenComplete((unused, throwable) -> {
-            com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() -> {
-                reloadLock.lock();
-                try {
-                    if (throwable == null) {
-                        reloadGUI();
-                        initBStats();
-                        initWebServer();
-                        loaded = true;
-                        if (isSignsModuleEnabled()) {
-                            SignPlayer.restorePreventedPlayers();
+            // Do not join the database future here: blocking Folia's global region thread stalls
+            // unrelated server work for the full duration of the DB operation.
+            reloadDatabaseOffThread().whenComplete((unused, databaseError) ->
+                    com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() -> {
+                        if (databaseError != null) {
+                            failReload(completion, databaseError);
+                            return;
                         }
-                        // Playback restore re-creates block players (signs/jukeboxes) and
-                        // per-player playback; it self-schedules each block's region and each
-                        // player's own region internally, so it is safe to invoke here on the
-                        // global region thread (it only schedules region/entity work).
-                        reloadPlaybackState.restore(playbackSnapshot);
-                        DebugLogger.debugPerformance("plugin reload", startTime);
-                        getLogger().info(logText(
-                                "Plugin reload finished in " + (System.currentTimeMillis() - startTime) + "ms",
-                                "插件重载完成，用时 " + (System.currentTimeMillis() - startTime) + "ms"
-                        ));
-                        completion.complete(null);
-                    } else {
-                        loaded = false;
-                        getLogger().log(Level.SEVERE, logText("Plugin reload failed", "插件重载失败"), throwable);
-                        completion.completeExceptionally(throwable);
-                    }
-                    reloading = false;
-                    reloadCondition.signalAll();
-                } finally {
-                    reloadLock.unlock();
+                        try {
+                            if (usesPublishedMusicLibrary()) {
+                                PublishedMusicManager.getInstance().loadAllPublishedMusic();
+                            }
+                            CompletableFuture<Void> playerMusicReload = usesPlayerMusicLibrary()
+                                    ? PlayerMusicManager.getInstance().reloadAsync()
+                                    : CompletableFuture.completedFuture(null);
+                            LanguageConfig.getInstance().reload();
+                            ConfigManager.getInstance().reload();
+                            PlayerWrapper.clearAll();
+                            CompletableFuture<Void> songReload = reloadSongs();
+                            CompletableFuture.allOf(songReload, playerMusicReload).whenComplete((unusedSongs, throwable) ->
+                                    com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() ->
+                                            finishReload(playbackSnapshot, startTime, completion, throwable)));
+                        } catch (Throwable failure) {
+                            failReload(completion, failure);
+                        }
+                    }));
+        } catch (Throwable failure) {
+            failReload(completion, failure);
+        }
+    }
+
+    private void finishReload(ReloadPlaybackState.Snapshot playbackSnapshot, long startTime,
+                              CompletableFuture<Void> completion, Throwable throwable) {
+        reloadLock.lock();
+        try {
+            if (throwable != null) {
+                loaded = false;
+                getLogger().log(Level.SEVERE, logText("Plugin reload failed", "插件重载失败"), throwable);
+                completion.completeExceptionally(throwable);
+            } else {
+                reloadGUI();
+                initBStats();
+                initWebServer();
+                loaded = true;
+                if (isSignsModuleEnabled()) {
+                    SignPlayer.restorePreventedPlayers();
                 }
-            });
-        });
-        return completion;
+                reloadPlaybackState.restore(playbackSnapshot);
+                DebugLogger.debugPerformance("plugin reload", startTime);
+                getLogger().info(logText(
+                        "Plugin reload finished in " + (System.currentTimeMillis() - startTime) + "ms",
+                        "插件重载完成，用时 " + (System.currentTimeMillis() - startTime) + "ms"
+                ));
+                completion.complete(null);
+            }
+        } catch (Throwable failure) {
+            loaded = false;
+            getLogger().log(Level.SEVERE, logText("Plugin reload failed", "插件重载失败"), failure);
+            completion.completeExceptionally(failure);
+        } finally {
+            reloading = false;
+            reloadCondition.signalAll();
+            reloadLock.unlock();
+        }
+    }
+
+    private void failReload(CompletableFuture<Void> completion, Throwable failure) {
+        loaded = false;
+        getLogger().log(Level.SEVERE, logText("Plugin reload failed", "插件重载失败"), failure);
+        reloadLock.lock();
+        try {
+            reloading = false;
+            reloadCondition.signalAll();
+        } finally {
+            reloadLock.unlock();
+        }
+        completion.completeExceptionally(failure);
     }
 
     private void reloadMainConfig() {
@@ -471,16 +498,11 @@ public final class MusicBox extends JavaPlugin {
         }
     }
 
-    // Runs reloadDatabase on the async executor and waits for it. The caller is on the global
-    // region scheduler, where the database layer refuses to work.
-    private void reloadDatabaseOffThread() {
-        try {
-            CompletableFuture.runAsync(this::reloadDatabase,
-                    AsyncTaskManager.getInstance().getAsyncExecutor()).join();
-        } catch (java.util.concurrent.CompletionException e) {
-            Throwable cause = e.getCause();
-            throw cause instanceof RuntimeException runtime ? runtime : new RuntimeException(cause);
-        }
+    // Runs reloadDatabase on the async executor. Callers must continue on a scheduler after the
+    // future completes; joining here would block Folia's global region thread.
+    private CompletableFuture<Void> reloadDatabaseOffThread() {
+        return CompletableFuture.runAsync(this::reloadDatabase,
+                AsyncTaskManager.getInstance().getAsyncExecutor());
     }
 
     private void reloadDatabase() {
@@ -517,39 +539,11 @@ public final class MusicBox extends JavaPlugin {
                         }
                     });
                 }
-                // Warm the song-stack building path off the main thread. The first song list the
-                // server shows after startup otherwise rebuilds every item on the main thread
-                // (MiniMessage parse + CraftEngine/ItemModel reflection + jukebox registry
-                // lookup + NBT write) while the caches and JIT are still cold, which drops TPS.
-                prewarmSongStacks();
             });
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, logText("Failed to reload songs", "重载歌曲失败"), e);
             return CompletableFuture.failedFuture(e);
         }
-    }
-
-    // Builds one ItemStack per song, discarding the result. The cost is real but it is paid
-    // here on the async executor instead of on the main thread when the first player opens the
-    // song list, and it fills the MiniMessage component cache plus the reflective lookups.
-    private void prewarmSongStacks() {
-        List<MusicBoxSong> songs = MusicBoxSongManager.getAllSongs();
-        if (songs == null || songs.isEmpty()) {
-            return;
-        }
-        long startTime = System.currentTimeMillis();
-        int built = 0;
-        for (MusicBoxSong song : songs) {
-            try {
-                song.getSongStack();
-                built++;
-            } catch (Throwable ignored) {
-                // A single misconfigured song must not abort the warmup of the rest.
-            }
-        }
-        getLogger().info(logText(
-            "Pre-warmed " + built + "/" + songs.size() + " song stacks in " + (System.currentTimeMillis() - startTime) + "ms",
-            "已预热 " + built + "/" + songs.size() + " 个歌曲物品，用时 " + (System.currentTimeMillis() - startTime) + "ms"));
     }
 
     // Resumes playback for jukeboxes that were left with a disc inside when the server shut
@@ -558,6 +552,11 @@ public final class MusicBox extends JavaPlugin {
     // stall any single region. Unloaded chunks are skipped by the ChunkLoadEvent handler
     // instead.
     private void restoreJukeboxesInLoadedChunks() {
+        if (com.huidu.musicboxplus.common.utils.scheduler.Scheduler.isFolia()) {
+            // Folia has no global loaded-chunk enumeration API. ChunkLoadEvent restores chunks
+            // as they enter a region; scanning here would violate region ownership.
+            return;
+        }
         if (!isJukeboxModuleEnabled() || !MusicBoxSongManager.isLoaded()) {
             return;
         }
@@ -748,19 +747,21 @@ public final class MusicBox extends JavaPlugin {
                 ConfigManager.getInstance().reload();
                 break;
             case "database":
+                CompletableFuture<Void> databaseReload;
                 try {
-                    reloadDatabaseOffThread();
-                    if (usesPublishedMusicLibrary()) {
-                        PublishedMusicManager.getInstance().loadAllPublishedMusic();
-                    }
+                    databaseReload = reloadDatabaseOffThread();
                 } catch (Exception e) {
                     getLogger().log(Level.SEVERE, logText("Failed to reload database", "重载数据库失败"), e);
                     return CompletableFuture.failedFuture(e);
                 }
-                if (usesPlayerMusicLibrary()) {
-                    return PlayerMusicManager.getInstance().reloadAsync().thenRun(() -> logPartialReloadComplete(type, startTime));
-                }
-                break;
+                return databaseReload.thenRun(() -> {
+                    if (usesPublishedMusicLibrary()) {
+                        PublishedMusicManager.getInstance().loadAllPublishedMusic();
+                    }
+                }).thenCompose(unused -> usesPlayerMusicLibrary()
+                        ? PlayerMusicManager.getInstance().reloadAsync()
+                        : CompletableFuture.completedFuture(null))
+                    .thenRun(() -> logPartialReloadComplete(type, startTime));
             case "aliases":
                 reloadAliasesOnly();
                 break;

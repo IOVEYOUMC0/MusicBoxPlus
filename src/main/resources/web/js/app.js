@@ -137,6 +137,7 @@ class MusicEditor {
         this.sessionExpiredDialog = null;
         this.noteIndex = new Map();
         this.notesByTick = new Map();
+        this.visibleCellIndex = new Map();
         this.dirty = false;
         this.saveInFlight = false;
         this.saveQueued = false;
@@ -663,22 +664,12 @@ class MusicEditor {
     }
 
     refreshCell(pitch, tick) {
-        const cell = document.querySelector(`.note-cell[data-pitch="${pitch}"][data-tick="${tick}"]`);
+        const cell = this.visibleCellIndex.get(this.noteKey(pitch, tick));
         if (!cell) return;
 
         const note = this.getNote(pitch, tick);
         const selected = this.selectedNotes.some(item => item.pitch === pitch && item.tick === tick);
         this.decorateNoteCell(cell, note, pitch, tick, selected);
-    }
-
-    refreshVisibleTick(tick) {
-        document.querySelectorAll(`.note-cell[data-tick="${tick}"]`).forEach(cell => {
-            const pitch = this.normalizeInt(cell.dataset.pitch, -1, 0, this.maxPitch);
-            if (pitch < 0) return;
-            const note = this.getNote(pitch, tick);
-            const selected = this.selectedNotes.some(item => item.pitch === pitch && item.tick === tick);
-            this.decorateNoteCell(cell, note, pitch, tick, selected);
-        });
     }
 
     clampVisibleTick() {
@@ -708,6 +699,7 @@ class MusicEditor {
         const selected = new Set(this.selectedNotes.map(note => this.noteKey(note.pitch, note.tick)));
         const visibleEnd = Math.min(this.maxTicks, this.visibleTickStart + TICKS_PER_VIEW);
         const rows = grid.children;
+        this.visibleCellIndex.clear();
         for (let rowIdx = 0; rowIdx < rows.length; rowIdx++) {
             // renderNoteGrid fills rows top-down from maxPitch to 0, so the row index is
             // the pitch offset.
@@ -722,6 +714,7 @@ class MusicEditor {
                 cells[col].style.display = '';
                 cells[col].dataset.tick = tick;
                 const key = this.noteKey(pitch, tick);
+                this.visibleCellIndex.set(key, cells[col]);
                 this.decorateNoteCell(cells[col], this.noteIndex.get(key), pitch, tick, selected.has(key));
             }
         }
@@ -952,6 +945,7 @@ class MusicEditor {
         const selected = new Set(this.selectedNotes.map(note => this.noteKey(note.pitch, note.tick)));
         const visibleEnd = Math.min(this.maxTicks, this.visibleTickStart + TICKS_PER_VIEW);
         const fragment = document.createDocumentFragment();
+        this.visibleCellIndex.clear();
 
         for (let pitch = this.maxPitch; pitch >= 0; pitch--) {
             const row = document.createElement('div');
@@ -965,6 +959,7 @@ class MusicEditor {
                 cell.dataset.pitch = pitch;
                 cell.dataset.tick = tick;
                 this.decorateNoteCell(cell, note, pitch, tick, selected.has(key));
+                this.visibleCellIndex.set(key, cell);
                 row.appendChild(cell);
             }
 

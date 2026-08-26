@@ -70,10 +70,13 @@ public class MusicEditGUI implements InventoryHolder {
     private boolean isPlaying = false;
     // volatile: written by main-thread edit handlers, read by the async auto-save timer.
     private volatile boolean hasUnsavedChanges = false;
+    private volatile long changeVersion = 0;
     private boolean openingSubGUI = false;
     private final List<MbTask> scheduledTaskIds = Collections.synchronizedList(new ArrayList<>());
     private MusicNote.NoteInstrument currentInstrument = MusicNote.NoteInstrument.HARP;
     private final List<Integer> editAreaSlots = new ArrayList<>();
+    private final Map<Integer, Integer> editAreaSlotIndexes = new HashMap<>();
+    private String[] layoutLines = new String[0];
     private final EditHistory editHistory = new EditHistory();
     private int currentPlayTick = -1;
     private Mode currentMode = Mode.EDIT;
@@ -163,6 +166,8 @@ public class MusicEditGUI implements InventoryHolder {
 
     private void parseLayout() {
         editAreaSlots.clear();
+        editAreaSlotIndexes.clear();
+        layoutLines = new String[0];
         cachedEditColumns = -1;
         cachedEditRows = -1;
 
@@ -172,6 +177,7 @@ public class MusicEditGUI implements InventoryHolder {
         }
 
         String[] lines = layout.split("\n");
+        layoutLines = lines;
         for (int row = 0; row < lines.length && row < 6; row++) {
             String line = lines[row];
             for (int col = 0; col < line.length() && col < 9; col++) {
@@ -179,6 +185,7 @@ public class MusicEditGUI implements InventoryHolder {
                 int slot = row * 9 + col;
 
                 if (c == config.getEditAreaChar()) {
+                    editAreaSlotIndexes.put(slot, editAreaSlots.size());
                     editAreaSlots.add(slot);
                 }
             }
@@ -206,15 +213,17 @@ public class MusicEditGUI implements InventoryHolder {
         long interval = getAutoSaveInterval();
         autoSaveTask = Scheduler.asyncTimer(() -> {
             if (hasUnsavedChanges) {
+                long version = changeVersion;
                 // Clear before saving: an edit that arrives during the save re-sets the
                 // flag and is caught next cycle, so no change is ever marked clean without
                 // having been persisted. Restore the flag if the save fails.
                 hasUnsavedChanges = false;
                 PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
                     if (success) {
+                        clearUnsavedChangesIfVersion(version);
                         MessageUtils.send(player, Lang.AUTOSAVE_SAVED);
                     } else {
-                        hasUnsavedChanges = true;
+                        restoreUnsavedChangesIfVersion(version);
                         MessageUtils.send(player, Lang.AUTOSAVE_FAILED_MANUAL);
                     }
                 });
@@ -254,16 +263,14 @@ public class MusicEditGUI implements InventoryHolder {
         GUIConfigManager.HotbarButtonConfig playConfig = isPlaying ? config.getButton("play-stop") : config.getButton("play");
         GUIConfigManager.HotbarButtonConfig emptyConfig = config.getButton("empty");
         
-        String layout = config.getLayout();
-        if (layout == null || layout.isEmpty()) {
+        if (layoutLines.length == 0) {
             return;
         }
 
         clearPlayerInventoryEditorArea();
         
-        String[] lines = layout.split("\n");
-        for (int row = 6; row < lines.length && row < 10; row++) {
-            String line = lines[row];
+        for (int row = 6; row < layoutLines.length && row < 10; row++) {
+            String line = layoutLines[row];
             for (int col = 0; col < line.length() && col < 9; col++) {
                 char c = line.charAt(col);
                 int layoutSlot = row * 9 + col;
@@ -399,7 +406,7 @@ public class MusicEditGUI implements InventoryHolder {
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{count}", String.valueOf(clearNoteCount)));
             }
-            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), infoConfig.getName(), lore, infoConfig.getCustomModelData());
+            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), infoConfig.getName(), lore, infoConfig.getCustomModelData(), infoConfig.getItemModel(), infoConfig.getCraftEngineItem());
             player.getInventory().setItem(infoSlot, infoItem);
         }
 
@@ -523,8 +530,8 @@ public class MusicEditGUI implements InventoryHolder {
             }
         } else if (changedSlots != null) {
             for (int slot : changedSlots) {
-                int index = editAreaSlots.indexOf(slot);
-                if (index < 0) continue;
+                Integer index = editAreaSlotIndexes.get(slot);
+                if (index == null) continue;
                 
                 int localRow = index / editCols;
                 int localCol = index % editCols;
@@ -631,7 +638,7 @@ public class MusicEditGUI implements InventoryHolder {
         if (currentMode == Mode.INSTRUMENT_SELECT) {
             return;
         }
-        if (editAreaSlots.contains(slot)) {
+        if (editAreaSlotIndexes.containsKey(slot)) {
             handleEditAreaClick(slot, isRightClick, isShiftClick);
         }
     }
@@ -732,8 +739,8 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void handleEditAreaClick(int slot, boolean isRightClick, boolean isShiftClick) {
-        int index = editAreaSlots.indexOf(slot);
-        if (index < 0) {
+        Integer index = editAreaSlotIndexes.get(slot);
+        if (index == null) {
             return;
         }
         
@@ -766,7 +773,7 @@ public class MusicEditGUI implements InventoryHolder {
             if (note != null) {
                 editHistory.pushAction(EditAction.removeNote(note));
                 music.removeNote(note);
-                hasUnsavedChanges = true;
+                markUnsavedChanges();
                 updateInventory();
             }
         } else {
@@ -782,7 +789,7 @@ public class MusicEditGUI implements InventoryHolder {
                 note.addInstrument(currentInstrument);
                 music.addNote(note);
                 editHistory.pushAction(EditAction.addNote(note));
-                hasUnsavedChanges = true;
+                markUnsavedChanges();
                 updateInventory();
                 playNoteSound(pitch, currentInstrument);
             } else {
@@ -865,7 +872,7 @@ public class MusicEditGUI implements InventoryHolder {
                 } else {
                     selectedNote.addInstrument(instrument);
                 }
-                hasUnsavedChanges = true;
+                markUnsavedChanges();
                 flashPreviewHighlight(selectedNote.getPitch(), selectedNote.getTick());
                 playNoteSound(selectedNote.getPitch(), instrument);
                 givePlayerInventoryItems();
@@ -950,15 +957,15 @@ public class MusicEditGUI implements InventoryHolder {
             List<MusicNote> allNotes = new ArrayList<>(music.getNotes());
             editHistory.pushAction(EditAction.clearAll(allNotes));
             music.clearNotes();
+            long version = markUnsavedChanges();
             PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
                 if (success) {
-                    hasUnsavedChanges = false;
+                    clearUnsavedChangesIfVersion(version);
                     currentMode = Mode.EDIT;
                     givePlayerInventoryItems();
                     updateInventory();
                     MessageUtils.send(player, Lang.EDIT_NOTES_CLEARED, "{count}", String.valueOf(clearNoteCount));
                 } else {
-                    hasUnsavedChanges = true;
                     MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
                 }
             }));
@@ -982,19 +989,11 @@ public class MusicEditGUI implements InventoryHolder {
         int row = layoutSlot / 9;
         int col = layoutSlot % 9;
         
-        String layout = config.getLayout();
-        if (layout == null || layout.isEmpty()) {
+        if (row < 0 || row >= layoutLines.length) {
             return ' ';
         }
-        
-        String[] lines = layout.split("\n");
-        if (row >= 0 && row < lines.length) {
-            String line = lines[row];
-            if (col < line.length()) {
-                return line.charAt(col);
-            }
-        }
-        return ' ';
+        String line = layoutLines[row];
+        return col < line.length() ? line.charAt(col) : ' ';
     }
 
     public void handleHotbarClick(int slot, boolean isRightClick, boolean isShiftClick) {
@@ -1050,13 +1049,12 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void saveMusic() {
-        hasUnsavedChanges = true;
+        long version = markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
             if (success) {
-                hasUnsavedChanges = false;
+                clearUnsavedChangesIfVersion(version);
                 MessageUtils.send(player, Lang.EDIT_SAVED, "{name}", music.getName());
             } else {
-                hasUnsavedChanges = true;
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             }
             givePlayerInventoryItems();
@@ -1069,13 +1067,12 @@ public class MusicEditGUI implements InventoryHolder {
             return;
         }
         music.setBpm(newBpm);
-        hasUnsavedChanges = true;
+        long version = markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
             if (!success) {
-                hasUnsavedChanges = true;
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             } else {
-                hasUnsavedChanges = false;
+                clearUnsavedChangesIfVersion(version);
             }
             givePlayerInventoryItems();
         }));
@@ -1087,13 +1084,12 @@ public class MusicEditGUI implements InventoryHolder {
             return;
         }
         music.setBpm(newBpm);
-        hasUnsavedChanges = true;
+        long version = markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
             if (!success) {
-                hasUnsavedChanges = true;
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             } else {
-                hasUnsavedChanges = false;
+                clearUnsavedChangesIfVersion(version);
             }
             givePlayerInventoryItems();
         }));
@@ -1110,13 +1106,12 @@ public class MusicEditGUI implements InventoryHolder {
         }
         PlayerMusic.TimeSignature newSignature = signatures[(currentIndex + 1) % signatures.length];
         music.setTimeSignature(newSignature);
-        hasUnsavedChanges = true;
+        long version = markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
             if (!success) {
-                hasUnsavedChanges = true;
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             } else {
-                hasUnsavedChanges = false;
+                clearUnsavedChangesIfVersion(version);
             }
             givePlayerInventoryItems();
         }));
@@ -1203,13 +1198,23 @@ public class MusicEditGUI implements InventoryHolder {
             int processed = 0;
             boolean needsInventoryRefresh = false;
             boolean needsHotbarRefresh = false;
+            boolean needsFullInventoryRefresh = false;
+            Set<Integer> changedSlots = new HashSet<>();
             while (accumulator[0] >= tickDurationMillis && timelineTick[0] <= endTick && processed < maxBurstPerServerTick) {
                 accumulator[0] -= tickDurationMillis;
+                int previousPlayTick = currentPlayTick;
+                int previousTickOffset = tickOffset;
                 if (currentIndex[0] < tickKeys.length && tickKeys[currentIndex[0]] == timelineTick[0]) {
                     needsHotbarRefresh |= playPlaybackTick(tickIndex, timelineTick[0], editCols);
                     currentIndex[0]++;
                 } else {
                     needsHotbarRefresh |= updatePlaybackPosition(tickIndex, timelineTick[0], editCols);
+                }
+                if (tickOffset != previousTickOffset) {
+                    needsFullInventoryRefresh = true;
+                } else {
+                    addPlaybackChangedSlots(changedSlots, previousPlayTick, editCols);
+                    addPlaybackChangedSlots(changedSlots, currentPlayTick, editCols);
                 }
                 needsInventoryRefresh = true;
                 timelineTick[0]++;
@@ -1225,7 +1230,11 @@ public class MusicEditGUI implements InventoryHolder {
                 if (needsHotbarRefresh) {
                     givePlayerInventoryItems();
                 }
-                updateInventory();
+                if (needsFullInventoryRefresh) {
+                    updateInventory();
+                } else if (!changedSlots.isEmpty()) {
+                    updateInventory(changedSlots);
+                }
             }
         }, 0L, 1L);
 
@@ -1274,6 +1283,23 @@ public class MusicEditGUI implements InventoryHolder {
         return nextVisibleNoteTick != null && nextVisibleNoteTick <= pageEnd;
     }
 
+    private void addPlaybackChangedSlots(Set<Integer> changedSlots, int tick, int editCols) {
+        if (tick < 0) {
+            return;
+        }
+        int localCol = tick - tickOffset * editCols;
+        if (localCol < 0 || localCol >= editCols) {
+            return;
+        }
+        int editRows = calculateEditRows();
+        for (int localRow = 0; localRow < editRows; localRow++) {
+            int index = localRow * editCols + localCol;
+            if (index < editAreaSlots.size()) {
+                changedSlots.add(editAreaSlots.get(index));
+            }
+        }
+    }
+
     private void finishPlayback() {
         if (!isPlaying) {
             return;
@@ -1307,7 +1333,7 @@ public class MusicEditGUI implements InventoryHolder {
                 isPlaying,
                 this::stopAutoSaveTask,
                 this::stopMusic,
-                () -> hasUnsavedChanges = false,
+                this::clearUnsavedChanges,
                 this::finishClose
         );
     }
@@ -1317,8 +1343,8 @@ public class MusicEditGUI implements InventoryHolder {
                 isPlaying,
                 this::stopAutoSaveTask,
                 this::stopMusic,
-                () -> hasUnsavedChanges = false,
-                () -> hasUnsavedChanges = true,
+                this::clearUnsavedChanges,
+                this::markUnsavedChanges,
                 this::finishClose,
                 callback -> PlayerMusicManager.getInstance().saveMusicAsync(music, callback::complete)
         );
@@ -1361,6 +1387,29 @@ public class MusicEditGUI implements InventoryHolder {
         return hasUnsavedChanges;
     }
 
+    public long markUnsavedChanges() {
+        changeVersion++;
+        hasUnsavedChanges = true;
+        return changeVersion;
+    }
+
+    public void clearUnsavedChangesIfVersion(long version) {
+        if (changeVersion == version) {
+            hasUnsavedChanges = false;
+        }
+    }
+
+    private void restoreUnsavedChangesIfVersion(long version) {
+        if (changeVersion == version) {
+            hasUnsavedChanges = true;
+        }
+    }
+
+    private void clearUnsavedChanges() {
+        changeVersion++;
+        hasUnsavedChanges = false;
+    }
+
     public boolean isOpeningSubGUI() {
         return openingSubGUI;
     }
@@ -1374,7 +1423,11 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     public void setHasUnsavedChanges(boolean hasUnsavedChanges) {
-        this.hasUnsavedChanges = hasUnsavedChanges;
+        if (hasUnsavedChanges) {
+            markUnsavedChanges();
+        } else {
+            clearUnsavedChanges();
+        }
     }
 
     public void refreshFromExternalUpdate() {
@@ -1391,7 +1444,7 @@ public class MusicEditGUI implements InventoryHolder {
         instrumentPageOffset = 0;
         selectionManager.clearSelection();
         editHistory.clear();
-        hasUnsavedChanges = false;
+        clearUnsavedChanges();
         updateInventory();
         givePlayerInventoryItems();
         if (wasPlaying) {
@@ -1406,7 +1459,7 @@ public class MusicEditGUI implements InventoryHolder {
         }
         
         applyUndoAction(action);
-        hasUnsavedChanges = true;
+        markUnsavedChanges();
         updateInventory();
     }
 
@@ -1417,7 +1470,7 @@ public class MusicEditGUI implements InventoryHolder {
         }
         
         applyRedoAction(action);
-        hasUnsavedChanges = true;
+        markUnsavedChanges();
         updateInventory();
     }
 
@@ -1497,7 +1550,7 @@ public class MusicEditGUI implements InventoryHolder {
                 () -> openingSubGUI = true,
                 () -> openingSubGUI = false,
                 () -> {
-                    hasUnsavedChanges = true;
+                    markUnsavedChanges();
                     updateInventory();
                 },
                 addedNotes -> editHistory.pushAction(EditAction.batchAdd(addedNotes))
@@ -1517,7 +1570,7 @@ public class MusicEditGUI implements InventoryHolder {
             music.removeNote(note);
         }
         
-        hasUnsavedChanges = true;
+        markUnsavedChanges();
         clearSelection();
         updateInventory();
         MessageUtils.send(player, Lang.EDIT_NOTES_DELETED_MSG, "{count}", String.valueOf(selectedNotes.size()));
@@ -1539,7 +1592,7 @@ public class MusicEditGUI implements InventoryHolder {
             count++;
         }
         
-        hasUnsavedChanges = true;
+        markUnsavedChanges();
         updateInventory();
         givePlayerInventoryItems();
         MessageUtils.send(player, Lang.EDIT_INSTRUMENT_CHANGED, "{count}", String.valueOf(count), "{instrument}", currentInstrument.getDisplayName());
@@ -1588,4 +1641,3 @@ public class MusicEditGUI implements InventoryHolder {
         return inventory;
     }
 }
-

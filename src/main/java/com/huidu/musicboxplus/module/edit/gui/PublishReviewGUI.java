@@ -39,7 +39,9 @@ public class PublishReviewGUI implements InventoryHolder {
         this.config = GUIConfigManager.getInstance().getPublishReviewConfig();
         this.reviewChar = config.getButtonMapping().getOrDefault("review-item", 'R');
         String title = config.getTitle();
-        this.inventory = Bukkit.createInventory(this, 54, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 6) * 9,
+                MiniMessageUtils.processComponent(title));
         loadPendingList();
         updateInventory();
     }
@@ -53,7 +55,7 @@ public class PublishReviewGUI implements InventoryHolder {
         slotMusicMap.clear();
 
         List<Integer> reviewSlots = config.getSlotsForChar(reviewChar);
-        int itemsPerPage = reviewSlots.size();
+        int itemsPerPage = Math.max(1, reviewSlots.size());
         int startIndex = page * itemsPerPage;
         int endIndex = Math.min(startIndex + itemsPerPage, pendingList.size());
 
@@ -74,7 +76,7 @@ public class PublishReviewGUI implements InventoryHolder {
                         .replace("{notes}", String.valueOf(music.getNoteCount())));
             }
             String name = reviewConfig.getName().replace("{name}", music.getName());
-            ItemStack item = ItemUtils.createStack(reviewConfig.getMaterial(), name, lore, reviewConfig.getCustomModelData());
+            ItemStack item = ItemUtils.createStack(reviewConfig.getMaterial(), name, lore, reviewConfig.getCustomModelData(), reviewConfig.getItemModel(), reviewConfig.getCraftEngineItem());
             inventory.setItem(slot, item);
             slotMusicMap.put(slot, music);
         }
@@ -104,14 +106,14 @@ public class PublishReviewGUI implements InventoryHolder {
 
     private ItemStack pageButton(String key) {
         GUIConfigManager.HotbarButtonConfig buttonConfig = config.getButton(key);
-        int itemsPerPage = config.getSlotsForChar(reviewChar).size();
+        int itemsPerPage = Math.max(1, config.getSlotsForChar(reviewChar).size());
         int totalPages = Math.max(1, (int) Math.ceil((double) pendingList.size() / itemsPerPage));
         List<String> lore = new ArrayList<>();
         for (String line : buttonConfig.getLore()) {
             lore.add(line.replace("{page}", String.valueOf(page + 1))
                     .replace("{totalPages}", String.valueOf(totalPages)));
         }
-        return ItemUtils.createStack(buttonConfig.getMaterial(), buttonConfig.getName(), lore, buttonConfig.getCustomModelData());
+        return ItemUtils.createStack(buttonConfig.getMaterial(), buttonConfig.getName(), lore, buttonConfig.getCustomModelData(), buttonConfig.getItemModel(), buttonConfig.getCraftEngineItem());
     }
 
     public void handleClick(int slot, boolean isRightClick) {
@@ -172,7 +174,7 @@ public class PublishReviewGUI implements InventoryHolder {
                 ? Sound.ENTITY_PLAYER_LEVELUP
                 : Sound.ENTITY_ITEM_BREAK, 0.5f, 1.0f);
         loadPendingList();
-        int itemsPerPage = config.getSlotsForChar(reviewChar).size();
+        int itemsPerPage = Math.max(1, config.getSlotsForChar(reviewChar).size());
         if (pendingList.isEmpty()) {
             page = 0;
         } else if (page * itemsPerPage >= pendingList.size()) {

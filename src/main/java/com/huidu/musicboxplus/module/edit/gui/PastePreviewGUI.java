@@ -33,7 +33,9 @@ public class PastePreviewGUI implements InventoryHolder {
         this.onClose = onClose;
         this.config = GUIConfigManager.getInstance().getPastePreviewConfig();
         String title = config.getTitle().replace("{count}", String.valueOf(noteCount));
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 

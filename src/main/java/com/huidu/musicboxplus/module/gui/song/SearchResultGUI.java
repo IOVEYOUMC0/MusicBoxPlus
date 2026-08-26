@@ -21,12 +21,15 @@ public class SearchResultGUI {
     }
 
     public static void open(PlayerWrapper wrapper, List<MusicBoxSong> results, String query, SongContainerGUI sourceGui, SongContainerGUI.SongGUIParams params, String guiType, Runnable backAction) {
+        if (wrapper == null || wrapper.getPlayer() == null || results == null) {
+            return;
+        }
         int pageCount;
         GUIConfigManager configManager = GUIConfigManager.getInstance();
         GUIConfigManager.ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
         int slotsPerPage = configManager.getLayoutCharCount("search-results", mapping.getResults());
         if (slotsPerPage <= 0) {
-            slotsPerPage = 45;
+            slotsPerPage = configManager.getGUIRows("search-results") * 9;
         }
         if ((pageCount = (int)Math.ceil((double)results.size() / (double)slotsPerPage)) == 0) {
             pageCount = 1;
@@ -41,7 +44,7 @@ public class SearchResultGUI {
             title = "<gold>Search Results <gray>- <yellow>{query} <gray>({page}/{last_page})";
         }
         title = title.replace("{query}", query).replace("{page}", String.valueOf(page + 1)).replace("{last_page}", String.valueOf(pageCount));
-        GUI gui = new GUI(title);
+        GUI gui = new GUI(title, configManager.getGUIRows("search-results"));
         LayoutParser layoutParser = new LayoutParser(gui, "search-results");
         GUIConfigManager.ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
         layoutParser.registerSimpleButton(mapping.getBack(), "back", backAction != null ? backAction : () -> com.huidu.musicboxplus.module.gui.GUIActions.openDefaultInventory(wrapper));
@@ -59,7 +62,7 @@ public class SearchResultGUI {
         }
         List<Integer> resultSlots = layoutParser.getSlotsForChar(mapping.getResults());
         if (resultSlots.isEmpty()) {
-            resultSlots = IntStream.range(0, 45).boxed().toList();
+            resultSlots = IntStream.range(0, configManager.getGUIRows("search-results") * 9).boxed().toList();
         }
         int startIndex = page * resultSlots.size();
         for (int i = 0; i < resultSlots.size() && startIndex + i < results.size(); ++i) {
@@ -74,7 +77,7 @@ public class SearchResultGUI {
                         ? List.of(Lang.SEARCH_RECORD_USE_DISC.toString())
                         : configManager.getShopLoreConfig().getSearchLore();
             }
-            ItemStack stack = song.getSongStack(Material.MUSIC_DISC_CAT, lore, false);
+            ItemStack stack = song.getSongStack(null, lore, false);
             gui.addItem(slot, stack, new ClickAction(() -> {
                 if (params != null && params.getOnSongLeftClick() != null && sourceGui != null) {
                     params.getOnSongLeftClick().accept(wrapper, sourceGui.createSongData(song, params, page, guiType));

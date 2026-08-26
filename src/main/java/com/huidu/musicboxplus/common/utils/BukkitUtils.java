@@ -5,15 +5,10 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
-import org.bukkit.entity.Player;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.metadata.MetadataValue;
 import org.bukkit.metadata.Metadatable;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public final class BukkitUtils {
     public static final List<Material> DISCS = Collections.unmodifiableList(Arrays.asList(Material.MUSIC_DISC_13, Material.MUSIC_DISC_CAT, Material.MUSIC_DISC_BLOCKS, Material.MUSIC_DISC_CHIRP, Material.MUSIC_DISC_FAR, Material.MUSIC_DISC_MALL, Material.MUSIC_DISC_MELLOHI, Material.MUSIC_DISC_STAL, Material.MUSIC_DISC_STRAD, Material.MUSIC_DISC_WARD, Material.MUSIC_DISC_11, Material.MUSIC_DISC_WAIT, Material.MUSIC_DISC_OTHERSIDE, Material.MUSIC_DISC_5, Material.MUSIC_DISC_PIGSTEP, Material.MUSIC_DISC_RELIC));
@@ -47,21 +42,6 @@ public final class BukkitUtils {
 
     public static Location centerBlock(Location location) {
         return new Location(location.getWorld(), (double)location.getBlockX() + 0.5, (double)location.getBlockY() + 0.5, (double)location.getBlockZ() + 0.5);
-    }
-
-    public static Set<Player> findOpenPlayers(InventoryHolder holder) {
-        BukkitUtils.checkPrimary();
-        return Bukkit.getOnlinePlayers().stream().filter(p -> {
-            Inventory inv = p.getOpenInventory().getTopInventory();
-            @Nullable InventoryHolder cHolder = inv.getHolder();
-            return holder.equals(cHolder);
-        }).collect(Collectors.toSet());
-    }
-
-    public static void checkPrimary() {
-        if (!Bukkit.isPrimaryThread()) {
-            throw new RuntimeException("Call this only in primary thread");
-        }
     }
 
     public static String locationToString(Location location) {
@@ -104,4 +84,3 @@ public final class BukkitUtils {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 }
-

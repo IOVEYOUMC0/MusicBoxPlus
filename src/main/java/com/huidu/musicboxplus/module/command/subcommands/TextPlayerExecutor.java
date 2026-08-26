@@ -57,11 +57,11 @@ public class TextPlayerExecutor implements SubCommand {
             // No song specified: create a song-less placeholder display. Assign a song later
             // via /musicboxplus textplayer songs <name> or the edit menu.
             if (TextDisplayPlayerManager.createIdle(name, player.getLocation(), 16) == null) {
-                MessageUtils.send(player, "&cText player module is disabled");
+                MessageUtils.send(player, Lang.TEXT_PLAYER_DISABLED);
                 return;
             }
             new TextDisplayPlayerEditGUI(name).open(player);
-            MessageUtils.send(player, "&aCreated empty text player &f" + name + "&a — pick a song from the menu");
+            MessageUtils.send(player, Lang.TEXT_PLAYER_CREATED_EMPTY, "{name}", name);
             return;
         }
         String songName = String.join(" ", java.util.Arrays.copyOfRange(args, 2, args.length)).replace('_', ' ');
@@ -73,24 +73,24 @@ public class TextPlayerExecutor implements SubCommand {
 
         TextDisplayPlayer textPlayer = TextDisplayPlayerManager.create(name, song, player.getLocation(), 16);
         if (textPlayer == null) {
-            MessageUtils.send(player, "&cText player module is disabled");
+            MessageUtils.send(player, Lang.TEXT_PLAYER_DISABLED);
             return;
         }
         textPlayer.getControl().open(player);
-        MessageUtils.send(player, "&aCreated text player &f" + name + "&a for &f" + song.getName());
+        MessageUtils.send(player, Lang.TEXT_PLAYER_CREATED, "{name}", name, "{song}", song.getName());
     }
 
     private void handleDelete(CommandSender sender, String name) {
         if (TextDisplayPlayerManager.delete(name)) {
-            MessageUtils.send(sender, "&aDeleted text player &f" + name);
+            MessageUtils.send(sender, Lang.TEXT_PLAYER_DELETED, "{name}", name);
         } else {
-            MessageUtils.send(sender, "&cText player not found: &f" + name);
+            MessageUtils.send(sender, Lang.TEXT_PLAYER_NOT_FOUND, "{name}", name);
         }
     }
 
     private void handleSongs(Player player, String name) {
         if (TextDisplayPlayerManager.get(name).isEmpty()) {
-            MessageUtils.send(player, "&cText player not found: &f" + name);
+            MessageUtils.send(player, Lang.TEXT_PLAYER_NOT_FOUND, "{name}", name);
             return;
         }
 
@@ -104,26 +104,25 @@ public class TextPlayerExecutor implements SubCommand {
                 }
                 TextDisplayPlayerManager.setSong(name, song);
                 TextDisplayPlayerManager.getActive(name).ifPresent(updated -> updated.getControl().open(player));
-                player.sendMessage(com.huidu.musicboxplus.common.utils.MiniMessageUtils.processComponent("&aSet text player &f" + name + "&a song to &f" + song.getName()));
+                MessageUtils.send(player, Lang.TEXT_PLAYER_SONG_SET, "{name}", name, "{song}", song.getName());
             })
             .build();
-        gui.openPage(0, params, "textplayer-songs");
+        gui.openPage(0, params, "textplayer-songs", () -> TextDisplayPlayerManager.getActive(name).ifPresentOrElse(
+            updated -> updated.getControl().open(player),
+            () -> new TextDisplayPlayerEditGUI(name).open(player)
+        ));
     }
 
     private void handleEdit(Player player, String name) {
         if (TextDisplayPlayerManager.get(name).isEmpty()) {
-            MessageUtils.send(player, "&cText player not found: &f" + name);
+            MessageUtils.send(player, Lang.TEXT_PLAYER_NOT_FOUND, "{name}", name);
             return;
         }
         new TextDisplayPlayerEditGUI(name).open(player);
     }
 
     private void sendUsage(CommandSender sender) {
-        MessageUtils.send(sender, "&cUsage:");
-        MessageUtils.send(sender, "&7/musicboxplus textplayer create <name> [song]");
-        MessageUtils.send(sender, "&7/musicboxplus textplayer delete <name>");
-        MessageUtils.send(sender, "&7/musicboxplus textplayer songs <name>");
-        MessageUtils.send(sender, "&7/musicboxplus textplayer edit <name>");
+        MessageUtils.sendAll(sender, Lang.TEXT_PLAYER_USAGE.toList());
     }
 
     @Override

@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.MusicBoxConfig;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
+import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -269,17 +270,38 @@ public class PlayerInventoryState {
     // where no code path could see it, and the player rejoined holding editor items instead of
     // their own inventory.
     public static void restoreAllPending() {
-        savedStates.entrySet().removeIf(entry -> {
+        for (Map.Entry<UUID, PlayerInventoryState> entry : savedStates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null) {
                 MusicBox.getInstance().getLogger().info("玩家 " + entry.getKey() + " 不在线，保留物品栏状态等待下次登录");
-                return false;
+                continue;
             }
-            entry.getValue().restore(player);
-            MessageUtils.send(player, Lang.EDIT_MODE_EXITED);
-            entry.getValue().deleteFromDisk();
-            return true;
-        });
+            PlayerInventoryState state = entry.getValue();
+            if (!savedStates.remove(entry.getKey(), state)) {
+                continue;
+            }
+            UUID playerId = entry.getKey();
+            Runnable restore = () -> {
+                try {
+                    if (!player.isOnline()) {
+                        savedStates.putIfAbsent(playerId, state);
+                        return;
+                    }
+                    state.restore(player);
+                    MessageUtils.send(player, Lang.EDIT_MODE_EXITED);
+                    state.deleteFromDisk();
+                } catch (RuntimeException failure) {
+                    savedStates.putIfAbsent(playerId, state);
+                    MusicBox.getInstance().getLogger().warning("恢复玩家物品栏失败: " + failure.getMessage());
+                }
+            };
+            Runnable retired = () -> savedStates.putIfAbsent(playerId, state);
+            if (Scheduler.ownsEntity(player)) {
+                restore.run();
+            } else {
+                Scheduler.entity(player, restore, retired);
+            }
+        }
     }
 
     public static void removeState(UUID playerUUID) {

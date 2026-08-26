@@ -38,7 +38,9 @@ public class PublishConfirmGUI implements InventoryHolder {
         this.currentPrice = clampPrice(this.currentPrice);
         this.description = sanitizeDescription(music.getDescription());
         String title = config.getTitle().replace("{name}", music.getName());
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -56,7 +58,7 @@ public class PublishConfirmGUI implements InventoryHolder {
                         .replace("{timeSignature}", music.getTimeSignature().toString()));
             }
             String name = infoConfig.getName().replace("{name}", music.getName());
-            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData());
+            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData(), infoConfig.getItemModel(), infoConfig.getCraftEngineItem());
             inventory.setItem(infoSlot, infoItem);
         }
 
@@ -72,7 +74,7 @@ public class PublishConfirmGUI implements InventoryHolder {
                         .replace("{maxPrice}", String.format("%.0f", maxPrice)));
             }
             String name = priceConfig.getName().replace("{price}", String.format("%.0f", currentPrice));
-            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData());
+            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData(), priceConfig.getItemModel(), priceConfig.getCraftEngineItem());
             inventory.setItem(priceSlot, priceItem);
         }
 
@@ -85,7 +87,7 @@ public class PublishConfirmGUI implements InventoryHolder {
                 lore.add(line.replace("{description}", descriptionText));
             }
             String name = descConfig.getName().replace("{description}", descriptionText);
-            ItemStack descItem = ItemUtils.createStack(descConfig.getMaterial(), name, lore, descConfig.getCustomModelData());
+            ItemStack descItem = ItemUtils.createStack(descConfig.getMaterial(), name, lore, descConfig.getCustomModelData(), descConfig.getItemModel(), descConfig.getCraftEngineItem());
             inventory.setItem(descSlot, descItem);
         }
 
@@ -100,7 +102,7 @@ public class PublishConfirmGUI implements InventoryHolder {
                         .replace("{price}", String.format("%.0f", currentPrice))
                         .replace("{revenue}", String.format("%.0f", authorRevenue)));
             }
-            ItemStack taxInfoItem = ItemUtils.createStack(taxConfig.getMaterial(), taxConfig.getName(), lore, taxConfig.getCustomModelData());
+            ItemStack taxInfoItem = ItemUtils.createStack(taxConfig.getMaterial(), taxConfig.getName(), lore, taxConfig.getCustomModelData(), taxConfig.getItemModel(), taxConfig.getCraftEngineItem());
             inventory.setItem(taxSlot, taxInfoItem);
         }
 

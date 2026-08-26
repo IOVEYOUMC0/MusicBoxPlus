@@ -33,6 +33,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.lang.ref.WeakReference;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.LinkedBlockingDeque;
 
 public class PlayerWrapper {
@@ -62,6 +63,8 @@ public class PlayerWrapper {
     private boolean autoPlayEnabled = true;
     private LoopMode loopMode = LoopMode.OFF;
     private volatile PlayerSongPlayer activePlayer;
+    // Invalidates delayed/async user play requests; automatic restarts keep the current request.
+    private final AtomicLong playRequestVersion = new AtomicLong();
     private PlayerPlayListModel playList;
     private final LinkedBlockingDeque<MusicBoxSong> recentSongs = new LinkedBlockingDeque<MusicBoxSong>();
     // The recent history fills in asynchronously after join; GUI rendering reads the deque
@@ -196,9 +199,8 @@ public class PlayerWrapper {
     }
 
     public static void clearAll(boolean saveRecentSongs) {
-        // destroy() tears down wrapper state synchronously here (so a following reload/restore
-        // observes a clean slate) and self-defers only its player-touching work (boss bar) onto
-        // the owner's region — so this stays Folia-safe without making the whole teardown async.
+        // Keep teardown synchronous: reload immediately recreates players after this method. The
+        // destroy method itself defers only entity-owned boss-bar/metadata operations.
         Bukkit.getOnlinePlayers().forEach(pl ->
             getInstanceOptional(pl).ifPresent(wrapper -> wrapper.destroy(saveRecentSongs)));
     }
@@ -225,8 +227,12 @@ public class PlayerWrapper {
                 bar.removeAll();
             }
         }
-        if (localPlayer != null && localPlayer.isOnline()) {
-            localPlayer.removeMetadata(METADATA_KEY, MusicBox.getInstance());
+        if (localPlayer != null) {
+            com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entityNow(localPlayer, () -> {
+                if (localPlayer.isOnline()) {
+                    localPlayer.removeMetadata(METADATA_KEY, MusicBox.getInstance());
+                }
+            });
         }
         // The throttled save above schedules a 30s flush; a wrapper being destroyed must not
         // write this player's recent songs to the database after it has logged out.
@@ -295,6 +301,7 @@ public class PlayerWrapper {
         if (!MusicBox.getInstance().isPlaybackModuleEnabled()) {
             return;
         }
+        final long requestVersion = this.playRequestVersion.incrementAndGet();
         MusicBoxSong currentSong = (MusicBoxSong) playList.getCurrent();
         if (currentSong != null) {
             this.addRecentSong(currentSong);
@@ -302,9 +309,9 @@ public class PlayerWrapper {
         Player delayTarget = this.getPlayer();
         if ((delayTicks = MusicBox.getInstance().getConfigObject().getPlayDelayTicks()) > 0 && delayTarget != null) {
             com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entityLater(
-                    delayTarget, () -> this.startPlayInternal(playList, tick, afterStart), delayTicks);
+                    delayTarget, () -> this.startPlayInternal(playList, tick, afterStart, requestVersion), delayTicks);
         } else {
-            this.startPlayInternal(playList, tick, afterStart);
+            this.startPlayInternal(playList, tick, afterStart, requestVersion);
         }
     }
 
@@ -315,12 +322,21 @@ public class PlayerWrapper {
     // afterStart runs on the same thread that created the player, immediately after it exists, so
     // callers that need to touch the new player keep working whichever path whenReady takes.
     private void startPlayInternal(IPlayList playList, short tick, Runnable afterStart) {
-        LoopMode oldLoopMode = this.loopMode;
+        this.startPlayInternal(playList, tick, afterStart, 0L);
+    }
+
+    // A non-zero request version belongs to a user-initiated play() call. Automatic restarts
+    // (speed/mode changes and playlist transitions) use zero and are never discarded here.
+    private void startPlayInternal(IPlayList playList, short tick, Runnable afterStart, long requestVersion) {
         PlaybackSetup.whenReady(playList, this::dispatchToListener, () -> {
+            if (requestVersion != 0L && requestVersion != this.playRequestVersion.get()) {
+                return;
+            }
+            LoopMode oldLoopMode = this.loopMode;
             if (this.speaker) {
-                this.startSpeaker(playList);
+                this.startSpeakerInternal(playList);
             } else {
-                this.startRadio(playList);
+                this.startRadioInternal(playList);
             }
             if (this.activePlayer != null) {
                 if (tick > -1) {
@@ -343,7 +359,7 @@ public class PlayerWrapper {
     // start touches. Falls back to the global region once they are gone.
     private void dispatchToListener(Runnable run) {
         Player player = this.getPlayer();
-        if (player != null && player.isOnline()) {
+        if (player != null) {
             com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, run);
         } else {
             com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(run);
@@ -550,12 +566,22 @@ public class PlayerWrapper {
     }
 
     public void startSpeaker(IPlayList playList) {
-        this.destroyActivePlayer();
+        this.playRequestVersion.incrementAndGet();
+        this.startSpeakerInternal(playList);
+    }
+
+    private void startSpeakerInternal(IPlayList playList) {
+        this.destroyActivePlayerInternal();
         this.activePlayer = speakerFactory != null ? speakerFactory.create(playList, this) : null;
     }
 
     public void startRadio(IPlayList playList) {
-        this.destroyActivePlayer();
+        this.playRequestVersion.incrementAndGet();
+        this.startRadioInternal(playList);
+    }
+
+    private void startRadioInternal(IPlayList playList) {
+        this.destroyActivePlayerInternal();
         this.activePlayer = radioFactory != null ? radioFactory.create(playList, this) : null;
     }
 
@@ -582,6 +608,11 @@ public class PlayerWrapper {
     }
 
     public synchronized void destroyActivePlayer() {
+        this.playRequestVersion.incrementAndGet();
+        this.destroyActivePlayerInternal();
+    }
+
+    private synchronized void destroyActivePlayerInternal() {
         PlayerSongPlayer player = this.activePlayer;
         if (player != null) {
             this.activePlayer = null;

@@ -1,13 +1,15 @@
 package com.huidu.musicboxplus.core.song;
 
 import com.huidu.musicboxplus.MusicBox;
-import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.utils.FileUtils;
+import com.huidu.musicboxplus.common.utils.ItemUtils;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
+import com.huidu.musicboxplus.common.utils.StorageAccess;
 import com.huidu.musicboxplus.common.utils.StringUtils;
 import com.huidu.musicboxplus.core.song.songContainers.types.FullSongContainer;
 import com.huidu.musicboxplus.core.song.songContainers.types.SubSongContainer;
 import org.bukkit.Material;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -29,11 +31,14 @@ public class MusicBoxSongContainer implements FullSongContainer {
     private final List<String> lore;
     private final int hash;
     private final String path;
-    private final Material customDisplayMaterial;
-    private final int customDisplayModelData;
-    private final String customDisplayName;
-    private final boolean customDisplayGlow;
-    private final String customDisplaySkullOwner;
+    private final Material displayMaterial;
+    private final int displayModelData;
+    private final String displayItemModel;
+    private final String displayCraftEngineItem;
+    private final String displayName;
+    private final boolean displayGlow;
+    private final String displaySkullOwner;
+    private final List<String> displayLore;
     private static volatile ExecutorService songLoader = createSongLoader();
 
     private static ExecutorService createSongLoader() {
@@ -95,67 +100,84 @@ public class MusicBoxSongContainer implements FullSongContainer {
         List<String> tempLore = new ArrayList<>();
         Material parsedMaterial = null;
         int parsedModelData = 0;
+        String parsedItemModel = "";
+        String parsedCraftEngineItem = "";
         String parsedName = null;
         boolean parsedGlow = false;
         String parsedSkullOwner = null;
+        List<String> description = new ArrayList<>();
+        List<String> infoDescription = new ArrayList<>();
+        List<String> configuredLore = new ArrayList<>();
 
         if (folderConfigFile.isFile()) {
             try {
-                org.bukkit.configuration.file.YamlConfiguration config = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(folderConfigFile);
+                YamlConfiguration config = YamlConfiguration.loadConfiguration(folderConfigFile);
 
-                if (config.contains("display.description")) {
-                    String description = config.getString("display.description");
-                    if (description != null && !description.isEmpty()) {
-                        tempLore.add(StringUtils.t(description));
-                    }
-                }
-                if (config.contains("display.item")) {
-                    String itemName = config.getString("display.item");
-                    if (itemName != null && !itemName.isEmpty()) {
-                        try {
-                            Material m = Material.valueOf(itemName.toUpperCase());
-                            if (m.isItem()) {
-                                parsedMaterial = m;
-                            }
-                        } catch (Exception ignored) {
+                String itemName = config.getString("display.item", config.getString("display.material", null));
+                if (itemName != null && !itemName.isEmpty()) {
+                    try {
+                        Material m = Material.matchMaterial(itemName);
+                        if (m != null && m.isItem()) {
+                            parsedMaterial = m;
                         }
+                    } catch (Exception ignored) {
                     }
                 }
-                if (config.contains("display.custom_model_data")) {
-                    parsedModelData = config.getInt("display.custom_model_data", 0);
-                }
+                parsedModelData = config.getInt("display.custom-model-data", config.getInt("display.custom_model_data", 0));
+                parsedItemModel = config.getString("display.item-model", config.getString("display.item_model", ""));
+                parsedCraftEngineItem = config.getString("display.craft-engine-item", config.getString("display.craft_engine_item", ""));
                 if (config.contains("display.name")) {
                     String customName = config.getString("display.name");
                     if (customName != null && !customName.isEmpty()) {
                         parsedName = StringUtils.t(customName);
                     }
                 }
+                description = readStringList(config, "display.description");
+                configuredLore = readStringList(config, "display.lore");
                 if (config.contains("display.glow")) {
                     parsedGlow = config.getBoolean("display.glow", false);
                 }
-                if (config.contains("display.skull_owner")) {
-                    parsedSkullOwner = config.getString("display.skull_owner");
+                parsedSkullOwner = config.getString("display.skull-owner", config.getString("display.skull_owner"));
+                if (parsedSkullOwner == null) {
+                    parsedSkullOwner = config.getString("display.skullOwner");
                 }
             } catch (Exception ex) {
-                MusicBox.getInstance().getLogger().warning("Failed to read folder.yml in " + folder.getPath() + ": " + ex.getMessage());
-            }
-        } else {
-            File infoFile = new File(folder, "info.txt");
-            if (infoFile.isFile()) {
-                try {
-                    tempLore = FileUtils.readFileToList(infoFile);
-                } catch (IOException ex) {
-                    MusicBox.getInstance().getLogger().warning("Failed to read info.txt in " + folder.getPath() + ": " + ex.getMessage());
+                MusicBox plugin = MusicBox.getInstance();
+                if (plugin != null) {
+                    plugin.getLogger().warning("Failed to read folder.yml in " + folder.getPath() + ": " + ex.getMessage());
                 }
             }
         }
 
-        this.lore = Collections.unmodifiableList(StringUtils.t(tempLore));
-        this.customDisplayMaterial = parsedMaterial;
-        this.customDisplayModelData = parsedModelData;
-        this.customDisplayName = parsedName;
-        this.customDisplayGlow = parsedGlow;
-        this.customDisplaySkullOwner = parsedSkullOwner;
+        if (description.isEmpty() && (configuredLore.isEmpty() || containsDescriptionPlaceholder(configuredLore))) {
+            infoDescription = readInfoDescription(folder);
+            description = infoDescription;
+        }
+
+        // A missing/empty folder.yml description falls back to the legacy info.txt. When the
+        // legacy file is the only source, write the equivalent folder.yml once and keep info.txt
+        // untouched so existing packs remain recoverable.
+        if (!configuredLore.isEmpty()) {
+            tempLore = expandDescription(configuredLore, description);
+        } else {
+            tempLore = new ArrayList<>(description);
+        }
+        if (tempLore.isEmpty()) {
+            tempLore = defaultDisplayLore();
+        }
+        if (!folderConfigFile.isFile() && !infoDescription.isEmpty()) {
+            migrateInfoFile(folderConfigFile, infoDescription);
+        }
+
+        this.lore = Collections.unmodifiableList(StringUtils.t(description));
+        this.displayMaterial = parsedMaterial;
+        this.displayModelData = parsedModelData;
+        this.displayItemModel = parsedItemModel;
+        this.displayCraftEngineItem = parsedCraftEngineItem;
+        this.displayName = parsedName;
+        this.displayGlow = parsedGlow;
+        this.displaySkullOwner = parsedSkullOwner;
+        this.displayLore = Collections.unmodifiableList(StringUtils.t(tempLore));
         this.hash = folder.getPath().hashCode();
         this.songs = Collections.emptyList();
         this.subContainers = Collections.emptyList();
@@ -287,19 +309,13 @@ public class MusicBoxSongContainer implements FullSongContainer {
 
     @Override
     public ItemStack getItemStack(List<String> extraLines) {
-        GUIConfigManager.FolderItemConfig folderConfig = GUIConfigManager.getInstance().getFolderItemConfig();
-        List<String> tempLore;
-
-        Material material = this.customDisplayMaterial != null ? this.customDisplayMaterial : folderConfig.getMaterial();
-        int customModelData = this.customDisplayModelData > 0 ? this.customDisplayModelData : folderConfig.getCustomModelData();
-        String displayName = this.customDisplayName != null ? this.customDisplayName : folderConfig.getNameFormat().replace("{folder}", this.getName());
-        String skullOwner = material == Material.PLAYER_HEAD ? this.customDisplaySkullOwner : null;
-
-        ItemStack chest = new ItemStack(material);
+        Material material = this.displayMaterial != null ? this.displayMaterial : Material.CHEST;
+        String displayName = resolvePlaceholders(this.displayName != null ? this.displayName : "<gold>" + this.getName() + "</gold>");
+        String skullOwner = material == Material.PLAYER_HEAD ? this.displaySkullOwner : null;
+        ItemStack chest = ItemUtils.createStack(material, displayName, null, this.displayModelData, this.displayItemModel, this.displayCraftEngineItem);
         ItemMeta meta = chest.getItemMeta();
-        meta.displayName(MiniMessageUtils.processComponent(displayName));
-        if (customModelData > 0) {
-            meta.setCustomModelData(customModelData);
+        if (meta == null) {
+            return chest;
         }
 
         if (material == Material.PLAYER_HEAD) {
@@ -319,31 +335,9 @@ public class MusicBoxSongContainer implements FullSongContainer {
             }
         }
 
-        List<String> configLore = folderConfig.getLoreFormat();
-        List<String> baseLore;
-        if (configLore != null && !configLore.isEmpty()) {
-            // The folder's info.txt / folder.yml description lives in this.lore. Expand a
-            // {description} line into those lines; if the template has no {description}
-            // placeholder, append the description at the end so it always shows.
-            boolean hasDescriptionPlaceholder = false;
-            baseLore = new ArrayList<>();
-            for (String line : configLore) {
-                if (line.contains("{description}")) {
-                    hasDescriptionPlaceholder = true;
-                    if (this.lore != null) {
-                        baseLore.addAll(this.lore);
-                    }
-                    continue;
-                }
-                baseLore.add(line.replace("{folder}", this.getName())
-                        .replace("{count}", String.valueOf(this.getAllSongCount())));
-            }
-            if (!hasDescriptionPlaceholder && this.lore != null && !this.lore.isEmpty()) {
-                baseLore.addAll(this.lore);
-            }
-        } else {
-            baseLore = new ArrayList<>(this.lore);
-        }
+        List<String> baseLore = new ArrayList<>(this.displayLore);
+        baseLore.replaceAll(this::resolvePlaceholders);
+        List<String> tempLore;
         if (!extraLines.isEmpty()) {
             tempLore = new ArrayList<>(baseLore);
             tempLore.addAll(extraLines);
@@ -353,11 +347,108 @@ public class MusicBoxSongContainer implements FullSongContainer {
         meta.lore(MiniMessageUtils.processComponents(tempLore));
         chest.setItemMeta(meta);
 
-        if (this.customDisplayGlow) {
+        if (this.displayGlow) {
             chest = com.huidu.musicboxplus.common.utils.ItemUtils.glow(chest);
         }
 
         return chest;
+    }
+
+    private static List<String> readInfoDescription(File folder) {
+        File infoFile = new File(folder, "info.txt");
+        if (!infoFile.isFile()) {
+            return new ArrayList<>();
+        }
+        try {
+            return new ArrayList<>(FileUtils.readFileToList(infoFile));
+        } catch (IOException ex) {
+            MusicBox plugin = MusicBox.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().warning("Failed to read info.txt in " + folder.getPath() + ": " + ex.getMessage());
+            }
+            return new ArrayList<>();
+        }
+    }
+
+    private static List<String> readStringList(YamlConfiguration config, String path) {
+        if (!config.contains(path)) {
+            return new ArrayList<>();
+        }
+        if (config.isList(path)) {
+            return new ArrayList<>(config.getStringList(path));
+        }
+        String value = config.getString(path);
+        return value == null || value.isEmpty() ? new ArrayList<>() : new ArrayList<>(Collections.singletonList(value));
+    }
+
+    private static List<String> expandDescription(List<String> template, List<String> description) {
+        List<String> expanded = new ArrayList<>();
+        for (String line : template) {
+            if (line == null) {
+                continue;
+            }
+            if (line.trim().equals("{description}")) {
+                expanded.addAll(description);
+            } else if (line.contains("{description}")) {
+                if (description.isEmpty()) {
+                    String withoutDescription = line.replace("{description}", "");
+                    if (!withoutDescription.isEmpty()) {
+                        expanded.add(withoutDescription);
+                    }
+                } else {
+                    for (String descriptionLine : description) {
+                        expanded.add(line.replace("{description}", descriptionLine));
+                    }
+                }
+            } else {
+                expanded.add(line);
+            }
+        }
+        return expanded;
+    }
+
+    private static boolean containsDescriptionPlaceholder(List<String> lines) {
+        for (String line : lines) {
+            if (line != null && line.contains("{description}")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static List<String> defaultDisplayLore() {
+        return new ArrayList<>(List.of(
+                "<gray>Songs: {count}</gray>",
+                "<yellow>Click to open</yellow>"
+        ));
+    }
+
+    private static void migrateInfoFile(File folderConfigFile, List<String> description) {
+        if (folderConfigFile.exists() || description.isEmpty() || !StorageAccess.canWriteTo(folderConfigFile)) {
+            return;
+        }
+        YamlConfiguration migrated = new YamlConfiguration();
+        migrated.set("display.description", description);
+        try {
+            migrated.save(folderConfigFile);
+            MusicBox plugin = MusicBox.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().fine("Migrated " + folderConfigFile.getParentFile().getName() + "/info.txt to folder.yml");
+            }
+        } catch (IOException ex) {
+            MusicBox plugin = MusicBox.getInstance();
+            if (plugin != null) {
+                plugin.getLogger().warning("Failed to migrate info.txt to " + folderConfigFile.getPath() + ": " + ex.getMessage());
+            }
+        }
+    }
+
+    private String resolvePlaceholders(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("{folder}", this.getName())
+                .replace("{count}", String.valueOf(this.getAllSongCount()));
     }
 
     private String getPath() {

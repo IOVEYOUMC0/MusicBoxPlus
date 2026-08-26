@@ -126,11 +126,11 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         }
         for (UUID uuid : playerList.keySet()) {
             Player listener = Bukkit.getPlayer(uuid);
-            if (listener == null || !listener.isOnline()) {
+            if (listener == null) {
                 continue;
             }
             Scheduler.entity(listener, () -> {
-                if (destroyed) {
+                if (destroyed || !listener.isOnline()) {
                     return;
                 }
                 for (int i = 0; i < count; i++) {
@@ -237,6 +237,12 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
     public void addPlayer(Player player) {
         if (player != null) {
             playerList.putIfAbsent(player.getUniqueId(), true);
+        }
+    }
+
+    public void addPlayer(UUID uuid) {
+        if (uuid != null) {
+            playerList.putIfAbsent(uuid, true);
         }
     }
 

@@ -40,13 +40,14 @@ public class TextDisplayPlayerEditGUI {
         stopWatcher();
         TextDisplayHandle textPlayer = TextDisplayPlayerManager.get(this.name).orElse(null);
         if (textPlayer == null) {
-            MessageUtils.send(player, "&cText player not found: &f" + this.name);
+            MessageUtils.send(player, Lang.TEXT_PLAYER_NOT_FOUND, "{name}", this.name);
             player.closeInventory();
             return;
         }
 
         this.config = GUIConfigManager.getInstance().getTextPlayerEditConfig();
-        this.gui = new GUI(config.getTitle().replace("{name}", this.name), 3);
+        this.gui = new GUI(config.getTitle().replace("{name}", this.name),
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3));
         TextDisplayPlayer.DisplayOptions options = textPlayer.getDisplayOptions();
         boolean admin = player.hasPermission(Permissions.ADMIN);
 
@@ -84,23 +85,23 @@ public class TextDisplayPlayerEditGUI {
             }
             addConfiguredItem("move-to-me", createConfiguredItem("move-to-me"), new PlayerClickAction(p -> {
                 if (TextDisplayPlayerManager.move(this.name, p.getLocation())) {
-                    MessageUtils.send(p, "&aMoved text player &f" + this.name + "&a to your position");
+                    MessageUtils.send(p, Lang.TEXT_PLAYER_MOVED, "{name}", this.name);
                 }
                 open(player);
             }));
             addConfiguredItem("raise", createConfiguredItem("raise"), new ClickAction(() -> {
-                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(0.25));
+                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(config.getHeightStep()));
                 open(player);
             }));
             addConfiguredItem("lower", createConfiguredItem("lower"), new ClickAction(() -> {
-                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(-0.25));
+                TextDisplayPlayerManager.get(this.name).ifPresent(tp -> tp.adjustHeight(-config.getHeightStep()));
                 open(player);
             }));
             addConfiguredItem("range-up", createRangeItem("range-up", textPlayer.getRange()), new ClickAction(
-                    () -> changeRange(player, TextDisplayPlayerManager.RANGE_STEP),
+                    () -> changeRange(player, config.getRangeStep()),
                     () -> promptRangeInput(player)));
             addConfiguredItem("range-down", createRangeItem("range-down", textPlayer.getRange()), new ClickAction(
-                    () -> changeRange(player, -TextDisplayPlayerManager.RANGE_STEP),
+                    () -> changeRange(player, -config.getRangeStep()),
                     () -> promptRangeInput(player)));
             addConfiguredItem("toggle-billboard", createToggleItem("toggle-billboard", options.isBillboardFixed()), new ClickAction(() -> {
                 options.setBillboardFixed(!options.isBillboardFixed());
@@ -125,7 +126,7 @@ public class TextDisplayPlayerEditGUI {
             }));
             addConfiguredItem("delete", createConfiguredItem("delete"), new PlayerClickAction(p -> {
                 if (TextDisplayPlayerManager.delete(this.name)) {
-                    MessageUtils.send(player, "&aDeleted text player &f" + this.name);
+                    MessageUtils.send(player, Lang.TEXT_PLAYER_DELETED, "{name}", this.name);
                 }
                 player.closeInventory();
             }));
@@ -187,7 +188,10 @@ public class TextDisplayPlayerEditGUI {
         GUIInputManager.getInstance().requestInput(
             player,
             GUIInputManager.InputType.SEARCH_QUERY,
-            MiniMessageUtils.processComponent("<yellow>输入播放范围 (" + TextDisplayPlayerManager.MIN_RANGE + "-" + TextDisplayPlayerManager.MAX_RANGE + "):</yellow>"),
+            Lang.TEXT_PLAYER_RANGE_INPUT.toComponent(
+                "{min}", String.valueOf(TextDisplayPlayerManager.MIN_RANGE),
+                "{max}", String.valueOf(TextDisplayPlayerManager.MAX_RANGE)
+            ),
             new GUIInputManager.InputCallback() {
                 @Override
                 public void onInputReceived(Player p, String input) {
@@ -195,10 +199,10 @@ public class TextDisplayPlayerEditGUI {
                         int value = Integer.parseInt(input.trim());
                         if (TextDisplayPlayerManager.setRange(name, value)) {
                             int applied = TextDisplayPlayerManager.get(name).map(TextDisplayHandle::getRange).orElse(value);
-                            MessageUtils.send(p, "&aSet text player &f" + name + "&a range to &f" + applied);
+                            MessageUtils.send(p, Lang.TEXT_PLAYER_RANGE_SET, "{name}", name, "{range}", String.valueOf(applied));
                         }
                     } catch (NumberFormatException e) {
-                        MessageUtils.send(p, "&cInvalid number: &f" + input);
+                        MessageUtils.send(p, Lang.TEXT_PLAYER_INVALID_NUMBER, "{input}", input);
                     }
                     Scheduler.entity(p, () -> new TextDisplayPlayerEditGUI(name).open(p));
                 }
@@ -226,7 +230,8 @@ public class TextDisplayPlayerEditGUI {
         List<String> lore = buttonConfig.getLore().stream()
             .map(line -> applyPlaceholders(line, replacements))
             .toList();
-        return ItemUtils.createStack(buttonConfig.getMaterial(), name, lore, buttonConfig.getCustomModelData());
+        return ItemUtils.createStack(buttonConfig.getMaterial(), name, lore, buttonConfig.getCustomModelData(),
+                buttonConfig.getItemModel(), buttonConfig.getCraftEngineItem());
     }
 
     private String applyPlaceholders(String input, String... replacements) {
@@ -250,7 +255,7 @@ public class TextDisplayPlayerEditGUI {
                     return;
                 }
                 TextDisplayPlayerManager.setSong(this.name, song);
-                player.sendMessage(MiniMessageUtils.processComponent("&aSet text player &f" + this.name + "&a song to &f" + song.getName()));
+                MessageUtils.send(player, Lang.TEXT_PLAYER_SONG_SET, "{name}", this.name, "{song}", song.getName());
                 new TextDisplayPlayerEditGUI(this.name).open(player);
             })
             .onContainerRightClick((w, data) -> {
@@ -261,13 +266,11 @@ public class TextDisplayPlayerEditGUI {
                 if (songs == null || songs.isEmpty()) {
                     return;
                 }
-                TextDisplayPlayerManager.setPlaylist(this.name, new ListPlaylist(songs, true));
-                player.sendMessage(MiniMessageUtils.processComponent("&aSet text player &f" + this.name + "&a playlist to &f" + songs.size() + " &asongs"));
-                new TextDisplayPlayerEditGUI(this.name).open(player);
+                applyPlaylist(player, songs);
             })
-            .extraContainerLore(data -> List.of("<gray>右键将整个文件夹设为播放列表</gray>"))
+            .extraContainerLore(data -> Lang.TEXT_PLAYER_FOLDER_LORE.toList())
             .build();
-        gui.openPage(0, params, "textplayer-songs");
+        gui.openPage(0, params, "textplayer-songs", () -> new TextDisplayPlayerEditGUI(this.name).open(player));
     }
 
     private void openPlaylistSelector(Player player) {
@@ -277,15 +280,20 @@ public class TextDisplayPlayerEditGUI {
             model -> new ClickAction(() -> {
                 List<MusicBoxSong> songs = model.getAllSongs();
                 if (songs == null || songs.isEmpty()) {
-                    player.sendMessage(MiniMessageUtils.processComponent("&cThat playlist is empty"));
+                    MessageUtils.send(player, Lang.TEXT_PLAYER_PLAYLIST_EMPTY);
                     return;
                 }
-                TextDisplayPlayerManager.setPlaylist(this.name, new ListPlaylist(songs, true));
-                player.sendMessage(MiniMessageUtils.processComponent("&aSet text player &f" + this.name + "&a playlist to &f" + songs.size() + " &asongs"));
-                new TextDisplayPlayerEditGUI(this.name).open(player);
+                applyPlaylist(player, songs);
             }),
             null,
             () -> new TextDisplayPlayerEditGUI(this.name).open(player)
         );
+    }
+
+    private void applyPlaylist(Player player, List<MusicBoxSong> songs) {
+        TextDisplayPlayerManager.setPlaylist(this.name, new ListPlaylist(songs, true));
+        MessageUtils.send(player, Lang.TEXT_PLAYER_PLAYLIST_SET,
+            "{name}", this.name, "{count}", String.valueOf(songs.size()));
+        new TextDisplayPlayerEditGUI(this.name).open(player);
     }
 }

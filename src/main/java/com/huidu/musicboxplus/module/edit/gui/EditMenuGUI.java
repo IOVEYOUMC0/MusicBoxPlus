@@ -32,7 +32,9 @@ public class EditMenuGUI implements InventoryHolder {
     public EditMenuGUI(Player player) {
         this.player = player;
         this.config = GUIConfigManager.getInstance().getEditMenuConfig();
-        this.inventory = Bukkit.createInventory(this, 36, MiniMessageUtils.processComponent(config.getTitle()));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 4) * 9,
+                MiniMessageUtils.processComponent(config.getTitle()));
         updateInventory();
     }
 

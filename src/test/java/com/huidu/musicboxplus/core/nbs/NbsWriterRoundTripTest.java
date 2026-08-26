@@ -10,6 +10,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Assumptions;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 // NbsWriter is the inverse of NbsReader, so reading a file, writing it back and reading that
@@ -84,6 +85,13 @@ class NbsWriterRoundTripTest {
         assertEquals("Ørn", reread.author());
         assertEquals("Ñ", reread.originalAuthor());
         assertEquals("üñî", reread.description());
+    }
+
+    @Test
+    void rejectsValuesThatDoNotFitTheNbsFormat() {
+        RawNbsSong tooLong = new RawNbsSong(4, 20, 65536, 1, "long", "", "", "",
+                1000, 4, false, 0, 0, List.of(), List.of(), List.of());
+        assertThrows(IOException.class, () -> NbsWriter.write(tooLong, new ByteArrayOutputStream()));
     }
 
     private static void assertRoundTrips(RawNbsSong original, String label) throws IOException {

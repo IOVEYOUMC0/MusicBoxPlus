@@ -392,6 +392,13 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
         }
     }
 
+    public void addPlayer(UUID uuid) {
+        MusicBoxSongPlayer owner = resolveOwner();
+        if (owner instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
+            enginePlayer.addPlayer(uuid);
+        }
+    }
+
     @Override
     public void removePlayer(Player player) {
         MusicBoxSongPlayer owner = resolveOwner();

@@ -245,7 +245,7 @@ final class GUIShopActions {
         double need = Math.max(0D, totalPrice - balance);
         List<String> lore = replaceContainerPurchase(config.getLore(), container, songCount, totalPrice, balance, need);
         String name = replaceContainerPurchase(config.getName(), container, songCount, totalPrice, balance, need);
-        return ItemUtils.createStack(config.getMaterial(), name, lore, config.getCustomModelData());
+        return ItemUtils.createStack(config.getMaterial(), name, lore, config.getCustomModelData(), config.getItemModel(), config.getCraftEngineItem());
     }
 
     private static List<String> replaceContainerPurchase(List<String> lore, FullSongContainer container, int songCount, double totalPrice) {

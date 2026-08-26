@@ -52,11 +52,29 @@ public final class NbsWriter {
         int maxLayer = -1;
         int maxTick = 0;
         for (RawNbsNote note : notes) {
+            if (note.tick() < 0 || note.tick() > 0xFFFF) {
+                throw new IOException("NBS note tick out of range: " + note.tick());
+            }
+            if (note.layer() < 0 || note.layer() > 0xFFFF) {
+                throw new IOException("NBS note layer out of range: " + note.layer());
+            }
             maxLayer = Math.max(maxLayer, note.layer());
             maxTick = Math.max(maxTick, note.tick());
         }
         int songHeight = Math.max(1, Math.max(song.songHeight(), maxLayer + 1));
         int lengthTicks = Math.max(song.lengthTicks(), maxTick);
+        if (lengthTicks > 0xFFFF) {
+            throw new IOException("NBS song length exceeds 65535 ticks: " + lengthTicks);
+        }
+        if (songHeight > 0xFFFF) {
+            throw new IOException("NBS song height exceeds 65535 layers: " + songHeight);
+        }
+        if (song.loopStartTick() < 0 || song.loopStartTick() > 0xFFFF) {
+            throw new IOException("NBS loop start tick out of range: " + song.loopStartTick());
+        }
+        if (song.customInstruments().size() > 255) {
+            throw new IOException("NBS custom instrument count exceeds 255: " + song.customInstruments().size());
+        }
 
         writeShortLE(os, 0);
         os.write(NBS_VERSION);
@@ -79,7 +97,7 @@ public final class NbsWriter {
         writeString(os, "");
         os.write(song.loopEnabled() ? 1 : 0);
         os.write(clampByte(song.maxLoopCount()));
-        writeShortLE(os, Math.max(0, song.loopStartTick()));
+        writeShortLE(os, song.loopStartTick());
 
         writeNotes(os, notes);
         writeLayers(os, song.layers(), songHeight);
@@ -93,7 +111,11 @@ public final class NbsWriter {
         int index = 0;
         while (index < sortedNotes.size()) {
             int tick = sortedNotes.get(index).tick();
-            writeShortLE(os, tick - previousTick);
+            int tickJump = tick - previousTick;
+            if (tickJump <= 0 || tickJump > 0xFFFF) {
+                throw new IOException("NBS tick jump out of range: " + tickJump);
+            }
+            writeShortLE(os, tickJump);
             previousTick = tick;
 
             int previousLayer = -1;
@@ -107,7 +129,11 @@ public final class NbsWriter {
                     index++;
                     continue;
                 }
-                writeShortLE(os, note.layer() - previousLayer);
+                int layerJump = note.layer() - previousLayer;
+                if (layerJump <= 0 || layerJump > 0xFFFF) {
+                    throw new IOException("NBS layer jump out of range: " + layerJump);
+                }
+                writeShortLE(os, layerJump);
                 previousLayer = note.layer();
                 os.write(clampByte(note.instrument()));
                 os.write(clampByte(note.key()));
@@ -143,8 +169,7 @@ public final class NbsWriter {
     // The table has to be written for real: notes carry ids at or above the vanilla count, so
     // declaring zero custom instruments points them at an empty table on re-import.
     private static void writeCustomInstruments(OutputStream os, List<RawNbsCustomInstrument> instruments) throws IOException {
-        // An unsigned byte holds the count, so anything past 255 cannot be declared at all.
-        int count = Math.min(255, instruments.size());
+        int count = instruments.size();
         os.write(count);
         for (int i = 0; i < count; i++) {
             RawNbsCustomInstrument instrument = instruments.get(i);

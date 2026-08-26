@@ -25,6 +25,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 // Captures the live playback state (per-player radio/speaker players and block players such
 // as signs and jukeboxes) before a plugin reload, tears the active players down, and
@@ -39,49 +41,89 @@ public final class ReloadPlaybackState {
         this.plugin = plugin;
     }
 
-    // Snapshot of everything that needs to survive a reload. Opaque to callers.
-    public Snapshot capture() {
-        List<PlayerPlaybackSnapshot> playerSnapshots = new ArrayList<>();
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            Optional<PlayerWrapper> wrapperOptional = PlayerWrapper.getInstanceOptional(player);
-            if (wrapperOptional.isEmpty()) {
-                continue;
+    // Snapshot of everything that needs to survive a reload. Entity/block state is read on its
+    // owner scheduler; the global reload path must never synchronously read it on Folia.
+    public CompletableFuture<Snapshot> captureAsync() {
+        List<PlayerPlaybackSnapshot> playerSnapshots = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<BlockPlaybackSnapshot> blockSnapshots = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<Player> players = new ArrayList<>(Bukkit.getOnlinePlayers());
+        List<AbstractBlockPlayer> blockPlayers = new ArrayList<>(AbstractBlockPlayer.getAll());
+        int taskCount = players.size();
+        for (AbstractBlockPlayer player : blockPlayers) {
+            if (player != null && player.getLocation() != null && player.getLocation().getWorld() != null
+                    && (player instanceof SignPlayer || player instanceof JukeboxPlayer)) {
+                taskCount++;
             }
-            PlayerWrapper wrapper = wrapperOptional.get();
-            PlayerSongPlayer activePlayer = wrapper.getActivePlayer();
-            if (activePlayer == null || activePlayer.isDestroyed() || activePlayer.getMusicBoxSong() == null) {
-                continue;
+        }
+        CompletableFuture<Snapshot> result = new CompletableFuture<>();
+        if (taskCount == 0) {
+            result.complete(new Snapshot(List.of(), List.of()));
+            return result;
+        }
+        AtomicInteger remaining = new AtomicInteger(taskCount);
+        Runnable completeOne = () -> {
+            if (remaining.decrementAndGet() == 0) {
+                result.complete(new Snapshot(List.copyOf(playerSnapshots), List.copyOf(blockSnapshots)));
             }
-            PlayerPlaylistSnapshot playlistSnapshot = snapshotPlayerPlaylist(activePlayer.getPlayList());
-            if (playlistSnapshot == null) {
-                continue;
+        };
+
+        for (Player player : players) {
+            try {
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, () -> {
+                    try {
+                        Optional<PlayerWrapper> wrapperOptional = PlayerWrapper.getInstanceOptional(player);
+                        if (wrapperOptional.isEmpty()) {
+                            return;
+                        }
+                        PlayerWrapper wrapper = wrapperOptional.get();
+                        PlayerSongPlayer activePlayer = wrapper.getActivePlayer();
+                        if (activePlayer == null || activePlayer.isDestroyed() || activePlayer.getMusicBoxSong() == null) {
+                            return;
+                        }
+                        PlayerPlaylistSnapshot playlistSnapshot = snapshotPlayerPlaylist(activePlayer.getPlayList());
+                        if (playlistSnapshot != null) {
+                            playerSnapshots.add(new PlayerPlaybackSnapshot(
+                                player.getUniqueId(), playlistSnapshot, activePlayer.getTick(), activePlayer.isPaused(),
+                                wrapper.isSpeaker(), wrapper.isSilent(), wrapper.getLoopMode(),
+                                wrapper.getPlaybackSpeedMultiplier()));
+                        }
+                    } finally {
+                        completeOne.run();
+                    }
+                }, completeOne);
+            } catch (RuntimeException ignored) {
+                completeOne.run();
             }
-            playerSnapshots.add(new PlayerPlaybackSnapshot(
-                player.getUniqueId(),
-                playlistSnapshot,
-                activePlayer.getTick(),
-                activePlayer.isPaused(),
-                wrapper.isSpeaker(),
-                wrapper.isSilent(),
-                wrapper.getLoopMode(),
-                wrapper.getPlaybackSpeedMultiplier()
-            ));
         }
 
-        List<BlockPlaybackSnapshot> blockSnapshots = new ArrayList<>();
-        for (AbstractBlockPlayer player : AbstractBlockPlayer.getAll()) {
-            if (player == null || player.isDestroyed() || player.getLocation() == null) {
+        for (AbstractBlockPlayer player : blockPlayers) {
+            if (player == null || player.getLocation() == null
+                    || player.getLocation().getWorld() == null
+                    || (!(player instanceof SignPlayer) && !(player instanceof JukeboxPlayer))) {
                 continue;
             }
-            if (player instanceof SignPlayer signPlayer) {
-                blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.SIGN, player.getLocation(),
-                        getCurrentSongHash(player), player.getTick(), signPlayer.getOwnerUuid()));
-            } else if (player instanceof JukeboxPlayer) {
-                blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.JUKEBOX, player.getLocation(),
-                        getCurrentSongHash(player), player.getTick(), null));
+            Location location = player.getLocation();
+            try {
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(location, () -> {
+                    try {
+                        if (!player.isDestroyed()) {
+                            if (player instanceof SignPlayer signPlayer) {
+                                blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.SIGN, location,
+                                        getCurrentSongHash(player), player.getTick(), signPlayer.getOwnerUuid()));
+                            } else {
+                                blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.JUKEBOX, location,
+                                        getCurrentSongHash(player), player.getTick(), null));
+                            }
+                        }
+                    } finally {
+                        completeOne.run();
+                    }
+                });
+            } catch (RuntimeException ignored) {
+                completeOne.run();
             }
         }
-        return new Snapshot(playerSnapshots, blockSnapshots);
+        return result;
     }
 
     // Destroys all active block players and clears player wrappers ahead of a reload.
@@ -147,22 +189,26 @@ public final class ReloadPlaybackState {
         }
         for (PlayerPlaybackSnapshot playerSnapshot : snapshot.playerSnapshots()) {
             Player player = Bukkit.getPlayer(playerSnapshot.playerId());
-            if (player == null || !player.isOnline()) {
+            if (player == null) {
                 continue;
             }
-            PlayerWrapper wrapper = PlayerWrapper.getInstance(player);
-            wrapper.setSilent(playerSnapshot.silent());
-            wrapper.setLoopMode(playerSnapshot.loopMode());
-            if (wrapper.isSpeaker() != playerSnapshot.speaker()) {
-                wrapper.switchMode();
-            }
-            wrapper.setPlaybackSpeedMultiplier(playerSnapshot.speed());
-
             restorePlayerPlaylist(playerSnapshot.playlist()).ifPresent(playlist -> {
-                wrapper.play(playlist, playerSnapshot.tick());
-                if (playerSnapshot.paused() && wrapper.getActivePlayer() != null) {
-                    wrapper.getActivePlayer().pause();
-                }
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, () -> {
+                    if (!player.isOnline()) {
+                        return;
+                    }
+                    PlayerWrapper wrapper = PlayerWrapper.getInstance(player);
+                    wrapper.setSilent(playerSnapshot.silent());
+                    wrapper.setLoopMode(playerSnapshot.loopMode());
+                    if (wrapper.isSpeaker() != playerSnapshot.speaker()) {
+                        wrapper.switchMode();
+                    }
+                    wrapper.setPlaybackSpeedMultiplier(playerSnapshot.speed());
+                    wrapper.play(playlist, playerSnapshot.tick());
+                    if (playerSnapshot.paused() && wrapper.getActivePlayer() != null) {
+                        wrapper.getActivePlayer().pause();
+                    }
+                });
             });
         }
     }

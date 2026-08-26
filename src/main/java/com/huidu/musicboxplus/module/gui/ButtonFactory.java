@@ -229,6 +229,10 @@ public final class ButtonFactory {
     }
 
     public static SongContainerGUI.BarButton createPlaylistButton() {
+        return createPlaylistButton(false);
+    }
+
+    public static SongContainerGUI.BarButton createPlaylistButton(boolean returnToShop) {
         return new SongContainerGUI.BarButton(){
 
             @Override
@@ -242,11 +246,16 @@ public final class ButtonFactory {
 
             @Override
             public InventoryAction getAction(PlayerWrapper wrapper, SongContainerGUI.SongGUIData<Void> data) {
-                return new PlayerClickAction(p -> PlayListListGUI.openAsync(wrapper, container -> new ClickAction(() -> wrapper.play(container), () -> {
-                    if (container instanceof PlayerPlayListModel) {
-                        new PlayListEditorGUI(wrapper, (PlayerPlayListModel)container).openPage(0);
-                    }
-                }), pl -> GUIConfigManager.getInstance().getPlaylistItemConfig().getListLore()));
+                return new PlayerClickAction(p -> PlayListListGUI.openAsync(
+                    wrapper,
+                    container -> new ClickAction(() -> wrapper.play(container), () -> {
+                        if (container instanceof PlayerPlayListModel) {
+                            new PlayListEditorGUI(wrapper, (PlayerPlayListModel)container).openPage(0);
+                        }
+                    }),
+                    pl -> GUIConfigManager.getInstance().getPlaylistItemConfig().getListLore(),
+                    returnToShop ? () -> GUIActions.openShopInventory(wrapper) : null
+                ));
             }
         };
     }

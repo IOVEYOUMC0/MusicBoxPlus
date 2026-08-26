@@ -84,6 +84,9 @@ implements InventoryHolder {
     }
 
     public void open(Player player) {
+        if (player == null) {
+            return;
+        }
         // Opening an inventory must run on the region that owns the player.
         com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, () -> player.openInventory(this.inventory));
     }
@@ -94,26 +97,42 @@ implements InventoryHolder {
     }
 
     public void addItem(int slot, ItemStack item, InventoryAction runnable) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         this.inventory.setItem(slot, item);
         this.runnableMap.put(slot, runnable);
     }
 
     public void removeItem(int slot) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         this.inventory.clear(slot);
         this.runnableMap.remove(slot);
     }
     
     public void updateItem(int slot, ItemStack item) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         this.inventory.setItem(slot, item);
     }
-    
+
     public void updateItem(int slot, ItemStack item, InventoryAction runnable) {
+        if (!isValidSlot(slot)) {
+            return;
+        }
         this.inventory.setItem(slot, item);
         this.runnableMap.put(slot, runnable);
     }
-    
+
     public boolean hasItem(int slot) {
-        return this.runnableMap.containsKey(slot);
+        return isValidSlot(slot) && this.runnableMap.containsKey(slot);
+    }
+
+    private boolean isValidSlot(int slot) {
+        return slot >= 0 && slot < this.inventory.getSize();
     }
 
     public void onInventoryClick(InventoryClickEvent e) {

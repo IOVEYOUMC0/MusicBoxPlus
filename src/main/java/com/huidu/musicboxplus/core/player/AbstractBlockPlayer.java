@@ -521,10 +521,9 @@ implements PositionPlayer {
         }
         this.destroyed = true;
 
-        // Dispatched before anything is torn down, while location, song and player state are
-        // still intact. Wrapped in try/catch because destroy() also runs during shutdown, where
-        // third-party listeners or the PluginManager itself may throw and teardown must still
-        // run to completion.
+        // Event delivery belongs to the block's region. Shutdown/reload can call destroy() from
+        // the global region, so queue it there instead of calling PluginManager on the wrong
+        // thread. The player is already marked destroyed, matching the public event contract.
         try {
             Location snapshot = null;
             try {
@@ -538,8 +537,20 @@ implements PositionPlayer {
             } catch (Exception ignored) {
                 // Same as above
             }
-            Bukkit.getPluginManager().callEvent(new MusicBoxPlayerDestroyEvent(
-                this, snapshot, currentSong, reason == null ? DestroyReason.UNKNOWN : reason));
+            MusicBoxPlayerDestroyEvent event = new MusicBoxPlayerDestroyEvent(
+                this, snapshot, currentSong, reason == null ? DestroyReason.UNKNOWN : reason);
+            Runnable dispatch = () -> {
+                try {
+                    Bukkit.getPluginManager().callEvent(event);
+                } catch (Exception ex) {
+                    logger.debug("Exception dispatching MusicBoxPlayerDestroyEvent: {}", ex.getMessage());
+                }
+            };
+            if (snapshot != null && snapshot.getWorld() != null && !com.huidu.musicboxplus.common.utils.scheduler.Scheduler.ownsRegion(snapshot)) {
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(snapshot, dispatch);
+            } else {
+                dispatch.run();
+            }
         } catch (Exception ex) {
             logger.debug("Exception dispatching MusicBoxPlayerDestroyEvent: {}", ex.getMessage());
         }

@@ -91,6 +91,26 @@ plugins/MusicBoxPlus/
 └── data.db              # SQLite 数据库（默认）
 ```
 
+每个歌曲文件夹可以放置 `folder.yml` 自定义文件夹物品，不需要在 GUI 配置中单独维护：
+
+```yaml
+display:
+  item: CHEST
+  custom-model-data: 0
+  item-model: ""
+  craft-engine-item: ""
+  name: "<gold>{folder}</gold>"
+  lore:
+    - "<gray>歌曲数: {count}</gray>"
+    - "{description}"
+  description:
+    - "这里是该文件夹的说明"
+  glow: false
+  skull-owner: ""
+```
+
+`display.description` 和 `display.lore` 都可以写成单行字符串；旧的 `custom_model_data`、`skull_owner` 写法仍兼容。没有 `folder.yml` 时继续读取同目录的 `info.txt` 作为 Lore，并在目录可写时自动生成等价的 `folder.yml`（不会删除 `info.txt`）。
+
 支持 MySQL（见 `db/MySQL.sql`）。可选集成：Vault（经济）、PlaceholderAPI（占位符）、CraftEngine（物品模型）。
 
 ## 构建

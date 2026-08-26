@@ -29,7 +29,6 @@ public class GUIConfigManager {
     private final Map<String, GUIConfig> guiConfigs = new ConcurrentHashMap<String, GUIConfig>();
     private final Map<String, ProgressBarConfig> progressBarConfigs = new ConcurrentHashMap<>();
     private volatile SongItemConfig songItemConfig;
-    private volatile FolderItemConfig folderItemConfig;
     private volatile Set<String> guiTitleKeywords;
 
     private static final Set<String> DEFAULT_GUI_TITLE_KEYWORDS = new HashSet<>(Arrays.asList(
@@ -44,8 +43,8 @@ public class GUIConfigManager {
         if (layout == null) {
             return -1;
         }
-        String[] lines = layout.split("\n");
-        for (int row = 0; row < lines.length; row++) {
+        String[] lines = layout.split("\\R", -1);
+        for (int row = 0; row < Math.min(lines.length, 6); row++) {
             String line = lines[row];
             for (int col = 0; col < line.length() && col < INVENTORY_COLS; col++) {
                 if (line.charAt(col) == c) {
@@ -62,8 +61,8 @@ public class GUIConfigManager {
         if (layout == null) {
             return slots;
         }
-        String[] lines = layout.split("\n");
-        for (int row = 0; row < lines.length; row++) {
+        String[] lines = layout.split("\\R", -1);
+        for (int row = 0; row < Math.min(lines.length, 6); row++) {
             String line = lines[row];
             for (int col = 0; col < line.length() && col < INVENTORY_COLS; col++) {
                 if (line.charAt(col) == c) {
@@ -72,6 +71,14 @@ public class GUIConfigManager {
             }
         }
         return slots;
+    }
+
+    public static int getRowsForLayout(String layout, int fallback) {
+        if (layout == null || layout.isBlank()) {
+            return Math.max(1, Math.min(6, fallback));
+        }
+        int rows = layout.split("\\R", -1).length;
+        return Math.max(1, Math.min(6, rows));
     }
 
     public static GUIConfigManager getInstance() {
@@ -128,7 +135,6 @@ public class GUIConfigManager {
         this.loadGUIConfigs();
         this.buttonRegistry.load(this.config);
         this.loadSongItemConfig();
-        this.loadFolderItemConfig();
     }
 
     private void loadGUITitleKeywords() {
@@ -245,22 +251,6 @@ public class GUIConfigManager {
         this.songItemConfig.tagsFormat = StringUtils.t(section.getString("tags-format", "<gray>Tags: <aqua>{tags}"));
     }
 
-    private void loadFolderItemConfig() {
-        ConfigurationSection section = this.config.getConfigurationSection("folder-item");
-        if (section == null) {
-            this.folderItemConfig = new FolderItemConfig();
-            return;
-        }
-        this.folderItemConfig = new FolderItemConfig();
-        this.folderItemConfig.material = Material.matchMaterial(section.getString("material", "CHEST"));
-        if (this.folderItemConfig.material == null) {
-            this.folderItemConfig.material = Material.CHEST;
-        }
-        this.folderItemConfig.customModelData = section.getInt("custom-model-data", 0);
-        this.folderItemConfig.nameFormat = StringUtils.t(section.getString("name-format", "<gold>{folder}"));
-        this.folderItemConfig.loreFormat = StringUtils.t(section.getStringList("lore-format"));
-    }
-
     public ButtonConfig getButtonConfig(String guiName, String buttonName) {
         return this.buttonRegistry.getButtonConfig(guiName, buttonName);
     }
@@ -306,9 +296,18 @@ public class GUIConfigManager {
             return 0;
         }
         int count = 0;
-        for (char ch : layout.toCharArray()) {
-            if (ch != c) continue;
-            ++count;
+        int rows = getGUIRows(guiName);
+        if (rows < 1 || rows > 6) {
+            rows = 3;
+        }
+        String[] lines = layout.split("\\R", -1);
+        for (int row = 0; row < Math.min(rows, lines.length); row++) {
+            String line = lines[row];
+            for (int col = 0; col < Math.min(INVENTORY_COLS, line.length()); col++) {
+                if (line.charAt(col) == c) {
+                    ++count;
+                }
+            }
         }
         return count;
     }
@@ -422,6 +421,13 @@ public class GUIConfigManager {
         if (this.config == null) {
             return playlistItemConfig;
         }
+        Material material = Material.matchMaterial(this.config.getString("playlist-item.material", "PAPER"));
+        if (material != null) {
+            playlistItemConfig.material = material;
+        }
+        playlistItemConfig.customModelData = this.config.getInt("playlist-item.custom-model-data", 0);
+        playlistItemConfig.itemModel = this.config.getString("playlist-item.item-model", "");
+        playlistItemConfig.craftEngineItem = this.config.getString("playlist-item.craft-engine-item", "");
         playlistItemConfig.nameFormat = StringUtils.t(this.config.getString("playlist-item.name-format", playlistItemConfig.nameFormat));
         if (this.config.contains("playlist-item.lore-format")) {
             playlistItemConfig.loreFormat = StringUtils.t(this.config.getStringList("playlist-item.lore-format"));
@@ -609,10 +615,6 @@ public class GUIConfigManager {
         return this.guiConfigs;
     }
 
-    public FolderItemConfig getFolderItemConfig() {
-        return this.folderItemConfig;
-    }
-
     public InstrumentSelectConfig getInstrumentSelectConfig() {
         InstrumentSelectConfig instrumentConfig = new InstrumentSelectConfig();
         if (this.config == null) {
@@ -715,6 +717,13 @@ public class GUIConfigManager {
             List<String> stepLore = stepSection.getStringList("lore");
             if (stepLore != null && !stepLore.isEmpty()) {
                 bpmConfig.stepLore = StringUtils.t(stepLore);
+            }
+        }
+        List<Integer> steps = section.getIntegerList("steps");
+        if (!steps.isEmpty()) {
+            List<Integer> validSteps = steps.stream().filter(step -> step != 0).toList();
+            if (!validSteps.isEmpty()) {
+                bpmConfig.steps = validSteps;
             }
         }
         
@@ -874,6 +883,8 @@ public class GUIConfigManager {
         }
         textPlayerConfig.title = section.getString("title", textPlayerConfig.title);
         textPlayerConfig.layout = section.getString("layout", textPlayerConfig.layout);
+        textPlayerConfig.rangeStep = Math.max(1, section.getInt("range-step", textPlayerConfig.rangeStep));
+        textPlayerConfig.heightStep = Math.max(0.01, section.getDouble("height-step", textPlayerConfig.heightStep));
         GUISectionConfigLoader.loadButtonMapping(section, textPlayerConfig.buttonMapping);
         GUISectionConfigLoader.loadButtonsConfig(section, textPlayerConfig.buttons);
         return textPlayerConfig;
@@ -1194,6 +1205,8 @@ public class GUIConfigManager {
         String nameOn = "<green>On";
         String nameOff = "<red>Off";
         List<String> lore = new ArrayList<String>();
+        String itemModel = "";
+        String craftEngineItem = "";
 
         // enabled is set when the button exists in gui-config.yml (or falls back to a global
         // definition); an unconfigured button is a placeholder returned by getButtonConfig.
@@ -1229,8 +1242,17 @@ public class GUIConfigManager {
             return this.lore;
         }
 
+        public String getItemModel() {
+            return this.itemModel;
+        }
+
+        public String getCraftEngineItem() {
+            return this.craftEngineItem;
+        }
+
         public ItemStack createItem() {
-            return ItemUtils.createStack(this.material, this.name, this.lore, this.customModelData);
+            return ItemUtils.createStack(this.material, this.name, this.lore, this.customModelData,
+                    this.itemModel, this.craftEngineItem);
         }
     }
 
@@ -1284,29 +1306,6 @@ public class GUIConfigManager {
 
         public String getTagsFormat() {
             return this.tagsFormat;
-        }
-    }
-
-    public static class FolderItemConfig {
-        private Material material = Material.CHEST;
-        private int customModelData = 0;
-        private String nameFormat = "<gold>{folder}";
-        private List<String> loreFormat = new ArrayList<String>();
-
-        public Material getMaterial() {
-            return this.material;
-        }
-
-        public int getCustomModelData() {
-            return this.customModelData;
-        }
-
-        public String getNameFormat() {
-            return this.nameFormat;
-        }
-
-        public List<String> getLoreFormat() {
-            return this.loreFormat;
         }
     }
 
@@ -1384,6 +1383,10 @@ public class GUIConfigManager {
     }
 
     public static class PlaylistItemConfig {
+        private Material material = Material.PAPER;
+        private int customModelData;
+        private String itemModel = "";
+        private String craftEngineItem = "";
         private String nameFormat = "<gold>{playlist}";
         private List<String> loreFormat = new ArrayList<String>();
         private List<String> itemLore = new ArrayList<String>();
@@ -1408,6 +1411,11 @@ public class GUIConfigManager {
         public String getNameFormat() {
             return this.nameFormat;
         }
+
+        public Material getMaterial() { return this.material; }
+        public int getCustomModelData() { return this.customModelData; }
+        public String getItemModel() { return this.itemModel; }
+        public String getCraftEngineItem() { return this.craftEngineItem; }
 
         public List<String> getLoreFormat() {
             return this.loreFormat;
@@ -1905,6 +1913,7 @@ public class GUIConfigManager {
             "<gray>Current: </gray><yellow>{current}</yellow>",
             "<gray>After: </gray><yellow>{after}</yellow>"
         ));
+        private List<Integer> steps = new ArrayList<>(Arrays.asList(-50, -20, -10, -5, -1, 1, 5, 10, 20, 50));
         private final Map<String, Character> buttonMapping = new HashMap<>();
         private final Map<String, HotbarButtonConfig> buttons = new HashMap<>();
 
@@ -1926,6 +1935,7 @@ public class GUIConfigManager {
         public String getStepIncreaseName() { return this.stepIncreaseName; }
         public String getStepDecreaseName() { return this.stepDecreaseName; }
         public List<String> getStepLore() { return this.stepLore; }
+        public List<Integer> getSteps() { return this.steps; }
         public List<Integer> getSlotsForChars(String chars) {
             List<Integer> slots = new ArrayList<>();
             if (chars == null || chars.isEmpty()) return slots;
@@ -2224,6 +2234,8 @@ public class GUIConfigManager {
     public static class TextPlayerEditConfig {
         private String title = "<gold>文字播放器</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>";
         private String layout = "XXXXIXXXX\nXNSPTXQCX\nXXXXBXXXD";
+        private int rangeStep = 4;
+        private double heightStep = 0.25;
         private final Map<String, Character> buttonMapping = new HashMap<>();
         private final Map<String, HotbarButtonConfig> buttons = new HashMap<>();
 
@@ -2255,6 +2267,8 @@ public class GUIConfigManager {
 
         public String getTitle() { return this.title; }
         public String getLayout() { return this.layout; }
+        public int getRangeStep() { return this.rangeStep; }
+        public double getHeightStep() { return this.heightStep; }
         public Map<String, Character> getButtonMapping() { return this.buttonMapping; }
         public HotbarButtonConfig getButton(String key) { return buttons.get(key); }
         public int getSlotForButton(String buttonType) { Character c = buttonMapping.get(buttonType); return c == null ? -1 : getSlotForChar(c); }

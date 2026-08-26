@@ -43,7 +43,9 @@ public class PurchaseConfirmGUI implements InventoryHolder {
         this.parentGUI = parentGUI;
         this.config = GUIConfigManager.getInstance().getPurchaseConfirmConfig();
         String title = config.getTitle().replace("{name}", published.getName());
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -64,7 +66,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
                         .replace("{publishedAt}", formatDate(published.getPublishedAt())));
             }
             String name = infoConfig.getName().replace("{name}", published.getName());
-            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData());
+            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData(), infoConfig.getItemModel(), infoConfig.getCraftEngineItem());
             inventory.setItem(infoSlot, infoItem);
         }
 
@@ -97,7 +99,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
             String name = priceConfig.getName().replace("{price}", String.format("%.0f", price))
                     .replace("{originalPrice}", String.format("%.0f", published.getPrice()))
                     .replace("{priceColor}", priceColor);
-            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData());
+            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData(), priceConfig.getItemModel(), priceConfig.getCraftEngineItem());
             inventory.setItem(priceSlot, priceItem);
         }
 
@@ -115,7 +117,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
                     for (String line : noMoneyConfig.getLore()) {
                         lore.add(line.replace("{need}", String.format("%.0f", need)));
                     }
-                    ItemStack noMoneyItem = ItemUtils.createStack(noMoneyConfig.getMaterial(), noMoneyConfig.getName(), lore, noMoneyConfig.getCustomModelData());
+                    ItemStack noMoneyItem = ItemUtils.createStack(noMoneyConfig.getMaterial(), noMoneyConfig.getName(), lore, noMoneyConfig.getCustomModelData(), noMoneyConfig.getItemModel(), noMoneyConfig.getCraftEngineItem());
                     inventory.setItem(confirmSlot, noMoneyItem);
                 }
             }

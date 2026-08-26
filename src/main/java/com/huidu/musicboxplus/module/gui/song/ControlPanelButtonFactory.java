@@ -119,6 +119,7 @@ final class ControlPanelButtonFactory {
 
     static ItemStack createVolumeButton(GUIConfigManager configManager, MusicBoxSongPlayer currentPlayer, Player viewer) {
         int currentVolume = getCurrentVolume(currentPlayer, viewer);
+        int step = MusicBox.getInstance().getConfigObject().getVolume().getStep();
         GUIConfigManager.VolumeControlConfig volumeConfig = configManager.getVolumeControlConfig();
         Material volumeMaterial;
         int customModelData;
@@ -149,13 +150,17 @@ final class ControlPanelButtonFactory {
             : new String[]{"volume-control-full", "volume-control"})));
         ItemStack item = null;
         for (String key : candidateKeys) {
-            item = configManager.createButtonItem("control-panel", key, "{volume}", String.valueOf(currentVolume));
+            item = configManager.createButtonItem("control-panel", key,
+                    "{volume}", String.valueOf(currentVolume), "{step}", String.valueOf(step));
             if (item != null) {
                 break;
             }
         }
         if (item == null) {
-            item = ItemUtils.createStack(volumeMaterial, "<gold>Volume Control", Arrays.asList("<yellow>Volume: " + currentVolume + "%", "", "<green>Left Click: Increase (+10%)", "<red>Right Click: Decrease (-10%)"), customModelData);
+            item = ItemUtils.createStack(volumeMaterial, "<gold>Volume Control", Arrays.asList(
+                    "<yellow>Volume: " + currentVolume + "%", "",
+                    "<green>Left Click: Increase (+" + step + ")",
+                    "<red>Right Click: Decrease (-" + step + ")"), customModelData);
         }
         return item;
     }

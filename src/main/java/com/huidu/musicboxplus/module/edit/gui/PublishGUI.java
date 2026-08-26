@@ -38,7 +38,9 @@ public class PublishGUI implements InventoryHolder {
         this.config = GUIConfigManager.getInstance().getPublishGUIConfig();
         this.musicList = PlayerMusicManager.getInstance().getMusicByPlayer(player);
         String title = config.getTitle();
-        this.inventory = Bukkit.createInventory(this, 54, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 6) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -47,9 +49,15 @@ public class PublishGUI implements InventoryHolder {
         slotMusicMap.clear();
 
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
-        int itemsPerPage = musicSlots.size();
+        int itemsPerPage = Math.max(1, musicSlots.size());
         int startIndex = page * itemsPerPage;
         int endIndex = Math.min(startIndex + itemsPerPage, musicList.size());
+        Map<java.util.UUID, PublishedMusic> publishedByMusic = new HashMap<>();
+        for (PublishedMusic published : PublishedMusicManager.getInstance().getPublishedByAuthor(player.getUniqueId())) {
+            if (published.getOriginalMusicId() != null) {
+                publishedByMusic.putIfAbsent(published.getOriginalMusicId(), published);
+            }
+        }
 
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
@@ -58,7 +66,7 @@ public class PublishGUI implements InventoryHolder {
             int slot = musicSlots.get(slotIndex);
             PlayerMusic music = musicList.get(i);
             
-            PublishedMusic publishedMusic = findPublishedMusic(music);
+            PublishedMusic publishedMusic = publishedByMusic.get(music.getUniqueId());
             boolean hasPublishedListing = publishedMusic != null;
             boolean isPublished = publishedMusic != null && publishedMusic.isAvailable();
             
@@ -112,7 +120,7 @@ public class PublishGUI implements InventoryHolder {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
                         .replace("{totalPages}", String.valueOf(totalPages)));
             }
-            ItemStack prevButton = ItemUtils.createStack(prevConfig.getMaterial(), prevConfig.getName(), lore, prevConfig.getCustomModelData());
+            ItemStack prevButton = ItemUtils.createStack(prevConfig.getMaterial(), prevConfig.getName(), lore, prevConfig.getCustomModelData(), prevConfig.getItemModel(), prevConfig.getCraftEngineItem());
             inventory.setItem(prevSlot, prevButton);
         }
 
@@ -125,7 +133,7 @@ public class PublishGUI implements InventoryHolder {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
                         .replace("{totalPages}", String.valueOf(totalPages)));
             }
-            ItemStack nextButton = ItemUtils.createStack(nextConfig.getMaterial(), nextConfig.getName(), lore, nextConfig.getCustomModelData());
+            ItemStack nextButton = ItemUtils.createStack(nextConfig.getMaterial(), nextConfig.getName(), lore, nextConfig.getCustomModelData(), nextConfig.getItemModel(), nextConfig.getCraftEngineItem());
             inventory.setItem(nextSlot, nextButton);
         }
 
@@ -145,7 +153,7 @@ public class PublishGUI implements InventoryHolder {
                 lore.add(line.replace("{amount}", String.format("%.2f", pendingRevenue)));
             }
             String name = revenueConfig.getName().replace("{amount}", String.format("%.2f", pendingRevenue));
-            ItemStack revenueButton = ItemUtils.createStack(revenueConfig.getMaterial(), name, lore, revenueConfig.getCustomModelData());
+            ItemStack revenueButton = ItemUtils.createStack(revenueConfig.getMaterial(), name, lore, revenueConfig.getCustomModelData(), revenueConfig.getItemModel(), revenueConfig.getCraftEngineItem());
             inventory.setItem(revenueSlot, revenueButton);
         }
     }
@@ -160,7 +168,7 @@ public class PublishGUI implements InventoryHolder {
 
     public void handleClick(int slot) {
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
-        int itemsPerPage = musicSlots.size();
+        int itemsPerPage = Math.max(1, musicSlots.size());
         int prevSlot = config.getSlotForButton("prev-page");
         int nextSlot = config.getSlotForButton("next-page");
         int closeSlot = config.getSlotForButton("close");

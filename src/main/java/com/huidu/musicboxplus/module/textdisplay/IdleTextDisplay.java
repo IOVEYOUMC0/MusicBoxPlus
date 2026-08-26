@@ -13,7 +13,7 @@ public class IdleTextDisplay implements TextDisplayHandle {
     private final TextDisplayPlayer.DisplayOptions displayOptions;
     private final TextDisplayVisual visual;
     private int range;
-    private Location location;
+    private volatile Location location;
 
     public IdleTextDisplay(String name, Location location, int range, TextDisplayPlayer.DisplayOptions displayOptions) {
         this.name = name;

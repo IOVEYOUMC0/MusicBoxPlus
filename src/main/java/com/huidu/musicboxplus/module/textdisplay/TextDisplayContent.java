@@ -1,5 +1,6 @@
 package com.huidu.musicboxplus.module.textdisplay;
 
+import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -21,7 +22,7 @@ final class TextDisplayContent {
         }
         if (current == null) {
             if (options.isShowSong()) {
-                content = appendLine(content, Component.text("-", NamedTextColor.GRAY), hasLine);
+                content = appendLine(content, Lang.PLACEHOLDER_NO_SONG.toComponent().color(NamedTextColor.GRAY), hasLine);
                 hasLine = true;
             }
             if (options.isShowProgress()) {
@@ -29,13 +30,13 @@ final class TextDisplayContent {
                 hasLine = true;
             }
             if (options.isShowTime()) {
-                content = appendLine(content, Component.text("0:00 / 0:00", NamedTextColor.GRAY), hasLine);
+                content = appendLine(content, formatTime("0:00", "0:00"), hasLine);
                 hasLine = true;
             }
             return hasLine ? content : Component.text(name, NamedTextColor.DARK_GRAY);
         }
 
-        short totalTicks = current.getLength();
+        int totalTicks = current.getLength();
         double progress = totalTicks <= 0 ? 0.0 : Math.max(0.0, Math.min(1.0, (double) currentTick / (double) totalTicks));
         float effectiveSpeed = Math.max(0.1f, current.getSpeed() * speedMultiplier);
         String currentTime = formatClock((int) Math.floor(currentTick / effectiveSpeed));
@@ -50,7 +51,7 @@ final class TextDisplayContent {
             hasLine = true;
         }
         if (options.isShowTime()) {
-            content = appendLine(content, Component.text(currentTime + " / " + totalTime, NamedTextColor.GRAY), hasLine);
+            content = appendLine(content, formatTime(currentTime, totalTime), hasLine);
             hasLine = true;
         }
         return hasLine ? content : Component.text(current.getName(), NamedTextColor.GREEN);
@@ -58,6 +59,13 @@ final class TextDisplayContent {
 
     private static Component appendLine(Component base, Component line, boolean hasLine) {
         return hasLine ? base.append(Component.newline()).append(line) : base.append(line);
+    }
+
+    private static Component formatTime(String current, String total) {
+        return Lang.TEXT_PLAYER_TIME_FORMAT.toComponent(
+            "{current}", current,
+            "{total}", total
+        );
     }
 
     private static final String FULL_BAR = "|".repeat(PROGRESS_BAR_SEGMENTS);

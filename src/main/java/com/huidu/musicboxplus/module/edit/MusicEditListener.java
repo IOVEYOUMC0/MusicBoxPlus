@@ -179,8 +179,12 @@ public class MusicEditListener implements Listener {
             MusicEditGUI gui = entry.getValue();
             if (gui != null && musicId.equals(gui.getMusic().getUniqueId())) {
                 Player owner = Bukkit.getPlayer(entry.getKey());
-                if (owner != null && owner.isOnline()) {
-                    Scheduler.entity(owner, gui::refreshFromExternalUpdate);
+                if (owner != null) {
+                    Scheduler.entity(owner, () -> {
+                        if (owner.isOnline()) {
+                            gui.refreshFromExternalUpdate();
+                        }
+                    });
                 }
             }
         }

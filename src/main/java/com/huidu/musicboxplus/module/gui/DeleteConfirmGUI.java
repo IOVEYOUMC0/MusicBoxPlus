@@ -33,7 +33,8 @@ public class DeleteConfirmGUI implements InventoryHolder {
         this.config = GUIConfigManager.getInstance().getDeleteConfirmConfig();
         String title = config.getTitle().replace("{name}", itemName);
         Component titleComponent = MiniMessageUtils.processComponent(title);
-        this.inventory = Bukkit.createInventory(this, 27, titleComponent);
+        int rows = GUIConfigManager.getRowsForLayout(config.getLayout(), 3);
+        this.inventory = Bukkit.createInventory(this, rows * 9, titleComponent);
         updateInventory();
     }
 

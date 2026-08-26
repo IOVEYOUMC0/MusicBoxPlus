@@ -194,33 +194,6 @@ public final class ItemUtils {
         return true;
     }
 
-    public static void groupInventory(Inventory inventory) {
-        BukkitUtils.checkPrimary();
-        List<ItemStack> songItems = new ArrayList<>();
-        List<ItemStack> otherItems = new ArrayList<>();
-        int size = inventory.getSize();
-        for (int i = 0; i < size; ++i) {
-            ItemStack stack = inventory.getItem(i);
-            if (stack == null || stack.getType().equals(Material.AIR)) continue;
-            if (com.huidu.musicboxplus.api.MusicBoxAPI.isMusicBoxDisc(stack)) {
-                songItems.add(stack);
-                continue;
-            }
-            otherItems.add(stack);
-        }
-        inventory.clear();
-        int current = 0;
-        for (ItemStack stack : songItems) {
-            inventory.setItem(current++, stack);
-        }
-        for (ItemStack stack : otherItems) {
-            if (current >= size) {
-                break;
-            }
-            inventory.setItem(current++, stack);
-        }
-    }
-
     public static int getFilledSlots(Inventory inventory) {
         int notEmpty = 0;
         for (ItemStack stack : inventory) {
@@ -287,4 +260,3 @@ public final class ItemUtils {
         throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
     }
 }
-

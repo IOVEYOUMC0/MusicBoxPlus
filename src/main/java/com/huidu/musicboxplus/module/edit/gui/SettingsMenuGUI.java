@@ -37,7 +37,9 @@ public class SettingsMenuGUI implements InventoryHolder {
         this.parentGUI = parentGUI;
         this.config = GUIConfigManager.getInstance().getSettingsMenuConfig();
         String title = config.getTitle().replace("{name}", music.getName());
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -52,7 +54,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 for (String line : bpmConfig.getLore()) {
                     lore.add(line.replace("{bpm}", String.valueOf(music.getBpm())));
                 }
-                ItemStack bpmButton = ItemUtils.createStack(bpmConfig.getMaterial(), bpmConfig.getName(), lore, bpmConfig.getCustomModelData());
+                ItemStack bpmButton = ItemUtils.createStack(bpmConfig.getMaterial(), bpmConfig.getName().replace("{bpm}", String.valueOf(music.getBpm())), lore, bpmConfig.getCustomModelData(), bpmConfig.getItemModel(), bpmConfig.getCraftEngineItem());
                 inventory.setItem(bpmSlot, bpmButton);
             }
         }
@@ -65,7 +67,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 for (String line : subConfig.getLore()) {
                     lore.add(line.replace("{subdivision}", String.valueOf(music.getBeatSubdivision())));
                 }
-                ItemStack subdivisionButton = ItemUtils.createStack(subConfig.getMaterial(), subConfig.getName(), lore, subConfig.getCustomModelData());
+                ItemStack subdivisionButton = ItemUtils.createStack(subConfig.getMaterial(), subConfig.getName().replace("{subdivision}", String.valueOf(music.getBeatSubdivision())), lore, subConfig.getCustomModelData(), subConfig.getItemModel(), subConfig.getCraftEngineItem());
                 inventory.setItem(subdivisionSlot, subdivisionButton);
             }
         }
@@ -78,7 +80,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 for (String line : tsConfig.getLore()) {
                     lore.add(line.replace("{timeSignature}", music.getTimeSignature().toString()));
                 }
-                ItemStack timeSignatureButton = ItemUtils.createStack(tsConfig.getMaterial(), tsConfig.getName(), lore, tsConfig.getCustomModelData());
+                ItemStack timeSignatureButton = ItemUtils.createStack(tsConfig.getMaterial(), tsConfig.getName().replace("{timeSignature}", music.getTimeSignature().toString()), lore, tsConfig.getCustomModelData(), tsConfig.getItemModel(), tsConfig.getCraftEngineItem());
                 inventory.setItem(timeSignatureSlot, timeSignatureButton);
             }
         }
@@ -91,7 +93,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 for (String line : nameConfig.getLore()) {
                     lore.add(line.replace("{name}", music.getName()));
                 }
-                ItemStack nameButton = ItemUtils.createStack(nameConfig.getMaterial(), nameConfig.getName(), lore, nameConfig.getCustomModelData());
+                ItemStack nameButton = ItemUtils.createStack(nameConfig.getMaterial(), nameConfig.getName().replace("{name}", music.getName()), lore, nameConfig.getCustomModelData(), nameConfig.getItemModel(), nameConfig.getCraftEngineItem());
                 inventory.setItem(nameSlot, nameButton);
             }
         }
@@ -104,7 +106,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 for (String line : clearConfig.getLore()) {
                     lore.add(line.replace("{notes}", String.valueOf(music.getNoteCount())));
                 }
-                ItemStack clearButton = ItemUtils.createStack(clearConfig.getMaterial(), clearConfig.getName(), lore, clearConfig.getCustomModelData());
+                ItemStack clearButton = ItemUtils.createStack(clearConfig.getMaterial(), clearConfig.getName().replace("{notes}", String.valueOf(music.getNoteCount())), lore, clearConfig.getCustomModelData(), clearConfig.getItemModel(), clearConfig.getCraftEngineItem());
                 inventory.setItem(clearSlot, clearButton);
             }
         }
@@ -138,7 +140,7 @@ public class SettingsMenuGUI implements InventoryHolder {
                 String name = publishConfig.getName()
                         .replace("{status}", status)
                         .replace("{action}", action);
-                ItemStack publishButton = ItemUtils.createStack(publishConfig.getMaterial(), name, lore, publishConfig.getCustomModelData());
+                ItemStack publishButton = ItemUtils.createStack(publishConfig.getMaterial(), name, lore, publishConfig.getCustomModelData(), publishConfig.getItemModel(), publishConfig.getCraftEngineItem());
                 inventory.setItem(publishSlot, publishButton);
             }
         }
@@ -198,12 +200,12 @@ public class SettingsMenuGUI implements InventoryHolder {
         int current = music.getBeatSubdivision();
         int newSubdivision = current >= 16 ? 1 : current + 1;
         music.setBeatSubdivision(newSubdivision);
-        parentGUI.setHasUnsavedChanges(true);
+        long version = parentGUI.markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
             if (!success) {
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             } else {
-                parentGUI.setHasUnsavedChanges(false);
+                parentGUI.clearUnsavedChangesIfVersion(version);
             }
         });
         SoundUtils.playClickSound(player);
@@ -221,12 +223,12 @@ public class SettingsMenuGUI implements InventoryHolder {
         }
         PlayerMusic.TimeSignature newSignature = signatures[(currentIndex + 1) % signatures.length];
         music.setTimeSignature(newSignature);
-        parentGUI.setHasUnsavedChanges(true);
+        long version = parentGUI.markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
             if (!success) {
                 MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
             } else {
-                parentGUI.setHasUnsavedChanges(false);
+                parentGUI.clearUnsavedChangesIfVersion(version);
             }
         });
         SoundUtils.playClickSound(player);
@@ -250,11 +252,11 @@ public class SettingsMenuGUI implements InventoryHolder {
             return;
         }
         music.clearNotes();
-        parentGUI.setHasUnsavedChanges(true);
+        long version = parentGUI.markUnsavedChanges();
         PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
             if (success) {
                 Scheduler.entity(player, () -> {
-                    parentGUI.setHasUnsavedChanges(false);
+                    parentGUI.clearUnsavedChangesIfVersion(version);
                     SoundUtils.playSound(player, Sound.ENTITY_GENERIC_EXPLODE, 0.5f, 1.0f);
                     MessageUtils.send(player, Lang.EDIT_NOTES_CLEARED, "{count}", String.valueOf(count));
                     updateInventory();

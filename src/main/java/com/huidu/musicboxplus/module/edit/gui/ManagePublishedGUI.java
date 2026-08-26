@@ -37,7 +37,9 @@ public class ManagePublishedGUI implements InventoryHolder {
         this.parentGUI = parentGUI;
         this.config = GUIConfigManager.getInstance().getManagePublishedConfig();
         String title = config.getTitle().replace("{name}", published.getName());
-        this.inventory = Bukkit.createInventory(this, 27, MiniMessageUtils.processComponent(title));
+        this.inventory = Bukkit.createInventory(this,
+                GUIConfigManager.getRowsForLayout(config.getLayout(), 3) * 9,
+                MiniMessageUtils.processComponent(title));
         updateInventory();
     }
 
@@ -57,7 +59,7 @@ public class ManagePublishedGUI implements InventoryHolder {
                         .replace("{updatedAt}", formatDate(published.getUpdatedAt())));
             }
             String name = infoConfig.getName().replace("{name}", published.getName());
-            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData());
+            ItemStack infoItem = ItemUtils.createStack(infoConfig.getMaterial(), name, lore, infoConfig.getCustomModelData(), infoConfig.getItemModel(), infoConfig.getCraftEngineItem());
             inventory.setItem(infoSlot, infoItem);
         }
 
@@ -71,7 +73,7 @@ public class ManagePublishedGUI implements InventoryHolder {
                         .replace("{revenue}", String.format("%.2f", published.getTotalRevenue())));
             }
             String name = priceConfig.getName().replace("{price}", String.format("%.0f", published.getPrice()));
-            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData());
+            ItemStack priceItem = ItemUtils.createStack(priceConfig.getMaterial(), name, lore, priceConfig.getCustomModelData(), priceConfig.getItemModel(), priceConfig.getCraftEngineItem());
             inventory.setItem(priceSlot, priceItem);
         }
 
@@ -94,7 +96,7 @@ public class ManagePublishedGUI implements InventoryHolder {
                         .replace("{revenue}", String.format("%.2f", published.getTotalRevenue()))
                         .replace("{status}", status));
             }
-            ItemStack statsItem = ItemUtils.createStack(statsConfig.getMaterial(), statsConfig.getName(), lore, statsConfig.getCustomModelData());
+            ItemStack statsItem = ItemUtils.createStack(statsConfig.getMaterial(), statsConfig.getName(), lore, statsConfig.getCustomModelData(), statsConfig.getItemModel(), statsConfig.getCraftEngineItem());
             inventory.setItem(statsSlot, statsItem);
         }
 
