@@ -3,7 +3,6 @@ package com.huidu.musicboxplus.module.edit.io;
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.module.edit.PlayerMusic;
 
-import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -13,8 +12,8 @@ import java.util.UUID;
 public class MusicFileImporter {
 
     // Hard caps bounding the memory/CPU a single import can consume; import files are untrusted.
-    public static final long MAX_IMPORT_FILE_BYTES = 5L * 1024 * 1024; // 5 MB
-    public static final int MAX_IMPORT_NOTES = 100_000;
+    public static final long MAX_IMPORT_FILE_BYTES = com.huidu.musicboxplus.core.nbs.NbsReader.MAX_FILE_BYTES;
+    public static final int MAX_IMPORT_NOTES = com.huidu.musicboxplus.core.nbs.NbsReader.MAX_NOTES;
 
     private static final MusicFileImporter INSTANCE = new MusicFileImporter();
 
@@ -57,9 +56,7 @@ public class MusicFileImporter {
         ImportFormat format = detectFormat(fileName);
         return switch (format) {
             case NBS -> {
-                try (ByteArrayInputStream input = new ByteArrayInputStream(bytes)) {
-                    yield new ImportResult(NBSImporter.getInstance().importFromStream(input, fileName, author, authorUUID), format, java.util.List.of());
-                }
+                yield new ImportResult(NBSImporter.getInstance().importFromBytes(bytes, fileName, author, authorUUID), format, java.util.List.of());
             }
             case MIDI -> {
                 File tempFile = File.createTempFile("musicboxplus-midi-import-", getTempSuffix(fileName));

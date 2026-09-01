@@ -145,6 +145,8 @@ public static MusicBoxConfig parseConfig(InputStream yamlStream) {
         if (performance.maxKeywordIndexSize <= 0) performance.maxKeywordIndexSize = 10000;
         if (performance.textDisplayRefreshIntervalTicks <= 0) performance.textDisplayRefreshIntervalTicks = 1;
         if (performance.textDisplayRefreshIntervalTicks > 100) performance.textDisplayRefreshIntervalTicks = 100;
+        if (web.maxRequestSize <= 0) web.maxRequestSize = 10;
+        if (web.maxRequestSize > 50) web.maxRequestSize = 50;
     }
 
     public EconomySetting getEconomy() {

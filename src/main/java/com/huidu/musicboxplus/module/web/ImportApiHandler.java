@@ -22,11 +22,13 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Semaphore;
 
 // POST /api/import: import an NBS/MIDI file into the session's music, either by server path or
 // as a multipart file upload.
 final class ImportApiHandler implements HttpHandler {
     private final WebApiSupport support;
+    private final Semaphore importPermits = new Semaphore(2);
 
     ImportApiHandler(WebApiSupport support) {
         this.support = support;
@@ -61,7 +63,13 @@ final class ImportApiHandler implements HttpHandler {
             return;
         }
 
+        boolean importPermit = false;
         try {
+            if (!importPermits.tryAcquire()) {
+                support.writeTextResponse(exchange, HttpStatus.TOO_MANY_REQUESTS, "Too many imports in progress");
+                return;
+            }
+            importPermit = true;
             String csrfToken = exchange.getRequestHeaders().getFirst("X-CSRF-Token");
             boolean validCsrf = csrfToken != null && session.validateCsrfToken(csrfToken);
             if (!validCsrf) {
@@ -128,6 +136,9 @@ final class ImportApiHandler implements HttpHandler {
         } catch (Exception e) {
             support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Import failed: " + e.getMessage());
         } finally {
+            if (importPermit) {
+                importPermits.release();
+            }
             support.sessionManager().disconnect(sessionId);
         }
     }
@@ -156,28 +167,31 @@ final class ImportApiHandler implements HttpHandler {
             throw new IllegalArgumentException("Missing multipart boundary");
         }
 
-        byte[] body = support.readRequestBodyBytes(exchange, support.getMaxRequestSize());
-        String bodyText = new String(body, StandardCharsets.ISO_8859_1);
-        String delimiter = "--" + boundary;
-        int cursor = bodyText.indexOf(delimiter);
+        int multipartLimit = (int) Math.min(
+                support.getMaxRequestSize(), MusicFileImporter.MAX_IMPORT_FILE_BYTES + 64L * 1024L);
+        byte[] body = support.readRequestBodyBytes(exchange, multipartLimit);
+        byte[] delimiter = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
+        byte[] partDelimiter = ("\r\n--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
+        byte[] headerSeparator = "\r\n\r\n".getBytes(StandardCharsets.ISO_8859_1);
+        int cursor = indexOf(body, delimiter, 0);
 
         while (cursor >= 0) {
-            int partStart = cursor + delimiter.length();
-            if (bodyText.startsWith("--", partStart)) {
+            int partStart = cursor + delimiter.length;
+            if (startsWith(body, "--".getBytes(StandardCharsets.ISO_8859_1), partStart)) {
                 break;
             }
-            if (bodyText.startsWith("\r\n", partStart)) {
+            if (startsWith(body, "\r\n".getBytes(StandardCharsets.ISO_8859_1), partStart)) {
                 partStart += 2;
             }
 
-            int headerEnd = bodyText.indexOf("\r\n\r\n", partStart);
+            int headerEnd = indexOf(body, headerSeparator, partStart);
             if (headerEnd < 0) {
                 break;
             }
 
-            String headers = bodyText.substring(partStart, headerEnd);
+            String headers = new String(body, partStart, headerEnd - partStart, StandardCharsets.ISO_8859_1);
             int dataStart = headerEnd + 4;
-            int nextDelimiter = bodyText.indexOf("\r\n" + delimiter, dataStart);
+            int nextDelimiter = indexOf(body, partDelimiter, dataStart);
             if (nextDelimiter < 0) {
                 break;
             }
@@ -202,6 +216,28 @@ final class ImportApiHandler implements HttpHandler {
         }
 
         throw new IllegalArgumentException("Missing upload file");
+    }
+
+    static int indexOf(byte[] data, byte[] target, int from) {
+        int limit = data.length - target.length;
+        for (int i = Math.max(0, from); i <= limit; i++) {
+            if (startsWith(data, target, i)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean startsWith(byte[] data, byte[] target, int offset) {
+        if (offset < 0 || offset + target.length > data.length) {
+            return false;
+        }
+        for (int i = 0; i < target.length; i++) {
+            if (data[offset + i] != target[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private String decodeMultipartHeaders(String headers) {

@@ -147,6 +147,7 @@ public class PlayerMusicManager {
         musicByIdCache.putAll(loadedById);
         playerMusicCache.clear();
         loadedByPlayer.forEach((uuid, list) -> playerMusicCache.put(uuid, new CopyOnWriteArrayList<>(list)));
+        com.huidu.musicboxplus.core.song.MusicBoxSongManager.clearPlayerMusicAdapters();
 
         MusicBox.getInstance().getLogger().info(com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(), "Loaded " + musicByIdCache.size() + " player music entries", "已加载 " + musicByIdCache.size() + " 条玩家音乐记录"));
     }
@@ -689,6 +690,7 @@ public class PlayerMusicManager {
         flushPendingSavesSync();
         playerMusicCache.clear();
         musicByIdCache.clear();
+        com.huidu.musicboxplus.core.song.MusicBoxSongManager.clearPlayerMusicAdapters();
         pendingSaveSnapshots.clear();
         pendingSaveSignatures.clear();
         lastSavedSignatures.clear();
@@ -700,4 +702,3 @@ public class PlayerMusicManager {
         }
     }
 }
-

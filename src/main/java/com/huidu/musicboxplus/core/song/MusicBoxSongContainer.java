@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.concurrent.*;
 
 public class MusicBoxSongContainer implements FullSongContainer {
+    private static final int SONG_LOADER_THREADS = 8;
+    private static final int SONG_LOADER_QUEUE_CAPACITY = 512;
     private final MusicBoxSongContainer parent;
     private volatile List<MusicBoxSongContainer> subContainers;
     private volatile List<MusicBoxSong> songs;
@@ -42,11 +44,13 @@ public class MusicBoxSongContainer implements FullSongContainer {
     private static volatile ExecutorService songLoader = createSongLoader();
 
     private static ExecutorService createSongLoader() {
-        return Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors(), r -> {
+        int threads = Math.max(2, Math.min(SONG_LOADER_THREADS, Runtime.getRuntime().availableProcessors()));
+        return new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(SONG_LOADER_QUEUE_CAPACITY), r -> {
             Thread t = new Thread(r, "MusicBox-SongLoader");
             t.setDaemon(true);
             return t;
-        });
+        }, new ThreadPoolExecutor.CallerRunsPolicy());
     }
 
     private static ExecutorService getSongLoader() {

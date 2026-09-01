@@ -18,6 +18,9 @@ public final class AsyncTaskManager {
     private final ScheduledExecutorService scheduledExecutor;
     private volatile boolean shutdown = false;
 
+    private static final int MAX_ASYNC_THREADS = 16;
+    private static final int ASYNC_QUEUE_CAPACITY = 512;
+
     public static AsyncTaskManager getInstance() {
         AsyncTaskManager local = instance;
         if (local != null) {
@@ -32,13 +35,16 @@ public final class AsyncTaskManager {
     }
 
     private AsyncTaskManager() {
-        int maxThreads = Math.max(4, Runtime.getRuntime().availableProcessors() * 2);
-        this.asyncExecutor = Executors.newFixedThreadPool(maxThreads, r -> {
+        int maxThreads = Math.max(4, Math.min(MAX_ASYNC_THREADS, Runtime.getRuntime().availableProcessors() * 2));
+        this.asyncExecutor = new ThreadPoolExecutor(
+                maxThreads, maxThreads, 0L, TimeUnit.MILLISECONDS,
+                new ArrayBlockingQueue<>(ASYNC_QUEUE_CAPACITY),
+                r -> {
             Thread thread = new Thread(r);
             thread.setName("MusicBox-Async-" + thread.threadId());
             thread.setDaemon(true);
             return thread;
-        });
+                }, new ThreadPoolExecutor.AbortPolicy());
 
         this.scheduledExecutor = Executors.newScheduledThreadPool(2, r -> {
             Thread thread = new Thread(r);
@@ -52,20 +58,25 @@ public final class AsyncTaskManager {
         if (shutdown) {
             return;
         }
-        asyncExecutor.execute(() -> {
+        Runnable wrapped = () -> {
             try {
                 task.run();
             } catch (Exception e) {
                 MusicBox.getInstance().getLogger().log(Level.WARNING, "Async task execution failed", e);
             }
-        });
+        };
+        try {
+            asyncExecutor.execute(wrapped);
+        } catch (RejectedExecutionException e) {
+            MusicBox.getInstance().getLogger().warning("Async task queue is full; task was rejected");
+        }
     }
 
     public void executeAsync(Runnable task, Runnable onFailure) {
         if (shutdown) {
             return;
         }
-        asyncExecutor.execute(() -> {
+        Runnable wrapped = () -> {
             try {
                 task.run();
             } catch (Exception e) {
@@ -78,7 +89,19 @@ public final class AsyncTaskManager {
                     }
                 }
             }
-        });
+        };
+        try {
+            asyncExecutor.execute(wrapped);
+        } catch (RejectedExecutionException e) {
+            MusicBox.getInstance().getLogger().warning("Async task queue is full; task was rejected");
+            if (onFailure != null) {
+                try {
+                    onFailure.run();
+                } catch (Exception callbackError) {
+                    MusicBox.getInstance().getLogger().log(Level.WARNING, "Failure callback execution failed", callbackError);
+                }
+            }
+        }
     }
 
     public ScheduledFuture<?> scheduleAtFixedRate(Runnable task, long initialDelay, long period, TimeUnit unit) {

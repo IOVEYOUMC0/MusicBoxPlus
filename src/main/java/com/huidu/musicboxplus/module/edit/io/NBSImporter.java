@@ -44,6 +44,10 @@ public class NBSImporter {
         return convertToPlayerMusic(NbsReader.read(stream), author, authorUUID, fileName);
     }
 
+    public PlayerMusic importFromBytes(byte[] data, String fileName, String author, UUID authorUUID) throws IOException {
+        return convertToPlayerMusic(NbsReader.read(data), author, authorUUID, fileName);
+    }
+
     private PlayerMusic convertToPlayerMusic(RawNbsSong song, String author, UUID authorUUID, String fileName) throws IOException {
         String name = song.title();
         if (name == null || name.isEmpty()) {
@@ -187,4 +191,3 @@ public class NBSImporter {
     private record TempoMapping(int bpm, int beatSubdivision) {
     }
 }
-

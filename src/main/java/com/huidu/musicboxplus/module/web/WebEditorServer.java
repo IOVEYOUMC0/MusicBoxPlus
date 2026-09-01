@@ -52,11 +52,9 @@ public class WebEditorServer {
             String bindAddress = config.getBindAddress();
             httpServer = HttpServer.create(new InetSocketAddress(bindAddress, config.getPort()), 0);
             registerHandlers();
-            // Bounded queue, not newFixedThreadPool's unbounded one: once the backlog is full a
-            // flood is rejected at the door instead of accumulating. This is the guard a
-            // per-route semaphore used to claim to provide and could not -- it had one permit per
-            // pool thread, so it could never actually refuse anything.
-            int webThreads = Math.max(2, Runtime.getRuntime().availableProcessors());
+            // Keep ordinary requests bounded; ImportApiHandler separately limits expensive
+            // multipart parsing and NBS conversion to two concurrent requests.
+            int webThreads = Math.max(2, Math.min(16, Runtime.getRuntime().availableProcessors()));
             httpExecutor = new java.util.concurrent.ThreadPoolExecutor(
                     webThreads, webThreads, 0L, java.util.concurrent.TimeUnit.MILLISECONDS,
                     new java.util.concurrent.ArrayBlockingQueue<>(REQUEST_BACKLOG),

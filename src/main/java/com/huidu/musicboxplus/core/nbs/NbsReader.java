@@ -21,18 +21,28 @@ import java.util.List;
 // makes that class of bug unreachable.
 public final class NbsReader {
 
+    // Keep library playback and editor imports on one bounded parser path. The importer has the
+    // same limits, while songs placed directly in the library otherwise bypassed them entirely.
+    public static final int MAX_FILE_BYTES = 5 * 1024 * 1024;
+    public static final int MAX_NOTES = 100_000;
+
     private NbsReader() {
     }
 
     public static RawNbsSong read(Path file) throws IOException {
+        checkFileSize(file);
         return read(Files.readAllBytes(file));
     }
 
     public static RawNbsSong read(InputStream rawStream) throws IOException {
-        return read(rawStream.readAllBytes());
+        if (rawStream == null) {
+            throw new IOException("NBS input stream is null");
+        }
+        return read(rawStream.readNBytes(MAX_FILE_BYTES + 1));
     }
 
     public static RawNbsSong read(byte[] data) throws IOException {
+        checkDataSize(data);
         Cursor c = new Cursor(data);
         Header h = readHeader(c);
 
@@ -51,10 +61,12 @@ public final class NbsReader {
     // v3+ carries lengthTicks in the header, so parsing can stop before the note section.
     // v1/v2 must still walk the note section to derive the length from the last note's tick.
     public static RawNbsSong readMetadata(Path file) throws IOException {
+        checkFileSize(file);
         return readMetadata(Files.readAllBytes(file));
     }
 
     public static RawNbsSong readMetadata(byte[] data) throws IOException {
+        checkDataSize(data);
         Cursor c = new Cursor(data);
         Header h = readHeader(c);
         // Only the versions that have no length in the header pay for the note walk.
@@ -177,10 +189,32 @@ public final class NbsReader {
                     panning = c.u8("notePanning");
                     finePitch = c.i16("noteFinePitch");   // the only signed field in the format
                 }
+                if (notes.size() >= MAX_NOTES) {
+                    throw new IOException("NBS file has too many notes (max " + MAX_NOTES + ")");
+                }
                 notes.add(new RawNbsNote(tick, layer, instrument, key, velocity, panning, finePitch));
             }
         }
         return notes;
+    }
+
+    private static void checkFileSize(Path file) throws IOException {
+        if (file == null) {
+            throw new IOException("NBS file is null");
+        }
+        long size = Files.size(file);
+        if (size > MAX_FILE_BYTES) {
+            throw new IOException("NBS file is too large (max " + (MAX_FILE_BYTES / (1024 * 1024)) + " MB)");
+        }
+    }
+
+    private static void checkDataSize(byte[] data) throws IOException {
+        if (data == null) {
+            throw new IOException("NBS data is null");
+        }
+        if (data.length > MAX_FILE_BYTES) {
+            throw new IOException("NBS file is too large (max " + (MAX_FILE_BYTES / (1024 * 1024)) + " MB)");
+        }
     }
 
     // Layers are exactly songHeight fixed-length records in order: no jump prefix, no

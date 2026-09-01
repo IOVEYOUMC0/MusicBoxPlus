@@ -115,6 +115,23 @@ public final class TextDisplayPlayerManager {
         return idle;
     }
 
+    // Replaces a player whose entire playlist disappeared during a song reload with the same
+    // song-less placeholder used by restore. This keeps the placed display visible and editable.
+    static boolean replaceWithIdle(String name) {
+        String normalized = normalize(name);
+        TextDisplayHandle handle = liveHandle(normalized);
+        if (handle == null) {
+            return false;
+        }
+        Location location = handle.getLocation();
+        int range = handle.getRange();
+        TextDisplayPlayer.DisplayOptions options = handle.getDisplayOptions().copy();
+        handle.destroy();
+        HANDLES.put(normalized, new IdleTextDisplay(handle.getName(), location, range, options));
+        TextDisplayStore.saveSoon();
+        return true;
+    }
+
     public static boolean delete(String name) {
         TextDisplayHandle handle = HANDLES.remove(normalize(name));
         if (handle == null) {

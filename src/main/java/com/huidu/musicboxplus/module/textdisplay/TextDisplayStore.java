@@ -64,11 +64,6 @@ public final class TextDisplayStore {
     private static final Map<String, Map<String, Object>> RECORDS =
             Collections.synchronizedMap(new LinkedHashMap<>());
 
-    // Displays whose restore could not reproduce what the file described -- a song that would not
-    // resolve, most often because the songs folder was momentarily unavailable. Their live handle
-    // is a lesser thing than their record, so it must not be allowed to overwrite it.
-    private static final Set<String> INCOMPLETE = ConcurrentHashMap.newKeySet();
-
     // Names between "decided to restore" and "inserted into the registry". Restore hops onto each
     // display's own region thread, so without this a second restoreAll could look at the registry,
     // still see nothing, and spawn a second set of entities for the same display.
@@ -102,9 +97,8 @@ public final class TextDisplayStore {
 
     // Reads the file and recreates every display that is not already live.
     //
-    // Also runs on /musicboxplus reload, where every display is still alive and untouched. Rebuilding
-    // them there would spawn a second set of entities and orphan the first, which nothing can then
-    // remove, so live ones are left exactly as they are.
+    // Also runs on /musicboxplus reload. Existing displays are rebound in place so they keep one
+    // set of entities while their playlists follow the freshly loaded song objects.
     public static void restoreAll() {
         List<Map<String, Object>> stored;
         try {
@@ -125,6 +119,10 @@ public final class TextDisplayStore {
         }
         loaded = true;
 
+        // A song reload rebuilds every MusicBoxSong instance. Rebind live text players to the new
+        // instances before restoring records, and drop entries that no longer resolve.
+        pruneLivePlaylists();
+
         int restored = 0;
         int waiting = 0;
         for (Map<String, Object> entry : snapshotRecords()) {
@@ -132,6 +130,9 @@ public final class TextDisplayStore {
             if (name == null || name.isBlank()) {
                 continue;
             }
+            // Clean song references even when the display's world is not mounted yet.
+            SongList storedSongs = readSongs(entry, name);
+            normalizePlaylistEntry(entry, storedSongs.songs);
             if (TextDisplayPlayerManager.get(name).isPresent() || !RESTORING.add(key(name))) {
                 continue;
             }
@@ -157,6 +158,7 @@ public final class TextDisplayStore {
             MusicBox.getInstance().getLogger().info("Restored " + restored + " text display(s)"
                     + (waiting > 0 ? ", " + waiting + " waiting for their world to load" : ""));
         }
+        saveSoon();
     }
 
     // Drops a display for good. The only thing that ever removes a record, which is what separates
@@ -165,8 +167,9 @@ public final class TextDisplayStore {
         if (name == null) {
             return;
         }
-        RECORDS.remove(key(name));
-        INCOMPLETE.remove(key(name));
+        synchronized (RECORDS) {
+            RECORDS.remove(key(name));
+        }
         saveSoon();
     }
 
@@ -222,11 +225,6 @@ public final class TextDisplayStore {
         float speed = number(entry, "speed", 1).floatValue();
         TextDisplayPlayer.DisplayOptions options = readOptions(map(entry.get("options")));
         SongList songs = readSongs(entry, name);
-        if (songs.lostAny) {
-            // Its record still describes the full playlist; keep the live handle from writing the
-            // reduced version back over it.
-            INCOMPLETE.add(key(name));
-        }
         boolean playing = bool(entry, "playing", true);
 
         // Each display belongs to whichever region owns its block, and restore runs on the global
@@ -264,6 +262,9 @@ public final class TextDisplayStore {
                     "Failed to spawn restored text display '" + name + "'", e);
         } finally {
             RESTORING.remove(key(name));
+            // The restored handle now contains the filtered playlist (including an empty one), so
+            // persist it immediately instead of waiting for the periodic safety save.
+            saveSoon();
         }
     }
 
@@ -289,10 +290,9 @@ public final class TextDisplayStore {
     // and every display would otherwise lose its song the first time the songs folder moves.
     private static SongList readSongs(Map<String, Object> entry, String displayName) {
         List<MusicBoxSong> songs = new ArrayList<>();
-        boolean lostAny = false;
         Object raw = entry.get("songs");
         if (!(raw instanceof List<?> list)) {
-            return new SongList(songs, false);
+            return new SongList(songs);
         }
         for (Object element : list) {
             Map<String, Object> stored = map(element);
@@ -303,13 +303,12 @@ public final class TextDisplayStore {
             if (resolved != null) {
                 songs.add(resolved);
             } else {
-                lostAny = true;
                 MusicBox.getInstance().getLogger().warning("Text display '" + displayName
-                        + "' refers to a song that is not loaded: " + string(stored, "name", "?")
-                        + " (kept in " + FILE_NAME + " in case it comes back)");
+                        + "' refers to a song that is not loaded; removing it from the playlist: "
+                        + string(stored, "name", "?"));
             }
         }
-        return new SongList(songs, lostAny);
+        return new SongList(songs);
     }
 
     private static MusicBoxSong resolveSong(Map<String, Object> stored) {
@@ -326,7 +325,89 @@ public final class TextDisplayStore {
         return resolved;
     }
 
-    private record SongList(List<MusicBoxSong> songs, boolean lostAny) {
+    private record SongList(List<MusicBoxSong> songs) {
+    }
+
+    private static void pruneLivePlaylists() {
+        for (String name : TextDisplayPlayerManager.getNames()) {
+            TextDisplayPlayer player = TextDisplayPlayerManager.getActive(name).orElse(null);
+            if (player == null) {
+                continue;
+            }
+            IPlayList oldList = player.getPlayList();
+            List<MusicBoxSong> rebound = new ArrayList<>();
+            MusicBoxSong oldCurrent = oldList == null ? null : (MusicBoxSong) oldList.getCurrent();
+            int currentIndex = 0;
+            boolean hasEnd = false;
+            boolean changed = false;
+            if (oldList instanceof ListPlaylist list) {
+                hasEnd = list.hasEnd();
+                List<MusicBoxSong> oldSongs = list.getSongsSnapshot();
+                for (MusicBoxSong oldSong : oldSongs) {
+                    MusicBoxSong resolved = resolveSong(songEntry(oldSong));
+                    if (resolved != oldSong) {
+                        changed = true;
+                    }
+                    if (resolved != null) {
+                        if (oldSong == oldCurrent) {
+                            currentIndex = rebound.size();
+                        }
+                        rebound.add(resolved);
+                    }
+                }
+            } else if (oldCurrent != null) {
+                MusicBoxSong resolved = resolveSong(songEntry(oldCurrent));
+                changed = resolved != oldCurrent;
+                if (resolved != null) {
+                    rebound.add(resolved);
+                }
+            }
+            if (!changed) {
+                continue;
+            }
+            Location location = player.getLocation();
+            if (location == null || location.getWorld() == null) {
+                continue;
+            }
+            IPlayList replacement = rebound.isEmpty() ? null : rebound.size() == 1
+                    ? new SingletonPlayList(rebound.get(0))
+                    : new ListPlaylist(rebound, hasEnd);
+            if (replacement instanceof ListPlaylist list && !rebound.isEmpty()) {
+                list.setSong(rebound.get(Math.min(currentIndex, rebound.size() - 1)));
+            }
+            boolean wasPlaying = player.isPlaying();
+            Scheduler.region(location, () -> {
+                if (TextDisplayPlayerManager.get(name).orElse(null) != player) {
+                    return;
+                }
+                if (replacement == null) {
+                    TextDisplayPlayerManager.replaceWithIdle(name);
+                } else if (TextDisplayPlayerManager.setPlaylist(name, replacement) && !wasPlaying) {
+                    TextDisplayPlayerManager.getActive(name).ifPresent(updated -> updated.setPlaying(false));
+                }
+            });
+        }
+    }
+
+    private static void normalizePlaylistEntry(Map<String, Object> entry, List<MusicBoxSong> songs) {
+        List<Map<String, Object>> storedSongs = new ArrayList<>(songs.size());
+        for (MusicBoxSong song : songs) {
+            storedSongs.add(songEntry(song));
+        }
+        entry.put("songs", storedSongs);
+        MusicBoxSong current = resolveSong(map(entry.get("current")));
+        if (current != null && songs.contains(current)) {
+            entry.put("current", songEntry(current));
+            entry.put("currentIndex", songs.indexOf(current));
+        } else {
+            entry.remove("current");
+            if (songs.isEmpty()) {
+                entry.remove("currentIndex");
+            } else {
+                int index = Math.max(0, Math.min(number(entry, "currentIndex", 0).intValue(), songs.size() - 1));
+                entry.put("currentIndex", index);
+            }
+        }
     }
 
     private static TextDisplayPlayer.DisplayOptions readOptions(Map<String, Object> stored) {
@@ -474,30 +555,39 @@ public final class TextDisplayStore {
     // those region threads. Records without a live handle go out unchanged -- that is the whole
     // point; see the class comment.
     private static CompletableFuture<String> serializeAsync() {
-        List<CompletableFuture<Map<String, Object>>> captures = new ArrayList<>();
+        List<HandleCapture> captures = new ArrayList<>();
         for (String name : TextDisplayPlayerManager.getNames()) {
-            if (INCOMPLETE.contains(key(name))) {
-                continue;
-            }
             TextDisplayPlayerManager.get(name).ifPresent(handle -> {
                 CompletableFuture<Map<String, Object>> capture = new CompletableFuture<>();
-                captures.add(capture);
+                captures.add(new HandleCapture(name, handle, capture));
                 captureHandle(name, handle, capture);
             });
         }
         if (captures.isEmpty()) {
             return CompletableFuture.completedFuture(toYaml(snapshotRecords()));
         }
-        CompletableFuture<?>[] futures = captures.toArray(CompletableFuture<?>[]::new);
+        CompletableFuture<?>[] futures = captures.stream()
+                .map(HandleCapture::result)
+                .toArray(CompletableFuture<?>[]::new);
         return CompletableFuture.allOf(futures).thenApplyAsync(ignored -> {
-            for (CompletableFuture<Map<String, Object>> capture : captures) {
-                Map<String, Object> entry = capture.join();
+            for (HandleCapture capture : captures) {
+                Map<String, Object> entry = capture.result().join();
                 if (entry != null) {
-                    RECORDS.put(key(string(entry, "name", "")), entry);
+                    // The handle may have been deleted/replaced while its region snapshot was in
+                    // flight. Never let that stale snapshot resurrect the old record.
+                    synchronized (RECORDS) {
+                        if (TextDisplayPlayerManager.get(capture.name()).orElse(null) == capture.handle()) {
+                            RECORDS.put(key(capture.name()), entry);
+                        }
+                    }
                 }
             }
             return toYaml(snapshotRecords());
         }, AsyncTaskManager.getInstance().getAsyncExecutor());
+    }
+
+    private record HandleCapture(String name, TextDisplayHandle handle,
+                                 CompletableFuture<Map<String, Object>> result) {
     }
 
     private static void captureHandle(String name, TextDisplayHandle handle,

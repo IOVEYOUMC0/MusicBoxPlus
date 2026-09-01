@@ -180,7 +180,6 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
         if (layout != null && !layout.isEmpty()) {
             this.layoutParser.parseAndApply(layout);
         }
-        this.refresh();
     }
     
     private void handleStop(Player p) {

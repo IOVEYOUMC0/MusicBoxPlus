@@ -322,7 +322,7 @@ web:
   linkExpireTime: 10
   # Maximum song length accepted by the editor, in ticks
   maxMusicLength: 10000
-  # Maximum request body size, in megabytes
+  # Maximum request body size, in megabytes (invalid values use 10; maximum 50)
   maxRequestSize: 10
   # Maximum requests per client IP per 60 seconds
   rateLimit: 100

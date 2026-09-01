@@ -306,6 +306,10 @@ public final class MusicBoxSongManager {
         }
     }
 
+    public static void clearPlayerMusicAdapters() {
+        playerMusicAdapters.clear();
+    }
+
     public static Optional<MusicBoxSong> findPlayableJukeboxSongByItem(ItemStack stack) {
         return findByItem(stack).filter(song -> !song.shouldUseVanillaJukeboxPlayback());
     }
