@@ -165,8 +165,21 @@ public final class MusicBoxSongManager {
             );
         }
         
+        // Built into a local and published at the end, like the indexes below it.
+        //
+        // This used to assign the field first and fill it later, so for the whole duration of a
+        // reload -- seconds, with one loader thread per core reading every header -- the main thread
+        // saw an empty container tree next to the *previous* generation's song index. Anything that
+        // browsed in that window got nothing: SongContainerGUI snapshots the sub-containers and songs
+        // when it is built, findContainerById found no CHEST: container so signs, LIST: playlists and
+        // autoplay resolved to empty, while findByName still answered from the old generation.
+        //
+        // Nothing inside the load path reads the manager's tree (the loader works on its own
+        // instance), so holding the previous one until the new one is complete is safe as well as
+        // more useful.
+        final MusicBoxSongContainer newRoot;
         try {
-            rootContainer = new MusicBoxSongContainer(rootFolder, null, false);
+            newRoot = new MusicBoxSongContainer(rootFolder, null, false);
         } catch (RuntimeException e) {
             // The constructor rejects a non-directory path ("File is not folder"), and that throw
             // happens BEFORE the future chain below exists -- so the whenComplete that resets these
@@ -179,9 +192,9 @@ public final class MusicBoxSongManager {
         }
         return CompletableFuture.runAsync(() -> maybeConvertMidi(rootFolder),
                         com.huidu.musicboxplus.common.utils.AsyncTaskManager.getInstance().getAsyncExecutor())
-                .thenCompose(ignored -> rootContainer.loadAsync(rootFolder))
+                .thenCompose(ignored -> newRoot.loadAsync(rootFolder))
                 .thenRun(() -> {
-            allSongs = Collections.unmodifiableList(new ArrayList<MusicBoxSong>(rootContainer.getAllSongs()));
+            allSongs = Collections.unmodifiableList(new ArrayList<MusicBoxSong>(newRoot.getAllSongs()));
             
             Map<String, MusicBoxSong> newNameToSong = new ConcurrentHashMap<>();
             Map<String, MusicBoxSong> newLowerCaseNameToSong = new ConcurrentHashMap<>();
@@ -203,15 +216,17 @@ public final class MusicBoxSongManager {
             nameToSongRef.set(Collections.unmodifiableMap(newNameToSong));
             lowerCaseNameToSongRef.set(Collections.unmodifiableMap(newLowerCaseNameToSong));
             hashToSongRef.set(Collections.unmodifiableMap(newHashToSong));
-            
+
             searchCacheLock.writeLock().lock();
             try {
                 resetSearchCache();
             } finally {
                 searchCacheLock.writeLock().unlock();
             }
-            
+
             buildKeywordIndex();
+            // Last, so the tree only becomes visible once everything read behind it is in place.
+            rootContainer = newRoot;
             isLoading.set(false);
             isLoaded.set(true);
             long endTime = System.currentTimeMillis();
