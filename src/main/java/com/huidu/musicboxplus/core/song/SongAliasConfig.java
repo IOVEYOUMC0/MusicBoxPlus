@@ -12,6 +12,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
 
 public class SongAliasConfig {
@@ -63,23 +66,108 @@ public class SongAliasConfig {
     }
 
     private void loadSongData() {
+        // `songs` is a list of entries, each carrying its own `name`.
+        //
+        // It cannot be a mapping keyed by the song name. Bukkit's configuration API treats "." as a
+        // path separator and offers no escape for it: MemorySection.set routes a Map value through
+        // mapChildrenValues, which calls createSection(key), and loading a file does the same via
+        // convertMapsToSections. So a name containing a dot is split on the way in *and* on the way
+        // out -- "Song v1.0" becomes songs -> "song v1" -> "0" -- and the entry can never be read
+        // back under its own name. A sequence has no keys to split, so the names survive verbatim.
+        if (this.config.isList("songs")) {
+            for (Map<?, ?> entry : this.config.getMapList("songs")) {
+                String name = stringField(entry, "name");
+                if (name == null || name.isEmpty()) {
+                    continue;
+                }
+                this.songDataMap.put(name.toLowerCase(), dataFrom(entry));
+            }
+        } else {
+            this.loadLegacySongsSection();
+        }
+        this.plugin.getLogger().info(LogLocale.text(this.plugin, "Loaded " + this.songDataMap.size() + " song configs", "已加载 " + this.songDataMap.size() + " 个歌曲配置"));
+    }
+
+    // The mapping form this file used before the list: `songs: { <name>: { aliases: [...] } }`.
+    //
+    // Still read so an existing file is not thrown away, and it recovers the entries the old format
+    // had already lost. A dotted name was split into nested sections, so the pieces are still in the
+    // file -- "song v1" -> "0" -- and joining them with the separator the writer split on
+    // reconstructs the name. That is the one place the old encoding is reversible.
+    private void loadLegacySongsSection() {
         ConfigurationSection songsSection = this.config.getConfigurationSection("songs");
         if (songsSection == null) {
             return;
         }
-        for (String songName : songsSection.getKeys(false)) {
-            ConfigurationSection songSection = songsSection.getConfigurationSection(songName);
-            if (songSection == null) continue;
-            List<String> aliases = songSection.getStringList("aliases");
-            List<String> tags = songSection.getStringList("tags");
-            String jukeboxPlayable = songSection.getString("jukebox-playable", null);
-            int customModelData = songSection.getInt("custom-model-data", 0);
-            String customMaterial = songSection.getString("custom-material", null);
-            String itemModel = songSection.getString("item-model", null);
-            String craftEngineItem = songSection.getString("craft-engine-item", null);
-            this.songDataMap.put(songName.toLowerCase(), new SongAliasData(aliases, tags, jukeboxPlayable, customModelData, customMaterial, itemModel, craftEngineItem));
+        for (String key : songsSection.getKeys(false)) {
+            ConfigurationSection section = songsSection.getConfigurationSection(key);
+            if (section == null) {
+                continue;
+            }
+            String name = key;
+            // Descend while this level holds no fields of its own and exactly one nested section:
+            // that nesting is a name that was split, not a real structure.
+            while (!hasFields(section) && section.getKeys(false).size() == 1) {
+                String child = section.getKeys(false).iterator().next();
+                ConfigurationSection childSection = section.getConfigurationSection(child);
+                if (childSection == null) {
+                    break;
+                }
+                name = name + "." + child;
+                section = childSection;
+            }
+            if (!hasFields(section)) {
+                continue;
+            }
+            this.songDataMap.put(name.toLowerCase(), new SongAliasData(
+                    section.getStringList("aliases"),
+                    section.getStringList("tags"),
+                    section.getString("jukebox-playable", null),
+                    section.getInt("custom-model-data", 0),
+                    section.getString("custom-material", null),
+                    section.getString("item-model", null),
+                    section.getString("craft-engine-item", null)));
         }
-        this.plugin.getLogger().info(LogLocale.text(this.plugin, "Loaded " + this.songDataMap.size() + " song configs", "已加载 " + this.songDataMap.size() + " 个歌曲配置"));
+    }
+
+    private static boolean hasFields(ConfigurationSection section) {
+        return section.isSet("aliases") || section.isSet("tags") || section.isSet("jukebox-playable")
+                || section.isSet("custom-model-data") || section.isSet("custom-material")
+                || section.isSet("item-model") || section.isSet("craft-engine-item");
+    }
+
+    private static String stringField(Map<?, ?> entry, String key) {
+        Object value = entry.get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private static List<String> stringListField(Map<?, ?> entry, String key) {
+        Object value = entry.get(key);
+        List<String> list = new ArrayList<>();
+        if (value instanceof List<?> raw) {
+            for (Object element : raw) {
+                if (element != null) {
+                    list.add(String.valueOf(element));
+                }
+            }
+        }
+        return list;
+    }
+
+    private static int intField(Map<?, ?> entry, String key) {
+        Object value = entry.get(key);
+        return value instanceof Number number ? number.intValue() : 0;
+    }
+
+    private static SongAliasData dataFrom(Map<?, ?> entry) {
+        return new SongAliasData(
+                stringListField(entry, "aliases"),
+                stringListField(entry, "tags"),
+                stringField(entry, "jukebox-playable"),
+                intField(entry, "custom-model-data"),
+                stringField(entry, "custom-material"),
+                stringField(entry, "item-model"),
+                stringField(entry, "craft-engine-item"));
     }
 
     public void applyToAllSongs() {
@@ -103,11 +191,55 @@ public class SongAliasConfig {
         this.plugin.getLogger().info(LogLocale.text(this.plugin, "Applied custom song config to " + appliedCount + " songs", "已为 " + appliedCount + " 首歌曲应用自定义配置"));
     }
 
+    // Rewrites the whole `songs` block from the in-memory map.
+    //
+    // A list of entries rather than a mapping keyed by song name, because the configuration API
+    // splits mapping keys on "." -- see loadSongData. Each entry carries its own `name`, so the name
+    // is stored verbatim and a file written here is readable by this class whatever the name is.
+    // This also collapses N per-field config writes into one.
     public void saveConfig() {
-        try {
-            this.config.save(this.configFile);
+        List<Map<String, Object>> songs = new ArrayList<>(this.songDataMap.size());
+        for (Map.Entry<String, SongAliasData> entry : this.songDataMap.entrySet()) {
+            SongAliasData data = entry.getValue();
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put("name", entry.getKey());
+            fields.put("aliases", new ArrayList<>(data.getAliases()));
+            fields.put("tags", new ArrayList<>(data.getTags()));
+            // Null fields are omitted rather than written as explicit nulls, which matches what the
+            // previous "set every field so that clearing persists" rule produced: a null value
+            // removed the key.
+            putIfPresent(fields, "jukebox-playable", data.getJukeboxPlayable());
+            fields.put("custom-model-data", data.getCustomModelData());
+            putIfPresent(fields, "custom-material", data.getCustomMaterial());
+            putIfPresent(fields, "item-model", data.getItemModel());
+            putIfPresent(fields, "craft-engine-item", data.getCraftEngineItem());
+            songs.add(fields);
         }
-        catch (IOException e) {
+        this.config.set("songs", songs);
+        this.writeAtomically();
+    }
+
+    private static void putIfPresent(Map<String, Object> fields, String key, String value) {
+        if (value != null) {
+            fields.put(key, value);
+        }
+    }
+
+    // Temp file + atomic move, like the other files this plugin rewrites in place. A plain
+    // config.save(file) truncates the real file first, so a crash or a full disk mid-write took every
+    // alias, tag and item override in the library with it.
+    private void writeAtomically() {
+        File temp = new File(this.configFile.getParentFile(), this.configFile.getName() + ".tmp");
+        try {
+            this.config.save(temp);
+            try {
+                Files.move(temp.toPath(), this.configFile.toPath(),
+                        StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temp.toPath(), this.configFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            temp.delete();
             this.plugin.getLogger().severe(LogLocale.text(this.plugin, "Failed to save song alias config: " + e.getMessage(), "无法保存歌曲别名配置: " + e.getMessage()));
         }
     }
@@ -191,17 +323,8 @@ public class SongAliasConfig {
     }
 
     private void saveSongData(String songName, SongAliasData data) {
-        String path = "songs." + songName;
-        this.config.set(path + ".aliases", data.getAliases());
-        this.config.set(path + ".tags", data.getTags());
-        // Always set every field (null removes the key in Bukkit's YamlConfiguration) so that
-        // clearing a value actually persists — the old "only write when non-null" left a stale
-        // value in the file, which is why unset didn't work.
-        this.config.set(path + ".jukebox-playable", data.getJukeboxPlayable());
-        this.config.set(path + ".custom-model-data", data.getCustomModelData());
-        this.config.set(path + ".custom-material", data.getCustomMaterial());
-        this.config.set(path + ".item-model", data.getItemModel());
-        this.config.set(path + ".craft-engine-item", data.getCraftEngineItem());
+        // The in-memory map is already updated by the caller and is the source of truth, so the whole
+        // block is rewritten from it; see saveConfig for why the song name must not end up in a path.
         this.saveConfig();
     }
 
