@@ -196,7 +196,17 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         if (!MusicBox.getInstance().isJukeboxModuleEnabled()) {
             return;
         }
-        for (BlockState state : chunk.getTileEntities()) {
+        // Filtered by the server, before it builds anything.
+        //
+        // Chunk#getTileEntities() allocates a BlockState for every tile entity in the chunk -- chests,
+        // hoppers, furnaces, signs, banners -- and with snapshot mode on it copies each block entity's
+        // NBT, which for a container means its inventory. This runs on every chunk load for the whole
+        // life of the server, to find the usually-zero jukeboxes. Paper's Predicate overload applies
+        // the test to the Block first, so a chunk with fifty chests now costs fifty Material compares
+        // instead of fifty BlockState snapshots. Snapshot mode is deliberately left on: the state is
+        // handed to createNew, and a live handle would change what its later reads return.
+        for (BlockState state : chunk.getTileEntities(
+                block -> block.getType() == Material.JUKEBOX, true)) {
             if (!(state instanceof Jukebox jukebox)) {
                 continue;
             }
