@@ -9,6 +9,7 @@ import com.huidu.musicboxplus.core.sound.SongInstruments;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -37,7 +38,21 @@ class NbsReaderExtendedCorpusTest {
         Map<String, NbsReference.Expected> reference = NbsReference.load(REFERENCE);
         assertTrue(reference.size() > 100, "baseline has too few entries: " + reference.size());
 
+        // Baseline entries are keyed by the relative path the file had when the reference was
+        // captured, and a corpus that has been tidied into subfolders since (Minecraft/, 其他音乐/,
+        // ...) no longer resolves those paths even though every file is still there. A path that does
+        // not resolve is not a reader disagreement, so it is looked up by basename before being given
+        // up on -- and an ambiguous basename is skipped rather than guessed at, because comparing the
+        // reader against the *wrong* file would be worse than not comparing it.
+        Map<String, List<Path>> byBasename = new HashMap<>();
+        for (Path rel : NbsCorpus.collect(root)) {
+            byBasename.computeIfAbsent(rel.getFileName().toString(), k -> new ArrayList<>())
+                    .add(root.resolve(rel));
+        }
+
         List<String> mismatches = new ArrayList<>();
+        List<String> unresolved = new ArrayList<>();
+        int compared = 0;
         for (Map.Entry<String, NbsReference.Expected> e : reference.entrySet()) {
             String name = e.getKey();
             if (e.getValue() == null) {
@@ -46,18 +61,31 @@ class NbsReaderExtendedCorpusTest {
             }
             Path file = root.resolve(name);
             if (!Files.exists(file)) {
-                mismatches.add(name + ": missing from corpus");
-                continue;
+                List<Path> sameName = byBasename.getOrDefault(
+                        Path.of(name).getFileName().toString(), List.of());
+                if (sameName.size() != 1) {
+                    unresolved.add(name + (sameName.isEmpty()
+                            ? ": not in this corpus"
+                            : ": ambiguous, " + sameName.size() + " files share its name"));
+                    continue;
+                }
+                file = sameName.get(0);
             }
             try {
                 mismatches.addAll(NbsReference.compare(name, e.getValue(), NbsReader.read(file)));
+                compared++;
             } catch (Throwable t) {
                 mismatches.add(name + ": threw " + t);
             }
         }
 
+        // The cross-check is worthless if corpus drift quietly emptied it, so it has to have
+        // actually compared a corpus.
+        assertTrue(compared > 100,
+                "only " + compared + " baseline files were compared; unresolved: " + unresolved);
         assertTrue(mismatches.isEmpty(),
-                "reader disagrees with the independent reference (" + mismatches.size() + "):\n  "
+                "reader disagrees with the independent reference (" + mismatches.size() + "), "
+                        + compared + " files compared, " + unresolved.size() + " unresolved:\n  "
                         + String.join("\n  ", mismatches.subList(0, Math.min(30, mismatches.size()))));
     }
 
