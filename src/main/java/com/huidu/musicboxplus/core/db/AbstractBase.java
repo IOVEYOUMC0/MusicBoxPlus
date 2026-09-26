@@ -431,14 +431,19 @@ public abstract class AbstractBase {
                 } else {
                     this.update(connection, "DELETE from playlist_song where playlists_id = ?", list.getId());
                 }
-                
-                if (!list.getSongs().isEmpty()) {
-                    List<Object[]> argsList = list.getSongs().stream()
-                        .map(MusicBoxSong::getHash)
-                        .map(h -> new Object[]{list.getId(), h, null})
-                        .collect(Collectors.toList());
-                    for (int i = 0; i < argsList.size(); i++) {
-                        argsList.get(i)[2] = i;
+
+                // Unresolvable rows are carried through rather than dropped: they were never in
+                // getSongs(), so rewriting from getSongs() alone deleted them for good. See
+                // playlistRowHashes.
+                List<Integer> resolvedHashes = new ArrayList<>(list.getSongs().size());
+                for (MusicBoxSong song : list.getSongs()) {
+                    resolvedHashes.add(song.getHash());
+                }
+                List<Integer> hashes = playlistRowHashes(resolvedHashes, list.getUnresolvedHashes());
+                if (!hashes.isEmpty()) {
+                    List<Object[]> argsList = new ArrayList<>(hashes.size());
+                    for (int i = 0; i < hashes.size(); i++) {
+                        argsList.add(new Object[]{list.getId(), hashes.get(i), i});
                     }
                     this.updateBatch(connection, "INSERT INTO playlist_song (playlists_id, song_hash,pos) values (?,?,?)", argsList);
                 }
@@ -476,8 +481,15 @@ public abstract class AbstractBase {
             int id = row.getInt("id");
             PlayerPlayListModel model = modelMap.computeIfAbsent(id, 
                 k -> new PlayerPlayListModel(id, UUID.fromString(row.getString("owner")), row.getString("name")));
-            MusicBoxSongManager.findSongByHash(row.getInt("song_hash"))
-                .ifPresent(s -> model.getSongs().add(s));
+            int hash = row.getInt("song_hash");
+            Optional<MusicBoxSong> song = MusicBoxSongManager.findSongByHash(hash);
+            if (song.isPresent()) {
+                model.getSongs().add(song.get());
+            } else {
+                // Kept on the model even though it cannot be shown, because it is about to be
+                // written back: see playlistRowHashes.
+                model.getUnresolvedHashes().add(hash);
+            }
         }
         List<PlayerPlayListModel> list = new ArrayList<>(modelMap.values());
         // Never DELETE a playlist as a side effect of reading it. findSongByHash returns empty
@@ -489,6 +501,29 @@ public abstract class AbstractBase {
         // their songs load again. (Empty rows are pruned only via an explicit deleteMe path.)
         list.removeIf(l -> l.getSongs().isEmpty());
         return list;
+    }
+
+    // The song rows to write for a playlist, in order.
+    //
+    // The whole point of this method is that the second list exists. savePlayList rewrites the
+    // playlist's rows from scratch -- DELETE then INSERT -- so anything not in the returned list is
+    // gone from the database. Building the list from the resolvable songs alone therefore deleted
+    // every song whose file was, at that moment, renamed, removed or still loading: the read path
+    // above goes to real trouble to preserve those rows, and the write path used to throw them away.
+    // That is silent, permanent data loss triggered by an unrelated edit -- adding one song to a
+    // playlist rewrites all of it -- and the comment above promised the opposite.
+    //
+    // A song the user actually removed is in neither list, which is what makes this a merge rather
+    // than "keep everything".
+    //
+    // Unresolvable hashes are appended rather than restored to their original positions. They are
+    // invisible in the GUI, so the only thing their position could affect is the order they reappear
+    // in if their songs come back; keeping the data at all is what matters.
+    static List<Integer> playlistRowHashes(List<Integer> resolvedHashes, List<Integer> unresolvedHashes) {
+        List<Integer> hashes = new ArrayList<>(resolvedHashes.size() + unresolvedHashes.size());
+        hashes.addAll(resolvedHashes);
+        hashes.addAll(unresolvedHashes);
+        return hashes;
     }
 
     public List<PlayerPlayListModel> getPlayLists(UUID playerUUID) {

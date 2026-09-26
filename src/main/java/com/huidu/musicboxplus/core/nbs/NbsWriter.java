@@ -3,7 +3,6 @@ package com.huidu.musicboxplus.core.nbs;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -200,12 +199,24 @@ public final class NbsWriter {
         os.write((value >> 24) & 0xFF);
     }
 
-    // ISO-8859-1: the format stores one byte per character, matching NbsReader and Note Block
-    // Studio. UTF-8 makes non-ASCII titles mojibake in every other NBS tool; characters above
-    // U+00FF have no representation at all and become '?'.
+    // One byte per character, which is what the format is and what the whole ecosystem reads.
+    //
+    // NoteBlockAPI -- the library every other NBS plugin here was built on -- reads a header string
+    // as `char c = (char) dataInputStream.readByte()` (see Reference/NoteBlockAPI/.../NBSDecoder),
+    // and NbsReader decodes each byte as U+00XX for the same reason. So the byte for a character is
+    // its low byte, and that is what is written here.
+    //
+    // Writing through ISO-8859-1 instead mapped every character above U+00FF to '?' -- so a Chinese
+    // song name, which is the normal case on a Chinese server, was destroyed on the way out even
+    // though its low byte was available and is what every NBS tool expects to find. The character
+    // itself still cannot survive (the field is one byte wide), but the information the file can
+    // hold now survives, and an import/export round trip of an existing file is byte-identical.
     private static void writeString(OutputStream os, String value) throws IOException {
-        byte[] bytes = (value == null ? "" : value).getBytes(StandardCharsets.ISO_8859_1);
-        writeIntLE(os, bytes.length);
-        os.write(bytes);
+        String text = value == null ? "" : value;
+        // The byte count is the character count: that is the whole point of this method.
+        writeIntLE(os, text.length());
+        for (int i = 0; i < text.length(); i++) {
+            os.write(text.charAt(i) & 0xFF);
+        }
     }
 }

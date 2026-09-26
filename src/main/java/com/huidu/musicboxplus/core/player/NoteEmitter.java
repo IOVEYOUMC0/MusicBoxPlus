@@ -175,7 +175,11 @@ public final class NoteEmitter {
             // Instruments with no sound file exist in real songs, most often as the marker a
             // tempo change is stored on. Sending an empty sound name is a wasted packet per
             // listener.
-            if (sound.isEmpty()) {
+            //
+            // Tested on the instrument, not on the resolved name: the ten-octave path appends a
+            // bucket suffix unconditionally, so a silent instrument came out as the non-empty
+            // "_1" and slipped past this check into a bogus sound event.
+            if (instruments.isSilent(instrument) || sound.isEmpty()) {
                 continue;
             }
             // A name only has to be sent when it is not a stock instrument: a custom

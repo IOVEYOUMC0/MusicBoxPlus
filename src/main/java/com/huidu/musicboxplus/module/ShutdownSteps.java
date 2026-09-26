@@ -60,6 +60,9 @@ public final class ShutdownSteps {
             }
         });
 
+        // Nulls the module listener handles so a same-classloader re-enable registers them again.
+        safeDisable("reset module listeners", plugin::resetModuleRuntimeSync);
+
         safeDisable("save recent songs for online players", () -> {
             for (Player onlinePlayer : Bukkit.getOnlinePlayers()) {
                 PlayerWrapper.getInstanceOptional(onlinePlayer).ifPresent(PlayerWrapper::saveRecentSongsNow);
@@ -69,6 +72,8 @@ public final class ShutdownSteps {
         safeDisable("save active editor sessions", MusicEditListener::saveAllActive);
         safeDisable("restore pending editor inventories", MusicEditListener::restoreAllPending);
         safeDisable("unregister edit listener", MusicEditListener::unregister);
+        safeDisable("unregister GUI input listener",
+                () -> com.huidu.musicboxplus.module.gui.GUIInputManager.getInstance().unregister());
         safeDisable("close all open GUIs", GUIActions::closeAllOpen);
         safeDisable("unregister GUI listener", GUI::unregisterListener);
         // Control-panel GUIs are tracked separately from open inventories; without this a hot
@@ -79,6 +84,8 @@ public final class ShutdownSteps {
         // rejects with a stack trace. Players left registered on a stopped clock are harmless --
         // they are torn down on the next line.
         safeDisable("shutdown playback clock", AbstractEnginePlayer::shutdownClock);
+        safeDisable("stop player position sampler",
+                com.huidu.musicboxplus.core.player.PlayerPositionSnapshot::stop);
         safeDisable("shutdown block players", AbstractBlockPlayer::shutdown);
         // AbstractBlockPlayer.shutdown() only knows block players. TextDisplayPlayerManager owns
         // the song-less IdleTextDisplay handles and their floating entities, which are not block
@@ -115,6 +122,7 @@ public final class ShutdownSteps {
         safeDisable("shutdown song container loader", MusicBoxSongContainer::shutdownLoader);
         safeDisable("destroy player wrappers", plugin::destroyAllPlayers);
         safeDisable("shutdown volume manager", VolumeManager::shutdown);
+        safeDisable("shutdown bstats", plugin::shutdownBStats);
         safeDisable("shutdown database", DatabaseLoader::shutdown);
     }
 

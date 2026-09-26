@@ -12,11 +12,9 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.musicboxplus.api.player.model.MusicBoxSongPlayerModel {
@@ -48,11 +46,8 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
     // thread -> volatile so the end-of-song decision never sees a stale list or loop mode.
     private volatile IPlayList playList;
     private final PositionPlayer positionPlayer;
-    private final Map<UUID, Boolean> mutedPlayers = new ConcurrentHashMap<>();
     private volatile boolean destroyed = false;
     private volatile LoopMode loopMode = LoopMode.OFF;
-    private final Set<UUID> listeningPlayers = ConcurrentHashMap.newKeySet();
-    private volatile PlayerControlGUI cachedControlGUI;
     // Written from the song-end callback (playback thread), read in destroy() on the main
     // thread -> volatile so the teardown observes the correct end/next state.
     private volatile boolean songEndNormal = false;
@@ -86,7 +81,7 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
     }
 
     @Override
-    public short getTick() {
+    public int getTick() {
         MusicBoxSongPlayer owner = this.ownerPlayer;
         return owner != null ? owner.getTick() : 0;
     }
@@ -113,10 +108,6 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
                 this.ownerPlayer = null;
             }
         }
-        
-        listeningPlayers.clear();
-        mutedPlayers.clear();
-        cachedControlGUI = null;
     }
 
     public PositionPlayer getPositionPlayer() {
@@ -297,48 +288,18 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
         destroy();
     }
 
+    // Deliberately NOT cached. The control GUI holds the viewer it was opened for and backs a
+    // single Inventory; sharing one across viewers let a non-owner click actions that the owner's
+    // open() had just registered into the shared runnable map, and made either viewer's close
+    // cancel the other's refresh task. Caching saved nothing either way -- open() re-runs
+    // initializeLayout()/refresh() on every call.
     public PlayerControlGUI getControlGUI() {
-        PlayerControlGUI cached = this.cachedControlGUI;
-        if (cached == null) {
-            synchronized (this) {
-                cached = this.cachedControlGUI;
-                if (cached == null) {
-                    ControlGuiFactory factory = controlGuiFactory;
-                    cached = factory != null ? factory.create(this) : null;
-                    this.cachedControlGUI = cached;
-                }
-            }
-        }
-        return cached;
-    }
-
-    public boolean isMuted(Player player) {
-        return mutedPlayers.getOrDefault(player.getUniqueId(), false);
-    }
-
-    public void mutePlayer(Player player) {
-        mutedPlayers.put(player.getUniqueId(), true);
-        this.removePlayer(player);
-    }
-
-    public void unmutePlayer(Player player) {
-        mutedPlayers.remove(player.getUniqueId());
-        if (!destroyed) {
-            this.addPlayer(player);
-        }
-    }
-
-    public void toggleMute(Player player) {
-        if (isMuted(player)) {
-            unmutePlayer(player);
-        } else {
-            mutePlayer(player);
-        }
+        ControlGuiFactory factory = controlGuiFactory;
+        return factory != null ? factory.create(this) : null;
     }
 
     public void copySettingsTo(MusicBoxSongPlayerModel other) {
         other.loopMode = this.loopMode;
-        other.mutedPlayers.putAll(this.mutedPlayers);
         other.volume = this.volume;
         other.playbackSpeedMultiplier = this.playbackSpeedMultiplier;
     }

@@ -67,9 +67,6 @@ public enum Lang {
     LOOP_MODE_OFF("loop_mode_off"),
     LOOP_MODE_SINGLE("loop_mode_single"),
     LOOP_MODE_ALL("loop_mode_all"),
-    VOLUME_INCREASE("volume_increase"),
-    VOLUME_DECREASE("volume_decrease"),
-    SILENT_MODE("silent_mode"),
     SILENT_MODE_RESPONSE("silent_mode_response"),
     MUTED("muted"),
 
@@ -196,7 +193,6 @@ public enum Lang {
     PLACEHOLDER_STATUS_STOPPED("placeholder_status_stopped"),
     PLACEHOLDER_MODE_RADIO("placeholder_mode_radio"),
     PLACEHOLDER_MODE_SPEAKER("placeholder_mode_speaker"),
-    RECENT_SONGS("recent_songs"),
     COMMAND_HELP_EDIT("command_help_edit"),
     COMMAND_HELP_EDIT_CREATE("command_help_edit_create"),
     COMMAND_HELP_EDIT_LIST("command_help_edit_list"),
@@ -467,6 +463,12 @@ public enum Lang {
 
     private Lang(String key) {
         this.key = key;
+    }
+
+    // The yml key this constant resolves to. Only LanguageFileParityTest needs it, to assert the
+    // enum and the language files have not drifted apart.
+    public String key() {
+        return this.key;
     }
 
     public String toString(String ... replacements) {

@@ -65,6 +65,8 @@ public class SearchResultGUI {
             resultSlots = IntStream.range(0, configManager.getGUIRows("search-results") * 9).boxed().toList();
         }
         int startIndex = page * resultSlots.size();
+        // Hoisted: the config object is per-page constant, and this loop runs once per result slot.
+        List<String> searchLore = configManager.getShopLoreConfig().getSearchLore();
         for (int i = 0; i < resultSlots.size() && startIndex + i < results.size(); ++i) {
             MusicBoxSong song = results.get(startIndex + i);
             int slot = resultSlots.get(i);
@@ -75,7 +77,7 @@ public class SearchResultGUI {
             } else {
                 lore = song.shouldUseVanillaJukeboxPlayback()
                         ? List.of(Lang.SEARCH_RECORD_USE_DISC.toString())
-                        : configManager.getShopLoreConfig().getSearchLore();
+                        : searchLore;
             }
             ItemStack stack = song.getSongStack(null, lore, false);
             gui.addItem(slot, stack, new ClickAction(() -> {

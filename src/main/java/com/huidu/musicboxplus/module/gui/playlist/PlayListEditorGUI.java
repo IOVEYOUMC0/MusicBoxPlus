@@ -170,13 +170,15 @@ public class PlayListEditorGUI {
         List<MusicBoxSong> songs = this.model.getSongs();
 
         int itemIndex = 0;
+        // Hoisted out of the slot loop: the item lore is the same for every slot on the page, and
+        // this method re-runs on every add/remove/shuffle.
+        List<String> itemLore = this.configManager.getPlaylistItemConfig().getItemLore();
         for (int slot : this.songSlots) {
             this.currentGUI.removeItem(slot);
             int arrayIndex = start + itemIndex;
             if (arrayIndex < songs.size()) {
                 MusicBoxSong song = songs.get(arrayIndex);
-                List<String> songLore = this.configManager.getPlaylistItemConfig().getItemLore();
-                ItemStack stack = song.getSongStack(null, songLore, false);
+                ItemStack stack = song.getSongStack(null, itemLore, false);
                 // Capture the song, not its index: the list shifts under an in-flight removal and
                 // removeSong resolves by identity anyway.
                 this.currentGUI.addItem(slot, stack, new ClickAction(null, () -> this.removeSongAsync(song)));

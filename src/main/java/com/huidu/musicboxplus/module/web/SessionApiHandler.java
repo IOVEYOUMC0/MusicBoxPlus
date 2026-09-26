@@ -18,12 +18,14 @@ final class SessionApiHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if ("OPTIONS".equals(exchange.getRequestMethod())) {
-            support.handleOptionsRequest(exchange);
+        // Rate limit first. Answering OPTIONS above it made preflight a free, unmetered route:
+        // the same work per request, none of it counted.
+        if (support.checkRateLimit(exchange)) {
             return;
         }
 
-        if (support.checkRateLimit(exchange)) {
+        if ("OPTIONS".equals(exchange.getRequestMethod())) {
+            support.handleOptionsRequest(exchange);
             return;
         }
 

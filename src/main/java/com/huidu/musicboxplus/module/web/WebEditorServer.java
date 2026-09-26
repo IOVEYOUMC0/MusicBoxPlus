@@ -50,6 +50,12 @@ public class WebEditorServer {
     public boolean startup() {
         try {
             String bindAddress = config.getBindAddress();
+            // Deliberately NOT setting sun.net.httpserver.maxReqTime/maxRspTime here. They are
+            // JVM-global and read once into static finals, so this plugin would be imposing its
+            // timeouts on every other plugin's HttpServer (or silently getting none, if one of
+            // them initialised first) -- and any fixed cap doubles as a ceiling on how long a
+            // legitimate large song upload may take. Operators who want slow-request protection
+            // can pass -Dsun.net.httpserver.maxReqTime=<seconds> on the server command line.
             httpServer = HttpServer.create(new InetSocketAddress(bindAddress, config.getPort()), 0);
             registerHandlers();
             // Keep ordinary requests bounded; ImportApiHandler separately limits expensive

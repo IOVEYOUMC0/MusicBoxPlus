@@ -118,7 +118,6 @@ final class WebAssetHandler implements HttpHandler {
         exchange.getResponseHeaders().set("Content-Type", mime);
         exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
         exchange.getResponseHeaders().set("ETag", etag);
-        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         byte[] bytes = readAll(new FileInputStream(file));
         writeBody(exchange, bytes, mime, etag);
     }
@@ -142,7 +141,6 @@ final class WebAssetHandler implements HttpHandler {
         exchange.getResponseHeaders().set("Content-Type", mime);
         exchange.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
         exchange.getResponseHeaders().set("ETag", etag);
-        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         writeBody(exchange, bytes, mime, etag);
     }
 
@@ -162,6 +160,7 @@ final class WebAssetHandler implements HttpHandler {
         if (encoding != null) {
             exchange.getResponseHeaders().set("Content-Encoding", encoding);
         }
+        WebApiSupport.applySecurityHeaders(exchange);
         exchange.sendResponseHeaders(HttpStatus.OK, body.length);
         try (OutputStream out = exchange.getResponseBody()) {
             out.write(body);
@@ -173,7 +172,7 @@ final class WebAssetHandler implements HttpHandler {
         if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
             corsHeaderSetter.accept(exchange);
             exchange.getResponseHeaders().set("ETag", etag);
-            exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+            WebApiSupport.applySecurityHeaders(exchange);
             exchange.sendResponseHeaders(HttpStatus.NOT_MODIFIED, -1L);
             exchange.close();
             return true;
@@ -240,8 +239,8 @@ final class WebAssetHandler implements HttpHandler {
     private void writeTextResponse(HttpExchange exchange, int code, String text) throws IOException {
         corsHeaderSetter.accept(exchange);
         exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
-        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        WebApiSupport.applySecurityHeaders(exchange);
         exchange.sendResponseHeaders(code, bytes.length);
         try (OutputStream out = exchange.getResponseBody()) {
             out.write(bytes);

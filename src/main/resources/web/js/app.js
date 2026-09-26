@@ -14,6 +14,9 @@ const DRAFT_SAVE_DELAY = 600;
 const LOCAL_STORAGE_PREFIX = 'musicbox_editor_draft_';
 const SESSION_EXPIRE_WARNING_MINUTES = 2;
 const MAX_UNDO_STATES = 80;
+// Total size of the retained undo snapshots, in UTF-16 code units (~2 bytes each). A snapshot is
+// the whole song, so the count cap alone let an imported 100,000-note song retain hundreds of MB.
+const MAX_UNDO_CHARS = 8_000_000;
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const TIME_SIGNATURES = ['1/4', '2/4', '3/4', '4/4', '5/4', '7/4', '3/8', '6/8', '9/8', '12/8'];
@@ -38,6 +41,30 @@ const DEFAULT_INSTRUMENT_MATERIALS = {
     TRUMPET_EXPOSED: 'exposed_copper',
     TRUMPET_WEATHERED: 'weathered_copper',
     TRUMPET_OXIDIZED: 'oxidized_copper'
+};
+// Hoisted out of getInstrumentColor, which built this object from scratch on every call -- once per
+// note cell, so up to 7,680 times per scroll frame and again per editing click.
+const INSTRUMENT_COLORS = {
+    HARP: '#d65d6d',
+    BASS: '#a67848',
+    BASS_DRUM: '#7c858e',
+    SNARE_DRUM: '#d0b56b',
+    CLICKS: '#6db4d8',
+    GUITAR: '#c18a55',
+    FLUTE: '#72b89f',
+    BELL: '#d6b94f',
+    CHIME: '#83b9e4',
+    XYLOPHONE: '#d99a66',
+    IRON_XYLOPHONE: '#aeb9c2',
+    COW_BELL: '#96765a',
+    DIDGERIDOO: '#d98255',
+    BIT: '#6ecf82',
+    BANJO: '#cab563',
+    PLING: '#d7d86c',
+    TRUMPET: '#d39154',
+    TRUMPET_EXPOSED: '#bf8b65',
+    TRUMPET_WEATHERED: '#62a88d',
+    TRUMPET_OXIDIZED: '#4da3a0'
 };
 const STANDARD_NBS_INSTRUMENTS = [
     { id: 'HARP', label: 'Harp', material: 'note_block', sound: 'minecraft:block.note_block.harp' },
@@ -99,6 +126,12 @@ class MusicEditor {
         this.instrumentIds = new Set();
         this.selectedInstrument = 'HARP';
         this.selectedNotes = [];
+        // Cache for selectedKeySet(); see the comment there.
+        this.selectedKeyIndex = new Set();
+        this.selectedKeyIndexSource = this.selectedNotes;
+        // Cache for getMeasureTicks().
+        this.measureTicksKey = null;
+        this.measureTicksValue = 4;
         this.clipboard = [];
         this.isPlaying = false;
         this.currentTick = 0;
@@ -114,6 +147,11 @@ class MusicEditor {
         this.tickWidth = TICK_WIDTH;
         this.noteRowHeight = NOTE_ROW_HEIGHT;
         this.zoomAccumulator = null;
+        this.viewportRenderQueued = false;
+        // Cells and ghosts the move preview currently has decorated, so clearing it does not have
+        // to search the document for them.
+        this.movePreviewCells = [];
+        this.movePreviewGhosts = [];
         this.dragAction = null;
         this.dragTouched = new Set();
         this.dragPointerId = null;
@@ -128,6 +166,7 @@ class MusicEditor {
         this.musicData = null;
         this.undoStack = [];
         this.redoStack = [];
+        this.undoChars = 0;
         this.autoSaveTimer = null;
         this.draftSaveTimer = null;
         this.visibleTickStart = 0;
@@ -663,13 +702,64 @@ class MusicEditor {
         requestAnimationFrame(() => this.scrollPitchIntoView(focusPitch, true));
     }
 
+    // O(1) membership test for the current selection.
+    //
+    // This used to be `selectedNotes.some(...)` at every call site, which made every repaint path
+    // quadratic: refreshing one cell scanned the whole selection, so repainting S selected cells
+    // cost S^2 noteKey() template strings. Two places hit that per pointer event -- clearMovePreview
+    // re-decorates every previewed cell on every move-drag frame, and refreshCells re-decorates the
+    // whole selection on every edit -- so moving or erasing a few hundred selected notes built
+    // hundreds of thousands of strings per mouse move.
+    //
+    // Rebuilt lazily and keyed on the identity of selectedNotes, which is sound only because every
+    // mutation REPLACES that array. toggleNoteSelection used to splice/push in place; it now
+    // reassigns, which also fixed a stale highlight: it captured previousSelection as the same array
+    // it then mutated, so the cell that had just been deselected was never re-decorated and kept its
+    // 'selected' class.
+    selectedKeySet() {
+        if (this.selectedKeyIndexSource !== this.selectedNotes) {
+            this.selectedKeyIndex = new Set(this.selectedNotes.map(note => this.noteKey(note.pitch, note.tick)));
+            this.selectedKeyIndexSource = this.selectedNotes;
+        }
+        return this.selectedKeyIndex;
+    }
+
     refreshCell(pitch, tick) {
-        const cell = this.visibleCellIndex.get(this.noteKey(pitch, tick));
+        const key = this.noteKey(pitch, tick);
+        const cell = this.visibleCellIndex.get(key);
         if (!cell) return;
 
         const note = this.getNote(pitch, tick);
-        const selected = this.selectedNotes.some(item => item.pitch === pitch && item.tick === tick);
-        this.decorateNoteCell(cell, note, pitch, tick, selected);
+        this.decorateNoteCell(cell, note, pitch, tick, this.selectedKeySet().has(key));
+    }
+
+    // Repaints just the cells whose decoration can have changed, instead of rebuilding the whole
+    // grid. Every single-cell edit used to call renderNoteGrid(), which destroys and recreates all
+    // (maxPitch+1) x 64 buttons -- 1,600 by default, up to 7,680 once an imported MIDI raises
+    // maxPitch to 119 -- to change one icon. A note edit affects its own cell; a selection change
+    // affects the cells that entered or left the selection.
+    refreshCells(changed, previousSelection) {
+        const keys = new Set();
+        const cells = [];
+        const push = (pitch, tick) => {
+            const key = this.noteKey(pitch, tick);
+            if (keys.has(key)) return;
+            keys.add(key);
+            cells.push({ pitch, tick });
+        };
+
+        for (const note of (changed || [])) push(note.pitch, note.tick);
+        for (const note of this.selectedNotes) push(note.pitch, note.tick);
+        // Cells that were selected before but are not any more carry the selection class until
+        // they are re-decorated; without this they stay highlighted.
+        if (previousSelection) {
+            const stillSelected = new Set(this.selectedNotes.map(note => this.noteKey(note.pitch, note.tick)));
+            for (const note of previousSelection) {
+                if (!stillSelected.has(this.noteKey(note.pitch, note.tick))) push(note.pitch, note.tick);
+            }
+        }
+
+        for (const cell of cells) this.refreshCell(cell.pitch, cell.tick);
     }
 
     clampVisibleTick() {
@@ -682,12 +772,26 @@ class MusicEditor {
         const clamped = this.normalizeInt(nextStart, this.visibleTickStart, 0, maxStart);
         if (clamped === this.visibleTickStart) return false;
 
+        // The offset itself is applied now -- every caller and every later read sees the newest
+        // value -- but the repaint is merged into one per animation frame. A wheel burst delivers
+        // 60-120 events per second and each one used to rebuild the ruler and re-decorate every
+        // visible cell (up to 7,680 of them), which is what made scrolling crawl. Same pattern as
+        // setGridZoom, which already coalesces for exactly this reason.
         this.visibleTickStart = clamped;
-        this.renderTimeRuler();
-        this.shiftVisibleTickWindow();
-        this.updateTimelineControls();
-        this.updatePlayCursor();
+        this.scheduleViewportRender();
         return true;
+    }
+
+    scheduleViewportRender() {
+        if (this.viewportRenderQueued) return;
+        this.viewportRenderQueued = true;
+        requestAnimationFrame(() => {
+            this.viewportRenderQueued = false;
+            this.renderTimeRuler();
+            this.shiftVisibleTickWindow();
+            this.updateTimelineControls();
+            this.updatePlayCursor();
+        });
     }
 
     // Scroll reuses the rendered grid instead of rebuilding all cells: only the tick each
@@ -842,29 +946,7 @@ class MusicEditor {
     }
 
     getInstrumentColor(instrumentId) {
-        const colors = {
-            HARP: '#d65d6d',
-            BASS: '#a67848',
-            BASS_DRUM: '#7c858e',
-            SNARE_DRUM: '#d0b56b',
-            CLICKS: '#6db4d8',
-            GUITAR: '#c18a55',
-            FLUTE: '#72b89f',
-            BELL: '#d6b94f',
-            CHIME: '#83b9e4',
-            XYLOPHONE: '#d99a66',
-            IRON_XYLOPHONE: '#aeb9c2',
-            COW_BELL: '#96765a',
-            DIDGERIDOO: '#d98255',
-            BIT: '#6ecf82',
-            BANJO: '#cab563',
-            PLING: '#d7d86c',
-            TRUMPET: '#d39154',
-            TRUMPET_EXPOSED: '#bf8b65',
-            TRUMPET_WEATHERED: '#62a88d',
-            TRUMPET_OXIDIZED: '#4da3a0'
-        };
-        return colors[instrumentId] || this.colorFromString(instrumentId || 'note');
+        return INSTRUMENT_COLORS[instrumentId] || this.colorFromString(instrumentId || 'note');
     }
 
     getInstrumentAccentColor(instrumentId) {
@@ -895,9 +977,18 @@ class MusicEditor {
     }
 
     getMeasureTicks() {
+        const beatTicks = this.getBeatTicks();
         const signature = this.musicData?.timeSignature || '4/4';
-        const beats = this.normalizeInt(signature.split('/')[0], 4, 1, 16);
-        return Math.max(1, beats * this.getBeatTicks());
+        // Memoised because decorateNoteCell asks for it once per cell: on the scroll path that is up
+        // to 7,680 calls per animation frame, each doing a split and a normalizeInt for a value that
+        // only changes when the song's time signature or subdivision does.
+        const key = signature + '@' + beatTicks;
+        if (this.measureTicksKey !== key) {
+            const beats = this.normalizeInt(signature.split('/')[0], 4, 1, 16);
+            this.measureTicksValue = Math.max(1, beats * beatTicks);
+            this.measureTicksKey = key;
+        }
+        return this.measureTicksValue;
     }
 
     previewPitch(pitch) {
@@ -1080,24 +1171,28 @@ class MusicEditor {
         this.dragCaptureTarget = null;
     }
 
-    refreshSelectionClasses() {
+    // Repaints the selection. With the previous selection in hand only the cells that entered or
+    // left it are touched; without it, every visible cell is reconciled (no DOM query and no
+    // dataset parsing, but still proportional to the grid).
+    refreshSelectionClasses(previousSelection = null) {
+        if (previousSelection) {
+            this.refreshCells([], previousSelection);
+            return;
+        }
         const selected = new Set(this.selectedNotes.map(note => this.noteKey(note.pitch, note.tick)));
-        document.querySelectorAll('.note-cell').forEach(cell => {
-            const key = this.noteKey(
-                this.normalizeInt(cell.dataset.pitch, -1, 0, this.maxPitch),
-                this.normalizeInt(cell.dataset.tick, -1, 0, this.maxTickLimit)
-            );
+        for (const [key, cell] of this.visibleCellIndex) {
             cell.classList.toggle('selected', selected.has(key));
-        });
+        }
     }
 
     selectSingleNote(pitch, tick, { render = true, showStatus = true } = {}) {
+        const previousSelection = this.selectedNotes;
         this.selectedNotes = [{ pitch, tick }];
         this.lastSelectedNote = { pitch, tick };
         if (render) {
             this.renderNoteGrid();
         } else {
-            this.refreshSelectionClasses();
+            this.refreshSelectionClasses(previousSelection);
         }
         this.updateSelectedNoteInfo();
         if (showStatus) this.showStatus(`${this.getNoteName(pitch)} / Tick ${tick}`);
@@ -1237,8 +1332,7 @@ class MusicEditor {
     }
 
     isSelectedNote(pitch, tick) {
-        const key = this.noteKey(pitch, tick);
-        return this.selectedNotes.some(note => this.noteKey(note.pitch, note.tick) === key);
+        return this.selectedKeySet().has(this.noteKey(pitch, tick));
     }
 
     startMoveDrag(pitch, tick) {
@@ -1356,19 +1450,22 @@ class MusicEditor {
             return { note, pitch, tick, key, outOfBounds };
         });
 
-        document.querySelectorAll('.note-cell.selected').forEach(cell => {
-            const key = this.noteKey(
-                this.normalizeInt(cell.dataset.pitch, -1, 0, this.maxPitch),
-                this.normalizeInt(cell.dataset.tick, -1, 0, this.maxTickLimit)
-            );
-            if (!selectedKeys.has(key)) return;
+        // Source cells and target cells are resolved through visibleCellIndex instead of a
+        // document-wide querySelectorAll per pointermove. Those queries scanned every rendered cell
+        // (up to 7,680) three times per move, plus one attribute-selector query per selected note,
+        // so dragging a large selection froze the tab. The cells this preview touched are remembered
+        // so clearing it is proportional to the preview, not to the grid.
+        for (const note of move.notes) {
+            const cell = this.visibleCellIndex.get(this.noteKey(note.pitch, note.tick));
+            if (!cell) continue;
             cell.classList.add('move-preview-source');
             cell.classList.toggle('move-preview-invalid', invalidTarget);
-        });
+            this.movePreviewCells.push(cell);
+        }
 
         previewNotes.forEach(preview => {
             if (preview.outOfBounds) return;
-            const cell = document.querySelector(`.note-cell[data-pitch="${preview.pitch}"][data-tick="${preview.tick}"]`);
+            const cell = this.visibleCellIndex.get(preview.key);
             if (!cell) return;
 
             const primaryInstrument = preview.note.instruments?.[0] || this.selectedInstrument;
@@ -1397,19 +1494,28 @@ class MusicEditor {
             }
 
             cell.appendChild(ghost);
+            this.movePreviewCells.push(cell);
+            this.movePreviewGhosts.push(ghost);
         });
     }
 
     clearMovePreview() {
-        document.querySelectorAll('.note-cell.move-preview-target').forEach(cell => {
+        for (const cell of this.movePreviewCells) {
             const pitch = this.normalizeInt(cell.dataset.pitch, -1, 0, this.maxPitch);
             const tick = this.normalizeInt(cell.dataset.tick, -1, 0, this.maxTickLimit);
-            if (pitch >= 0 && tick >= 0) this.refreshCell(pitch, tick);
-        });
-        document.querySelectorAll('.move-preview-ghost').forEach(ghost => ghost.remove());
-        document.querySelectorAll('.note-cell.move-preview-source, .note-cell.move-preview-target, .note-cell.move-preview-invalid, .note-cell.move-preview-valid').forEach(cell => {
-            cell.classList.remove('move-preview-source', 'move-preview-target', 'move-preview-invalid', 'move-preview-valid');
-        });
+            if (pitch >= 0 && tick >= 0) {
+                // decorateNoteCell resets className and the cell's content, so this drops the
+                // preview classes and the ghost in one step.
+                this.refreshCell(pitch, tick);
+            } else {
+                cell.classList.remove('move-preview-source', 'move-preview-target', 'move-preview-invalid', 'move-preview-valid');
+            }
+        }
+        for (const ghost of this.movePreviewGhosts) {
+            ghost.remove();
+        }
+        this.movePreviewCells = [];
+        this.movePreviewGhosts = [];
     }
 
     handleGridWheel(event) {
@@ -1588,12 +1694,13 @@ class MusicEditor {
         const existing = this.getNote(pitch, tick);
         if (existing) {
             if (existing.instruments.includes(this.selectedInstrument)) {
+                const previousSelection = this.selectedNotes;
                 this.selectedNotes = [{ pitch, tick }];
                 this.lastSelectedNote = { pitch, tick };
                 if (options.quiet) {
                     this.refreshCell(pitch, tick);
                 } else {
-                    this.renderNoteGrid();
+                    this.refreshCells([{ pitch, tick }], previousSelection);
                 }
                 this.updateSelectedNoteInfo();
                 if (!options.quiet) this.showStatus(`${this.getNoteName(pitch)} / ${tick}`);
@@ -1606,7 +1713,7 @@ class MusicEditor {
             if (options.quiet) {
                 this.refreshCell(pitch, tick);
             } else {
-                this.renderNoteGrid();
+                this.refreshCells([{ pitch, tick }]);
             }
             this.updateSelectedNoteInfo();
             if (!options.quiet) this.showStatus('已添加乐器');
@@ -1630,7 +1737,7 @@ class MusicEditor {
         if (options.quiet) {
             this.refreshCell(pitch, tick);
         } else {
-            this.renderNoteGrid();
+            this.refreshCells([{ pitch, tick }]);
         }
         this.updateHeader();
         if (!options.quiet) this.showStatus(`已添加 ${this.getNoteName(pitch)} / ${tick}`);
@@ -1641,7 +1748,12 @@ class MusicEditor {
         if (!this.noteIndex.has(key)) return;
 
         if (!options.skipUndo) this.saveStateForUndo();
-        const noteIndex = this.musicData.notes.findIndex(note => this.noteKey(note.pitch, note.tick) === key);
+        const previousSelection = this.selectedNotes;
+        // The note object itself, from the index that already holds it, instead of a findIndex that
+        // rebuilt a noteKey() string for every note in the song: erase-dragging calls this once per
+        // touched cell, so a drag across a large song allocated a string per note per cell.
+        const removed = this.noteIndex.get(key);
+        const noteIndex = removed ? this.musicData.notes.indexOf(removed) : -1;
         if (noteIndex >= 0) {
             this.musicData.notes.splice(noteIndex, 1);
         }
@@ -1661,7 +1773,7 @@ class MusicEditor {
         if (options.quiet) {
             this.refreshCell(pitch, tick);
         } else {
-            this.renderNoteGrid();
+            this.refreshCells([{ pitch, tick }], previousSelection);
         }
         this.updateHeader();
         this.updateSelectedNoteInfo();
@@ -1676,8 +1788,9 @@ class MusicEditor {
         }
 
         if (event.shiftKey && this.lastSelectedNote) {
+            const previousSelection = this.selectedNotes;
             this.selectRange(this.lastSelectedNote, { pitch, tick }, this.isToggleSelectionGesture(event));
-            this.renderNoteGrid();
+            this.refreshCells([], previousSelection);
             this.updateSelectedNoteInfo();
             return;
         }
@@ -1689,31 +1802,38 @@ class MusicEditor {
         }
 
         if (this.selectedNotes.length === 1 && this.noteKey(this.selectedNotes[0].pitch, this.selectedNotes[0].tick) === key) {
+            const previousSelection = this.selectedNotes;
             this.selectedNotes = [];
             this.lastSelectedNote = null;
-            this.renderNoteGrid();
+            this.refreshCells([], previousSelection);
             this.updateSelectedNoteInfo();
             this.showStatus('已取消选择');
             return;
         }
 
+        const previousSelection = this.selectedNotes;
         this.selectedNotes = [{ pitch, tick }];
         this.lastSelectedNote = { pitch, tick };
-        this.renderNoteGrid();
+        this.refreshCells([], previousSelection);
         this.updateSelectedNoteInfo();
         this.showStatus(`${this.getNoteName(pitch)} / Tick ${tick}`);
     }
 
     toggleNoteSelection(pitch, tick) {
+        const previousSelection = this.selectedNotes;
         const key = this.noteKey(pitch, tick);
         const index = this.selectedNotes.findIndex(note => this.noteKey(note.pitch, note.tick) === key);
+        // Reassigned rather than spliced/pushed: selectedKeySet() keys its cache on this array's
+        // identity, and an in-place edit leaves the captured previousSelection pointing at the
+        // already-mutated array, so the deselected cell was never in the "left the selection" diff
+        // and kept its highlight.
         if (index >= 0) {
-            this.selectedNotes.splice(index, 1);
+            this.selectedNotes = this.selectedNotes.filter((note, i) => i !== index);
         } else {
-            this.selectedNotes.push({ pitch, tick });
+            this.selectedNotes = [...this.selectedNotes, { pitch, tick }];
         }
 
-        this.renderNoteGrid();
+        this.refreshCells([], previousSelection);
         this.updateSelectedNoteInfo();
     }
 
@@ -2103,11 +2223,24 @@ class MusicEditor {
 
     saveStateForUndo() {
         if (!this.musicData) return;
-        this.undoStack.push(JSON.stringify(this.musicData));
-        if (this.undoStack.length > MAX_UNDO_STATES) {
-            this.undoStack.shift();
-        }
+        const serialized = JSON.stringify(this.musicData);
+        this.undoStack.push(serialized);
+        this.undoChars += serialized.length;
+        this.trimUndoStack();
         this.redoStack = [];
+    }
+
+    // Two caps, not one: the state count, and the total size of the retained snapshots.
+    //
+    // A snapshot is the whole song, so 80 of them is fine for a hand-written tune and hundreds of
+    // MB for a 100,000-note import -- and the web editor accepts exactly that, since the server
+    // permits NbsReader.MAX_NOTES on write. The newest state is never evicted, so a single snapshot
+    // larger than the whole budget still gives one step of undo.
+    trimUndoStack() {
+        while (this.undoStack.length > MAX_UNDO_STATES
+            || (this.undoChars > MAX_UNDO_CHARS && this.undoStack.length > 1)) {
+            this.undoChars -= this.undoStack.shift().length;
+        }
     }
 
     restoreState(serializedState) {
@@ -2129,8 +2262,10 @@ class MusicEditor {
             return;
         }
 
+        const previous = this.undoStack.pop();
+        this.undoChars -= previous.length;
         this.redoStack.push(JSON.stringify(this.musicData));
-        this.restoreState(this.undoStack.pop());
+        this.restoreState(previous);
         this.showStatus('已撤销');
     }
 
@@ -2140,7 +2275,10 @@ class MusicEditor {
             return;
         }
 
-        this.undoStack.push(JSON.stringify(this.musicData));
+        const serialized = JSON.stringify(this.musicData);
+        this.undoStack.push(serialized);
+        this.undoChars += serialized.length;
+        this.trimUndoStack();
         this.restoreState(this.redoStack.pop());
         this.showStatus('已重做');
     }
@@ -2605,6 +2743,7 @@ class MusicEditor {
             const result = await response.json();
             this.undoStack = [];
             this.redoStack = [];
+            this.undoChars = 0;
             this.applyMusicData(result.music, { dirty: false, focusContent: true });
             localStorage.removeItem(this.getDraftKey());
             this.closeImportDialog();

@@ -4,14 +4,13 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
+import com.huidu.musicboxplus.core.player.PlayerPositionSnapshot;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -29,10 +28,12 @@ public class RangePlayerModel {
     private long lastNonEmptyTime = 0;
     private long lastRangeRefresh = 0;
     private long rangeRefreshIntervalMillis;
-    private int pendingFoliaScan;
 
     public RangePlayerModel(MusicBoxSongPlayer model) {
         this.model = model;
+        // Idempotent, and started here rather than in onEnable because the sampler reads the same
+        // config value this constructor does -- which is not parsed yet when onEnable runs.
+        PlayerPositionSnapshot.start();
         long configured = MusicBox.getInstance().getConfigObject().getPlayer().getRangeCacheClearInterval();
         this.cacheClearInterval = Math.max(1000, configured);
         // Kept in milliseconds, not in PlayerManager ticks, so the refresh cadence does not
@@ -83,9 +84,6 @@ public class RangePlayerModel {
             }
             return;
         }
-        if (Scheduler.isFolia() && pendingFoliaScan > 0) {
-            return;
-        }
         lastRangeRefresh = now;
 
         PositionPlayer positionPlayer = model.getMusicBoxModel().getPositionPlayer();
@@ -113,7 +111,31 @@ public class RangePlayerModel {
         currentInRangeBuffer.clear();
 
         if (Scheduler.isFolia()) {
-            startFoliaScan(targetLocation, world, tx, ty, tz, rangeSquared);
+            // Read the shared position sample instead of asking each player's own region thread.
+            // Every coordinate in there was captured on the thread that owned that player, so this
+            // loop touches no entity state at all -- and it costs one map scan rather than
+            // (players x block players) scheduler round-trips per refresh. The sampler runs at
+            // half this refresh period, so a reading here is never more than half a scan old.
+            UUID worldId = world.getUID();
+            for (Map.Entry<UUID, PlayerPositionSnapshot.Pos> entry : PlayerPositionSnapshot.entries()) {
+                UUID uuid = entry.getKey();
+                PlayerPositionSnapshot.Pos pos = entry.getValue();
+                if (!worldId.equals(pos.worldId())) {
+                    continue;
+                }
+                double dx = pos.x() - tx;
+                double dy = pos.y() - ty;
+                double dz = pos.z() - tz;
+                boolean inRange = dx * dx + dy * dy + dz * dz <= rangeSquared;
+                playerInRangeCache.put(uuid, inRange);
+                if (inRange) {
+                    currentInRangeBuffer.add(uuid);
+                    if (!activePlayers.contains(uuid)) {
+                        onPlayerEnterRange(uuid);
+                    }
+                }
+            }
+            finishRangeScan(now);
             return;
         }
 
@@ -201,56 +223,6 @@ public class RangePlayerModel {
         } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
             enginePlayer.removePlayer(uuid);
         }
-    }
-
-    private void startFoliaScan(Location targetLocation, World world, double tx, double ty, double tz,
-                                double rangeSquared) {
-        List<Player> players = new ArrayList<>(world.getPlayers());
-        pendingFoliaScan = players.size();
-        if (pendingFoliaScan == 0) {
-            finishRangeScan(System.currentTimeMillis());
-            return;
-        }
-
-        for (Player player : players) {
-            UUID uuid = player.getUniqueId();
-            try {
-                Scheduler.entity(player, () -> {
-                    boolean inRange = false;
-                    try {
-                        if (player.isOnline() && player.getWorld() == world) {
-                            double dx = player.getX() - tx;
-                            double dy = player.getY() - ty;
-                            double dz = player.getZ() - tz;
-                            inRange = dx * dx + dy * dy + dz * dz <= rangeSquared;
-                        }
-                    } finally {
-                        submitFoliaResult(targetLocation, uuid, inRange);
-                    }
-                }, () -> submitFoliaResult(targetLocation, uuid, false));
-            } catch (RuntimeException ignored) {
-                submitFoliaResult(targetLocation, uuid, false);
-            }
-        }
-    }
-
-    private void submitFoliaResult(Location targetLocation, UUID uuid, boolean inRange) {
-        Scheduler.region(targetLocation, () -> {
-            if (destroyed || pendingFoliaScan <= 0) {
-                return;
-            }
-            playerInRangeCache.put(uuid, inRange);
-            if (inRange) {
-                currentInRangeBuffer.add(uuid);
-                if (!activePlayers.contains(uuid)) {
-                    onPlayerEnterRange(uuid);
-                }
-            }
-            pendingFoliaScan--;
-            if (pendingFoliaScan == 0) {
-                finishRangeScan(System.currentTimeMillis());
-            }
-        });
     }
 
     private void finishRangeScan(long now) {

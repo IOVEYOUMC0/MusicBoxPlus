@@ -87,6 +87,55 @@ class NbsWriterRoundTripTest {
         assertEquals("üñî", reread.description());
     }
 
+    // A Chinese title cannot be stored (the field is one byte per character) but it must not be
+    // thrown away as '?' either: the byte written for a character is its low byte, which is what
+    // NoteBlockAPI reads back and what every NBS file in the wild contains for CJK. Writing through
+    // ISO-8859-1 replaced all five characters with '?'.
+    @Test
+    void writesTheLowByteOfCharactersTheFormatCannotHold() throws IOException {
+        RawNbsSong song = new RawNbsSong(4, 20, 1, 1, "忘情牛肉面", "", "", "",
+                1000, 4, false, 0, 0, List.of(), List.of(), List.of());
+
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        NbsWriter.write(song, buffer);
+        byte[] data = buffer.toByteArray();
+
+        // Title length (5, little endian) followed by the low byte of each character.
+        byte[] expected = {0x05, 0x00, 0x00, 0x00, (byte) 0xD8, (byte) 0xC5, 0x5B, (byte) 0x89, 0x62};
+        int at = indexOf(data, expected);
+        assertTrue(at >= 0, "expected the low bytes of the title at some offset in " + hex(data));
+        assertTrue(indexOf(data, new byte[]{0x3F, 0x3F, 0x3F, 0x3F, 0x3F}) < 0,
+                "the title was written as '?????'");
+
+        // And the reader gives back exactly those bytes, character for character, so an
+        // export/import round trip of such a file is stable.
+        RawNbsSong reread = NbsReader.read(data);
+        assertEquals("\u00D8\u00C5[\u0089b", reread.title(),
+                "the reader decodes one byte per character; the round trip must be byte-stable");
+        assertEquals(reread.title(), writeAndRead(reread).title());
+    }
+
+    private static int indexOf(byte[] haystack, byte[] needle) {
+        outer:
+        for (int i = 0; i + needle.length <= haystack.length; i++) {
+            for (int j = 0; j < needle.length; j++) {
+                if (haystack[i + j] != needle[j]) {
+                    continue outer;
+                }
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    private static String hex(byte[] data) {
+        StringBuilder text = new StringBuilder();
+        for (byte b : data) {
+            text.append(String.format("%02x ", b));
+        }
+        return text.toString().trim();
+    }
+
     @Test
     void rejectsValuesThatDoNotFitTheNbsFormat() {
         RawNbsSong tooLong = new RawNbsSong(4, 20, 65536, 1, "long", "", "", "",

@@ -70,7 +70,7 @@ final class ControlPanelProgressRenderer {
         }
 
         int allTicks = musicPlayer.getMusicBoxSong().getLength();
-        short currentTick = musicPlayer.getTick();
+        int currentTick = musicPlayer.getTick();
         int chunkSizeInt = (int) Math.ceil((double) allTicks / (double) totalSlots);
         double progress = (double) currentTick / (double) allTicks;
         int currentPercent = (int) Math.floor((double) currentTick / (double) allTicks * 100.0);
@@ -97,7 +97,7 @@ final class ControlPanelProgressRenderer {
 
         for (int i = 0; i < totalSlots; ++i) {
             int slot = progressSlots.get(i);
-            short chunkStart = (short) (i * chunkSizeInt);
+            int chunkStart = i * chunkSizeInt;
             double chunkProgress = (double) i / (double) totalSlots;
             double chunkEndProgress = (double) (i + 1) / (double) totalSlots;
             double chunkMidProgress = (chunkProgress + chunkEndProgress) / 2.0;
@@ -142,7 +142,7 @@ final class ControlPanelProgressRenderer {
         }
     }
 
-    private static void seek(MusicBoxSongPlayer musicPlayer, short tick, Runnable afterSeek) {
+    private static void seek(MusicBoxSongPlayer musicPlayer, int tick, Runnable afterSeek) {
         if (musicPlayer == null) {
             return;
         }

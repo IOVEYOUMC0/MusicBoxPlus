@@ -1,7 +1,7 @@
 package com.huidu.musicboxplus.core.engine;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.LongSupplier;
 
@@ -56,7 +56,13 @@ public final class PlaybackClock {
     // Long enough for an in-flight step() to finish, short enough not to hold up a server stop.
     private static final long SHUTDOWN_JOIN_MILLIS = 2000L;
 
-    private final CopyOnWriteArrayList<Entry> entries = new CopyOnWriteArrayList<>();
+    // Keyed by target rather than held in a CopyOnWriteArrayList: registration happens on every
+    // player construction and again on every setPlaying(true), and the copy-on-write list made each
+    // of those an O(n) identity scan plus a full backing-array copy (and unregister another copy).
+    // Placing or reloading N block players was O(N^2) reference copies on the main thread. The key
+    // is the target itself, and players do not override equals, so this keeps the identity semantics
+    // the duplicate check below relies on.
+    private final Map<Target, Entry> entries = new ConcurrentHashMap<>();
     private final LongSupplier nanoTime;
     private final String threadName;
 
@@ -75,22 +81,21 @@ public final class PlaybackClock {
     // rather than in each caller.
     public void register(Target target) {
         long now = nanoTime.getAsLong();
-        for (Entry existing : entries) {
-            if (existing.target == target) {
-                // Restart this target's clock from now. With every target paused the thread parks,
-                // so lastNanos can be arbitrarily old; letting that elapsed time reach the cursor
-                // on resume would jump the song forward by however long the pause lasted.
-                existing.lastNanos = now;
-                wake();
-                return;
-            }
+        Entry existing = entries.get(target);
+        if (existing != null) {
+            // Restart this target's clock from now. With every target paused the thread parks,
+            // so lastNanos can be arbitrarily old; letting that elapsed time reach the cursor
+            // on resume would jump the song forward by however long the pause lasted.
+            existing.lastNanos = now;
+            wake();
+            return;
         }
-        entries.add(new Entry(target, now));
+        entries.put(target, new Entry(target, now));
         wake();
     }
 
     public void unregister(Target target) {
-        entries.removeIf(e -> e.target == target);
+        entries.remove(target);
     }
 
     public int targetCount() {
@@ -103,9 +108,9 @@ public final class PlaybackClock {
         long now = nanoTime.getAsLong();
         long sleep = Long.MAX_VALUE;
 
-        for (Entry entry : entries) {
+        for (Entry entry : entries.values()) {
             if (!entry.target.alive()) {
-                entries.remove(entry);
+                entries.remove(entry.target);
                 continue;
             }
 
@@ -117,25 +122,37 @@ public final class PlaybackClock {
                 continue;
             }
 
-            // advance()/firstEmittedTick()/finished()/nanosUntilNextTick() are four separate
-            // synchronized calls; a seek or pause landing between them would split one batch
-            // across two states (emit ticks from before a seek, or fire songFinished for a
-            // cursor that was just restarted). Holding the cursor's monitor spans the whole
-            // batch so it is atomic. playTicks only schedules per-listener work and never
-            // touches the cursor, so this cannot deadlock.
+            // The cursor's state is read under its own monitor as one batch -- advance(),
+            // firstEmittedTick(), finished() and nanosUntilNextTick() are four separate
+            // synchronized calls, and a seek or pause landing between them would split one batch
+            // across two states (emit ticks from before a seek, or fire songFinished for a cursor
+            // that was just restarted).
+            //
+            // The dispatch deliberately happens OUTSIDE that monitor. playTicks/ songFinished only
+            // schedule work on the thread owning the player and never touch the cursor, so nothing
+            // here needs the lock; holding it across a scheduler hand-off instead gives the main
+            // thread a way to block on the clock thread, because every API method on the cursor
+            // (setSong, setTick, setPlaying, getTick ...) takes that same monitor.
+            int count;
+            int firstTick = -1;
+            boolean finished;
+            long next;
             synchronized (cursor) {
-                int count = cursor.advance(elapsed);
+                count = cursor.advance(elapsed);
                 if (count > 0) {
-                    entry.target.playTicks(cursor.firstEmittedTick(), count);
+                    firstTick = cursor.firstEmittedTick();
                 }
-                if (cursor.finished()) {
-                    entry.target.songFinished();
-                }
-
-                long next = cursor.nanosUntilNextTick();
-                if (next < sleep) {
-                    sleep = next;
-                }
+                finished = cursor.finished();
+                next = cursor.nanosUntilNextTick();
+            }
+            if (next < sleep) {
+                sleep = next;
+            }
+            if (count > 0) {
+                entry.target.playTicks(firstTick, count);
+            }
+            if (finished) {
+                entry.target.songFinished();
             }
         }
 

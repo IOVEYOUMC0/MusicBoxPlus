@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.module.edit.io;
 
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.utils.DebugLogger;
+import com.huidu.musicboxplus.common.utils.StringUtils;
 import com.huidu.musicboxplus.core.nbs.NbsReader;
 import com.huidu.musicboxplus.core.nbs.RawNbsNote;
 import com.huidu.musicboxplus.core.nbs.RawNbsSong;
@@ -20,6 +21,7 @@ public class NBSImporter {
 
     private static final NBSImporter INSTANCE = new NBSImporter();
     private static final int[] SUBDIVISION_CANDIDATES = new int[]{16, 12, 8, 6, 4, 3, 2, 1};
+    public static final int MAX_DESCRIPTION_CHARS = 1000;
 
     public static NBSImporter getInstance() {
         return INSTANCE;
@@ -49,9 +51,13 @@ public class NBSImporter {
     }
 
     private PlayerMusic convertToPlayerMusic(RawNbsSong song, String author, UUID authorUUID, String fileName) throws IOException {
-        String name = song.title();
-        if (name == null || name.isEmpty()) {
-            name = fileName.replaceAll("\\.[^.]+$", "");
+        // The imported file's name, minus its extension, is the fallback for a header title that
+        // cannot be carrying the name -- an empty one, one that is all '?', or one that sits inside
+        // the single-byte space while the file name does not (see StringUtils.songNameFromHeader).
+        String name = StringUtils.songNameFromHeader(song.title(),
+                fileName == null ? "" : fileName.replaceAll("\\.[^.]+$", ""));
+        if (name.isEmpty()) {
+            name = "imported";
         }
 
         PlayerMusic music = new PlayerMusic(name, author, authorUUID);
@@ -61,15 +67,16 @@ public class NBSImporter {
         music.setBpm(tempoMapping.bpm());
         music.setBeatSubdivision(tempoMapping.beatSubdivision());
 
-        String description = song.description();
-        if (description != null && !description.isEmpty()) {
+        String description = sanitizeDescription(song.description());
+        if (!description.isEmpty()) {
             music.setDescription(description);
         }
 
         for (RawNbsNote nbsNote : song.notes()) {
             int tick = nbsNote.tick();
             int pitch = NotePitchMapper.nbsKeyToEditorPitch(nbsNote.key(), (short) nbsNote.finePitch());
-            MusicNote.NoteInstrument instrument = convertNBSInstrument(nbsNote.instrument());
+            MusicNote.NoteInstrument instrument =
+                    convertNBSInstrument(nbsNote.instrument(), song.vanillaInstrumentCount());
 
             MusicNote existingNote = music.getNote(pitch, tick);
             if (existingNote == null) {
@@ -143,7 +150,16 @@ public class NBSImporter {
         }
     }
 
-    private MusicNote.NoteInstrument convertNBSInstrument(int nbsInstrument) {
+    // vanillaInstrumentCount is the file's own boundary between vanilla ids and its custom
+    // instrument table; ids at or above it index the custom table and mean nothing here.
+    // Mapping them by number turned e.g. a "Tempo Changer" marker (id 16 in a file whose count
+    // is 16) into an audible trumpet, which a re-export then froze in place as a real one.
+    // The editor's enum cannot represent a custom instrument at all, so HARP is the honest
+    // fallback -- the same one the default branch already uses.
+    private MusicNote.NoteInstrument convertNBSInstrument(int nbsInstrument, int vanillaInstrumentCount) {
+        if (vanillaInstrumentCount > 0 && nbsInstrument >= vanillaInstrumentCount) {
+            return MusicNote.NoteInstrument.HARP;
+        }
         switch (nbsInstrument) {
             case 1:
                 return MusicNote.NoteInstrument.BASS;
@@ -186,6 +202,24 @@ public class NBSImporter {
             default:
                 return MusicNote.NoteInstrument.HARP;
         }
+    }
+
+    // Descriptions read out of an .nbs file reach other players' screens: publishing a song
+    // renders its description as disc lore for everyone browsing the shop. Sanitising here rather
+    // than in the web handler covers the in-game /edit import path too, which shares this importer
+    // and previously had no sanitiser at all.
+    //
+    // Strips the MiniMessage/legacy-colour injection vectors (< > & U+00A7) plus control chars,
+    // and bounds the length so a multi-megabyte string cannot be used as a component-cache key.
+    // Newlines/tabs survive for multi-line lore.
+    public static String sanitizeDescription(String description) {
+        if (description == null) {
+            return "";
+        }
+        String trimmed = description.length() > MAX_DESCRIPTION_CHARS
+                ? description.substring(0, MAX_DESCRIPTION_CHARS)
+                : description;
+        return trimmed.replaceAll("[<>&\\u00a7\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f-\\x9f]", "");
     }
 
     private record TempoMapping(int bpm, int beatSubdivision) {

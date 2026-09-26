@@ -37,7 +37,7 @@ public class IdleTextDisplay implements TextDisplayHandle {
 
     @Override
     public void refreshText() {
-        this.visual.render(TextDisplayContent.build(this.name, this.displayOptions, null, (short) 0, 1.0f));
+        this.visual.render(TextDisplayContent.build(this.name, this.displayOptions, null, 0, 1.0f));
     }
 
     @Override

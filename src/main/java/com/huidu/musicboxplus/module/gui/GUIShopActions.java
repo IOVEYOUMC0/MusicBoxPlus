@@ -47,15 +47,23 @@ final class GUIShopActions {
                 MessageUtils.send(player, Lang.ERROR_OCCURRED);
                 return;
             }
+            // Take payment, then hand over. Giving the disc first and rolling it back on payment
+            // failure only works if the payment call returns; EconomyUtils.withdrawPlayer has no
+            // try/catch, so a throwing economy plugin skipped the rollback and left a free disc.
+            if (!EconomyUtils.buyNoMessage(player, price)) {
+                MessageUtils.send(player, Lang.ERROR, "{message}", Lang.PAYMENT_FAILED.toString());
+                return;
+            }
             HashMap<Integer, ItemStack> result = player.getInventory().addItem(songStack);
             if (!result.isEmpty()) {
+                // Paid for but undeliverable: refund. This is the live failure path, not a
+                // formality -- addItem is what knows whether the disc merges into an existing
+                // partial stack, which an empty-slot pre-check would wrongly refuse.
+                EconomyUtils.depositPlayer(player, price);
                 MessageUtils.send(player, Lang.NO_INVENTORY_SPACE);
-            } else if (EconomyUtils.buyNoMessage(player, price)) {
-                MessageUtils.send(player, Lang.DISC_PURCHASED, "{disc}", musicBoxSong.getName());
-            } else {
-                player.getInventory().removeItem(songStack);
-                MessageUtils.send(player, Lang.ERROR, "{message}", Lang.PAYMENT_FAILED.toString());
+                return;
             }
+            MessageUtils.send(player, Lang.DISC_PURCHASED, "{disc}", musicBoxSong.getName());
         } catch (Exception e) {
             logger.severe("Failed to buy music: " + musicBoxSong.getName() + " for player: " + player.getName() + " - " + e.getMessage());
             MessageUtils.send(player, Lang.ERROR_OCCURRED);

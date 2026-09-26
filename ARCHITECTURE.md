@@ -104,15 +104,6 @@ directly.
   Component API stops resolving.
 - The platform line is dictated by CraftEngine, because CustomJukeBox hard-depends on it.
 
-## Unwired code
-
-These exist and compile but nothing references them. They are unfinished wiring, **not** dead code —
-decide whether to wire them up or drop them, don't let them rot silently:
-
-- `core.playback.AutoPlayService` — autoplay-on-join, honours config/permission/opt-out
-- `module.edit.io.MidiAutoConverter` — walks song folders converting `.mid` → `.nbs`
-- `module.edit.gui.EditGUIListener` — a `Listener` that is never registered
-
 ## Cleanup priorities
 
 Status of the previously tracked items:
@@ -122,7 +113,7 @@ Status of the previously tracked items:
    `api.player.PlayerControlGUI`; `MusicBoxAPI` is service-delegated. `api` no longer depends on `module`.
 3. ~~Split `api` into its own module and publish it for downstream plugins~~ — `api` is
    now `musicbox-api/`, a standalone module with no internal dependencies (see Build).
-4. Add an ArchUnit test fixing the dependency direction so it cannot regress
+4. ~~Add an ArchUnit test fixing the dependency direction~~ — done (`LayerDependencyRuleTest`).
 5. Only then consider larger domain refactors inside `module.edit`
 
 Evaluated and kept: `MusicBox#startupAsync()` / `reloadPluginAsync()` stay in the god class. They

@@ -75,6 +75,9 @@ public class MusicEditGUI implements InventoryHolder {
     private final List<MbTask> scheduledTaskIds = Collections.synchronizedList(new ArrayList<>());
     private MusicNote.NoteInstrument currentInstrument = MusicNote.NoteInstrument.HARP;
     private final List<Integer> editAreaSlots = new ArrayList<>();
+    // The slots currently carrying the preview flash, so clearing it repaints only those. See
+    // flashPreviewHighlight.
+    private final Set<Integer> previewHighlightSlots = new HashSet<>();
     private final Map<Integer, Integer> editAreaSlotIndexes = new HashMap<>();
     private String[] layoutLines = new String[0];
     private final EditHistory editHistory = new EditHistory();
@@ -774,7 +777,11 @@ public class MusicEditGUI implements InventoryHolder {
                 editHistory.pushAction(EditAction.removeNote(note));
                 music.removeNote(note);
                 markUnsavedChanges();
-                updateInventory();
+                // Only this cell changed: adding or removing a note does not alter how any other
+                // cell renders (the playing-tick highlight depends on the tick, not on the note).
+                // Passing the slot takes the incremental path in updateInventory, instead of
+                // rebuilding all 54 edit-area items for one changed icon.
+                updateInventory(java.util.Collections.singleton(slot));
             }
         } else {
             if (isExtendedOctave && !canEditExtendedOctave) {
@@ -790,7 +797,8 @@ public class MusicEditGUI implements InventoryHolder {
                 music.addNote(note);
                 editHistory.pushAction(EditAction.addNote(note));
                 markUnsavedChanges();
-                updateInventory();
+                // Incremental, for the same reason as the removal above.
+                updateInventory(java.util.Collections.singleton(slot));
                 playNoteSound(pitch, currentInstrument);
             } else {
                 if (note.getPitch() > getDefaultMaxPitch() && !canEditExtendedOctave) {
@@ -873,10 +881,12 @@ public class MusicEditGUI implements InventoryHolder {
                     selectedNote.addInstrument(instrument);
                 }
                 markUnsavedChanges();
+                // flashPreviewHighlight renders the grid itself (its immediate onUpdate), so the
+                // explicit updateInventory() that used to follow this was a second identical
+                // 54-slot rebuild for the same click.
                 flashPreviewHighlight(selectedNote.getPitch(), selectedNote.getTick());
                 playNoteSound(selectedNote.getPitch(), instrument);
                 givePlayerInventoryItems();
-                updateInventory();
             }
         }
     }
@@ -1023,12 +1033,60 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void flashPreviewHighlight(int pitch, int tick) {
-        previewHighlighter.flash(player, pitch, tick, this::updateInventory);
+        // Only the previewed column is repainted, not the whole edit area twice per click.
+        //
+        // The flash marks a whole tick column (see isHighlightedTick), so it can change at most
+        // editRows cells -- 6 at the default grid -- while this used to call the no-arg
+        // updateInventory() for both the flash and its 6-tick expiry. That is 2 x 54 edit-area
+        // ItemStacks with their meta copies (createEditAreaItem -> ItemUtils.createStack plus
+        // MiniMessage name/lore) per instrument pick or preview click, to move a highlight on one
+        // column.
+        //
+        // The affected set is the union of the column being flashed and the one that was flashing,
+        // because the previous column has to lose its highlight. It is captured by both callbacks:
+        // at expiry the highlighter has already forgotten which column it was on.
+        Set<Integer> flashed = slotsInPreviewColumn(tick);
+        Set<Integer> affected = new HashSet<>(this.previewHighlightSlots);
+        affected.addAll(flashed);
+        this.previewHighlightSlots.clear();
+        this.previewHighlightSlots.addAll(flashed);
+        previewHighlighter.flash(player, pitch, tick,
+                () -> updateInventory(affected),
+                () -> {
+                    this.previewHighlightSlots.clear();
+                    updateInventory(affected);
+                });
+    }
+
+    // The edit-area slots in one tick's column. Mirrors the localRow/localCol/tick derivation in
+    // updateInventory, including the pitch and row bounds it applies.
+    private Set<Integer> slotsInPreviewColumn(int tick) {
+        Set<Integer> slots = new HashSet<>();
+        int editCols = calculateEditColumns();
+        int editRows = calculateEditRows();
+        for (int i = 0; i < editAreaSlots.size(); i++) {
+            int localRow = i / editCols;
+            if (localRow >= editRows) {
+                continue;
+            }
+            int localCol = i % editCols;
+            if (localCol + tickOffset * editCols != tick) {
+                continue;
+            }
+            if (localRow + pitchOffset > maxPitch) {
+                continue;
+            }
+            slots.add(editAreaSlots.get(i));
+        }
+        return slots;
     }
 
     private void previewColumn(int pitch, int tick) {
         flashPreviewHighlight(pitch, tick);
-        List<MusicNote> tickNotes = music.getTickIndexMap().get(tick);
+        // getNotesAtTick, not getTickIndexMap().get(tick): the latter copies the whole tick index
+        // (a TreeMap with one node per distinct tick, up to ~1e5 on a long imported song) to read a
+        // single key, on every "preview this column" click.
+        List<MusicNote> tickNotes = music.getNotesAtTick(tick);
         if (tickNotes == null || tickNotes.isEmpty()) {
             playNoteSound(pitch, currentInstrument);
             return;
@@ -1587,8 +1645,12 @@ public class MusicEditGUI implements InventoryHolder {
         
         int count = 0;
         for (MusicNote note : selectedNotes) {
-            note.getInstruments().clear();
-            note.addInstrument(currentInstrument);
+            // setInstruments, not getInstruments().clear(): getInstruments() returns a copy
+            // (MusicNote:213), so clearing it cleared nothing and the old instruments stayed on the
+            // note while addInstrument appended to them -- repeated clicks grew every selected
+            // note's instrument list instead of replacing it. Same trap the undo path documents at
+            // :1500.
+            note.setInstruments(java.util.List.of(currentInstrument));
             count++;
         }
         

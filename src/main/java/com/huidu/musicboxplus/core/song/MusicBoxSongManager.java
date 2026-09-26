@@ -38,6 +38,9 @@ public final class MusicBoxSongManager {
     private static final ReentrantReadWriteLock keywordIndexLock = new ReentrantReadWriteLock();
     private static final int MIN_KEYWORD_LENGTH = 2;
     private static final int MAX_KEYWORDS_PER_SONG = 200;
+    // What separates search tokens: anything that is not a letter or a digit.
+    private static final java.util.regex.Pattern TOKEN_SEPARATOR =
+            java.util.regex.Pattern.compile("[^\\p{IsAlphabetic}\\p{IsDigit}]+");
     
     private static int getMaxKeywordLength() {
         return MusicBox.getInstance().getConfigObject().getSearch().getMaxKeywordLength();
@@ -162,8 +165,20 @@ public final class MusicBoxSongManager {
             );
         }
         
-        rootContainer = new MusicBoxSongContainer(rootFolder, null, false);
-        return CompletableFuture.runAsync(() -> maybeConvertMidi(rootFolder))
+        try {
+            rootContainer = new MusicBoxSongContainer(rootFolder, null, false);
+        } catch (RuntimeException e) {
+            // The constructor rejects a non-directory path ("File is not folder"), and that throw
+            // happens BEFORE the future chain below exists -- so the whenComplete that resets these
+            // flags would never run, isLoading would stay true for the rest of the server's life,
+            // and every later reload would be refused with "Songs are still loading" while nothing
+            // ever loads again. Reset here instead; the caller gets the failure.
+            isLoading.set(false);
+            isLoaded.set(false);
+            throw e;
+        }
+        return CompletableFuture.runAsync(() -> maybeConvertMidi(rootFolder),
+                        com.huidu.musicboxplus.common.utils.AsyncTaskManager.getInstance().getAsyncExecutor())
                 .thenCompose(ignored -> rootContainer.loadAsync(rootFolder))
                 .thenRun(() -> {
             allSongs = Collections.unmodifiableList(new ArrayList<MusicBoxSong>(rootContainer.getAllSongs()));
@@ -505,7 +520,10 @@ public final class MusicBoxSongManager {
 
         LinkedHashMap<String, Boolean> tokens = new LinkedHashMap<>();
         int maxKeywordLength = Math.max(MIN_KEYWORD_LENGTH, getMaxKeywordLength());
-        for (String token : normalized.split("[^\\p{IsAlphabetic}\\p{IsDigit}]+")) {
+        // Precompiled: String.split(regex) compiles a fresh Pattern per call, and this runs once per
+        // song name plus once per alias and per tag on every index rebuild -- tens of thousands of
+        // compilations for a large library, each on the main thread during an alias edit.
+        for (String token : TOKEN_SEPARATOR.split(normalized)) {
             if (token.length() < MIN_KEYWORD_LENGTH) {
                 continue;
             }

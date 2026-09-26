@@ -34,6 +34,9 @@ extends AbstractBlockPlayer {
     private final Sign sign;
     private boolean preventDestroy;
     private Location infoSign;
+    // Last text written to the info sign, so the 5 s refresh can skip an unchanged write.
+    // Region-confined (read and written from this player's tick on its own region).
+    private String infoSignSignature;
     private SignTextDisplayPlayer infoTextDisplayPlayer;
     private volatile long nextExistenceCheckAt = 0L;
     @Nullable
@@ -46,11 +49,22 @@ extends AbstractBlockPlayer {
     private SignPlayer(IPlayList list, int range, Sign sign, @Nullable UUID ownerUuid, float speedMultiplier) {
         super(list, sign.getLocation(), range, speedMultiplier);
         this.sign = sign;
-        this.ownerUuid = ownerUuid;
+        // A caller that knows the owner persists it onto the block; one that does not (reload,
+        // redstone rebuild) falls back to whatever the block already carries, so ownership
+        // survives every path that reconstructs the player.
+        SignOwner.write(sign, ownerUuid);
+        this.ownerUuid = ownerUuid != null ? ownerUuid : SignOwner.read(sign);
         String line3 = SignUtils.getSignLine(sign, 3);
         this.preventDestroy = line3 != null && line3.contains("P");
         if (this.preventDestroy) {
             this.getRangePlayerModel().setAutoDestroyMillis(0);
+            // Signs protected before owners were persisted have no owner recorded anywhere -- the
+            // `signs` table only ever stored a location -- so the ownership checks fall back to
+            // admin-only rather than to the old "everyone owns it". Say so, because from the
+            // owner's side it just looks like the sign stopped responding to them.
+            if (this.ownerUuid == null) {
+                warnUnownedProtectedSign(sign.getLocation());
+            }
         }
         this.updateSignDisplayText();
         this.setupInfoSign();
@@ -67,6 +81,21 @@ extends AbstractBlockPlayer {
         this(list, range, sign, null);
     }
 
+    // One line per sign, once per server session: a sign is reconstructed on every reload and on
+    // every redstone rebuild, and repeating the warning each time would bury the log.
+    private static final Set<String> warnedUnownedSigns =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    private static void warnUnownedProtectedSign(Location location) {
+        if (!warnedUnownedSigns.add(BukkitUtils.locationToString(location))) {
+            return;
+        }
+        MusicBox.getInstance().getLogger().warning(
+                "Protected music sign at " + BukkitUtils.locationToString(location)
+                        + " has no recorded owner (created before sign ownership was persisted). "
+                        + "Only admins can control or unprotect it; re-create it to set an owner.");
+    }
+
     public boolean isOwnerOrAdmin(Player player) {
         if (player == null) {
             return false;
@@ -74,8 +103,12 @@ extends AbstractBlockPlayer {
         if (player.hasPermission(Permissions.ADMIN)) {
             return true;
         }
+        // Fail closed. A null owner used to mean "everyone owns it", which handed every sign
+        // rebuilt without owner information -- i.e. every protected sign after a restart -- to
+        // whoever clicked it first. Signs placed before owners were persisted have no owner
+        // recorded anywhere, so admin-only is the only answer that is not a guess.
         if (this.ownerUuid == null) {
-            return true;
+            return false;
         }
         return this.ownerUuid.equals(player.getUniqueId());
     }
@@ -90,8 +123,9 @@ extends AbstractBlockPlayer {
         if (!player.hasPermission(Permissions.SIGN_PROTECT)) {
             return false;
         }
+        // Fail closed for the same reason as isOwnerOrAdmin above.
         if (this.ownerUuid == null) {
-            return true;
+            return false;
         }
         return this.ownerUuid.equals(player.getUniqueId());
     }
@@ -269,7 +303,9 @@ extends AbstractBlockPlayer {
         if (line3 != null && line3.contains("I")) {
             SignUtils.findSign(this.sign.getLocation()).ifPresentOrElse(s -> {
                 this.infoSign = s.getLocation();
-                SignPlaylistUtils.setPlayListInfo(this.infoSign, super.getPlayList());
+                // null forces the first write; updateInfoSign() caches what it wrote.
+                this.infoSignSignature = null;
+                this.updateInfoSign();
             }, this::setupTextDisplayInfo);
         }
     }
@@ -282,12 +318,29 @@ extends AbstractBlockPlayer {
     }
 
     private void refreshInfoDisplay() {
-        if (this.infoSign != null) {
-            SignPlaylistUtils.setPlayListInfo(this.infoSign, this.getPlayList());
-        }
+        this.updateInfoSign();
         if (this.infoTextDisplayPlayer != null) {
             this.infoTextDisplayPlayer.spawnOrUpdate(this.getPlayList());
         }
+    }
+
+    // Writes the info sign only when the text it would show has changed.
+    //
+    // This runs every 5 s per music sign, and it used to rebuild four Components and call
+    // Sign#update() unconditionally -- and that update is a block-state write broadcast to every
+    // player tracking the chunk. A sign whose playlist has not moved has nothing to broadcast, and
+    // a jukebox-backed playlist pays two inventory scans to produce the text either way.
+    private void updateInfoSign() {
+        if (this.infoSign == null) {
+            return;
+        }
+        List<String> lines = SignPlaylistUtils.playlistInfoLines(this.getPlayList());
+        String signature = String.join("\n", lines);
+        if (signature.equals(this.infoSignSignature)) {
+            return;
+        }
+        this.infoSignSignature = signature;
+        SignPlaylistUtils.setPlayListInfo(this.infoSign, lines);
     }
 
     private void removeInfoTextDisplay() {

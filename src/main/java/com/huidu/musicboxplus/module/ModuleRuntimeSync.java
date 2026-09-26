@@ -99,6 +99,31 @@ public final class ModuleRuntimeSync {
     // Registered once and kept for the plugin's lifetime. The individual handlers decide
     // for themselves whether their module is enabled, so these do not need unregistering
     // when a module is switched off -- unlike the per-feature listeners below.
+    // Releases every listener this class registered, so the next enable registers them again.
+    //
+    // Bukkit unregisters a plugin's listeners during disable, but the fields below keep their
+    // non-null values, and `moduleRuntimeSync` is a final field of MusicBox. On a same-classloader
+    // re-enable (PlugMan disable+enable, as opposed to /reload, which builds a new classloader) the
+    // null guards in syncCrossModuleListeners/syncJukeboxRuntimeState/syncTextPlayerRuntimeState
+    // then see a non-null handle and skip registration -- leaving RedstoneListener,
+    // BlockInteractionListener, ChunkListener and both jukebox listeners permanently unregistered
+    // while the plugin otherwise looks healthy. AbstractBlockPlayer.shutdown() already resets its
+    // own registration flags for exactly this reason; this is the same pattern.
+    public void reset() {
+        unregisterListener(jukeboxHopperListener);
+        unregisterListener(jukeboxChestListener);
+        unregisterListener(textDisplayPlayerListener);
+        unregisterListener(redstoneListener);
+        unregisterListener(blockInteractionListener);
+        unregisterListener(chunkListener);
+        jukeboxHopperListener = null;
+        jukeboxChestListener = null;
+        textDisplayPlayerListener = null;
+        redstoneListener = null;
+        blockInteractionListener = null;
+        chunkListener = null;
+    }
+
     private void syncCrossModuleListeners() {
         if (redstoneListener == null) {
             redstoneListener = new RedstoneListener();
@@ -213,7 +238,17 @@ public final class ModuleRuntimeSync {
 
     private void syncPublishedRuntimeState() {
         if (plugin.usesPublishedMusicLibrary()) {
-            PublishedMusicManager.getInstance();
+            PublishedMusicManager existing = PublishedMusicManager.getExistingInstance();
+            if (existing != null) {
+                // A reload. Refresh the catalog here, once, so the callers that used to do it
+                // themselves after syncAll() do not each parse the whole catalog a second time --
+                // the constructor already loaded it on the first call, and a YAML listing embeds
+                // the song's entire note graph, so a second pass over N listings is real work on
+                // the main thread.
+                existing.loadAllPublishedMusic();
+            } else {
+                PublishedMusicManager.getInstance();
+            }
         } else {
             PublishedMusicManager existing = PublishedMusicManager.getExistingInstance();
             if (existing != null) {

@@ -10,8 +10,6 @@ no_permissions: "<red>You do not have permission to do that.</red>"
 only_players: "<red>This command can only be used by players.</red>"
 specify_player: "<red>You need to specify a player name.</red>"
 player_not_found: "<red>Player not found.</red>"
-invalid_arguments: "<red>Invalid arguments.</red>"
-unknown_command: "<red>Unknown command.</red>"
 enable: "Enabled"
 disable: "Disabled"
 "no": "No"
@@ -121,7 +119,6 @@ loop_mode_all: "<green>All</green>"
 
 # Seek and Rewind
 rewind_to: "<gold>Jumped to </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
-rewound: "<gold>Rewound to </gold><yellow>{time}</yellow><dark_gray> ({percent}%)</dark_gray>"
 
 # Reload
 reload_time: "<gray>Reload completed in {time}ms</gray>"
@@ -192,32 +189,6 @@ tag_usage_removealias: "<yellow>/musicboxplus tag <song> removealias <alias></ye
 tag_usage_addtag: "<yellow>/musicboxplus tag <song> addtag <tag></yellow><gray> - Add a tag to a song</gray>"
 tag_usage_removetag: "<yellow>/musicboxplus tag <song> removetag <tag></yellow><gray> - Remove a tag from a song</gray>"
 tag_usage_list: "<yellow>/musicboxplus tag <song> list</yellow><gray> - Show aliases and tags for a song</gray>"
-tag_usage_aliases: "<red>Usage: /musicboxplus tag aliases <song></red>"
-tag_usage_tags: "<red>Usage: /musicboxplus tag tags <song></red>"
-tag_usage_search: "<red>Usage: /musicboxplus tag search <tag></red>"
-tag_help_title: "<gold>=== Song Tag Help ===</gold>"
-tag_help_list: "<yellow>/musicboxplus tag list</yellow><gray> - List aliases and tags for a song</gray>"
-tag_help_aliases: "<yellow>/musicboxplus tag aliases <song></yellow><gray> - Show aliases for a song</gray>"
-tag_help_tags: "<yellow>/musicboxplus tag tags <song></yellow><gray> - Show tags for a song</gray>"
-tag_help_addalias: "<yellow>/musicboxplus tag addalias <song> <alias></yellow><gray> - Add an alias</gray>"
-tag_help_removealias: "<yellow>/musicboxplus tag removealias <song> <alias></yellow><gray> - Remove an alias</gray>"
-tag_help_addtag: "<yellow>/musicboxplus tag addtag <song> <tag></yellow><gray> - Add a tag</gray>"
-tag_help_removetag: "<yellow>/musicboxplus tag removetag <song> <tag></yellow><gray> - Remove a tag</gray>"
-tag_help_search: "<yellow>/musicboxplus tag search <tag></yellow><gray> - Search songs by tag</gray>"
-tag_help_reload: "<yellow>/musicboxplus tag reload</yellow><gray> - Reload the tag configuration</gray>"
-tag_song_list: "<gold>=== Song List ({count}) ===</gold>"
-tag_song_not_found: "<red>Song not found: {song}</red>"
-tag_aliases_title: "<gold>=== Aliases for {song} ===</gold>"
-tag_no_aliases: "<gray>This song has no aliases</gray>"
-tag_tags_title: "<gold>=== Tags for {song} ===</gold>"
-tag_no_tags: "<gray>This song has no tags</gray>"
-tag_alias_added: "<green>Added alias </green><yellow>{alias}</yellow><gray> -> </gray><white>{song}</white>"
-tag_alias_removed: "<green>Removed alias </green><yellow>{alias}</yellow><gray> from </gray><white>{song}</white>"
-tag_tag_added: "<green>Added tag </green><aqua>{tag}</aqua><gray> -> </gray><white>{song}</white>"
-tag_tag_removed: "<green>Removed tag </green><aqua>{tag}</aqua><gray> from </gray><white>{song}</white>"
-tag_search_title: "<gold>=== Songs with tag '</gold><aqua>{tag}</aqua><gold>' ({count}) ===</gold>"
-tag_no_matches: "<gray>No songs matched that tag</gray>"
-tag_config_reloaded: "<green>Tag configuration reloaded</green>"
 tag_alias_not_found: "<red>Alias </red><yellow>{alias}</yellow><gray> was not found on </gray><white>{song}</white>"
 tag_tag_not_found: "<red>Tag </red><aqua>{tag}</aqua><gray> was not found on </gray><white>{song}</white>"
 tag_list_header: "<gold>=== Song Tags for {song} ===</gold>"
@@ -443,8 +414,6 @@ instrument_trumpet_oxidized: "Trumpet (Oxidized)"
 instrument_select_selected: "<gray>Currently selected</gray>"
 instrument_select_unselected: "<gray>Click to select</gray>"
 
-instrument_select_lore: "<gray>Choose which instruments should be used for this note.</gray>"
-
 # GUI Input
 gui_input_prompt: "<gold>Please type your input in chat.</gold>"
 gui_input_cancel: "<gray>Type 'cancel' to abort.</gray>"
@@ -565,33 +534,12 @@ playlist_list_title: "<gold>Playlists </gold><gray>({page}/{last_page})</gray>"
 # Navigation
 
 # Publish Results
-publish_unavailable: "<red>Publishing is currently unavailable.</red>"
 publish_price_invalid: "<red>Invalid price.</red>"
-publish_price_out_of_range: "<red>Price must be between </red><yellow>{min}</yellow><red> and </red><yellow>{max}</yellow><red>.</red>"
-
-unpublish_success: "<red>Song unpublished successfully.</red>"
-republish_success: "<green>Song republished successfully.</green>"
-publish_delete_success: "<red>Published song deleted.</red>"
-publish_update_success: "<green>Published song updated successfully.</green>"
-publish_update_failed: "<red>Failed to update published song.</red>"
-publish_not_found: "<red>Published song not found</red>"
 
 purchase_no_money: "<red>You do not have enough money.</red>"
 purchase_payment_failed: "<red>Payment failed.</red>"
 
-revenue_none: "<red>You have no revenue to claim.</red>"
-
-shop_search_prompt: "<green>Enter a search term in chat (use 'all' to show everything):</green>"
-
-publish_price_prompt: "<green>Enter a new publish price in chat (current: </green><yellow>{current}</yellow><green>):</green>"
-publish_description_prompt: "<green>Enter a publish description in chat (type 'cancel' to abort):</green>"
 publish_description_empty: "(none)"
-
-my_music_title: "<gold>My Published Music</gold>"
-shop_title: "<gold>Music Shop</gold>"
-publish_confirm_title: "<gold>Publish Confirmation</gold>"
-manage_publish_title: "<gold>Manage Published Music</gold>"
-purchase_confirm_title: "<gold>Purchase Confirmation</gold>"
 
 # Edit Operations
 edit_note_extended_octave_only_delete: "<red>Extended octave notes can only be removed, not moved.</red>"

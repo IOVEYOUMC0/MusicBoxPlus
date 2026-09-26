@@ -646,7 +646,7 @@ implements PositionPlayer {
         return this.rangePlayerModel;
     }
 
-    public short getCurrentTick() {
+    public int getCurrentTick() {
         return this.getTick();
     }
 

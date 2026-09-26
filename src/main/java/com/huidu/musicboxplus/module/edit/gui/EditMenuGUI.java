@@ -204,7 +204,7 @@ public class EditMenuGUI implements InventoryHolder {
     private void startImportFlow() {
         PlayerMusicManager musicManager = PlayerMusicManager.getInstance();
 
-        if (musicManager.canCreateMore(player)) {
+        if (musicManager.isMusicLimitReached(player)) {
             int limit = musicManager.getMusicLimit(player);
             MessageUtils.send(player, Lang.EDIT_CREATE_LIMIT, "{limit}", String.valueOf(limit));
             return;

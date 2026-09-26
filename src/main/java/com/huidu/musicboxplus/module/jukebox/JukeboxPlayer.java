@@ -69,7 +69,11 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         // reaches chunks owned by a neighbouring region, which throws. getPlayers() is a plain
         // per-world list with no chunk access, and cheaper at realistic player counts anyway.
         Location center = box.getLocation().clone();
-        double radiusSquared = 64.0 * 64.0;
+        // The player's own range, not a hardcoded 64: those agree only at the default
+        // jukeboxRadius. Lowering it used to announce the song to people standing too far away to
+        // hear it, and raising it left everyone past 64 blocks hearing an unannounced song.
+        double range = this.getRange();
+        double radiusSquared = range * range;
         for (Player player : center.getWorld().getPlayers()) {
             com.huidu.musicboxplus.common.utils.scheduler.Scheduler.entity(player, () -> {
                 if (!player.isOnline() || player.getWorld() != center.getWorld()) return;
@@ -114,8 +118,16 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         return item;
     }
 
-    public static void createNew(Jukebox jukebox) {
+    public static void createNew(Jukebox snapshot) {
         try {
+            // Read the live block state, not the caller's snapshot. Callers capture the state
+            // before the disc is swapped (BlockInteractionListener snapshots it, then
+            // eject()/insert() mutate the live block), so the snapshot still holds the OLD disc:
+            // inserting a MusicBox disc over a vanilla one read back as "some non-MusicBox record"
+            // and bailed out below without ever starting playback.
+            Jukebox jukebox = snapshot.getLocation().getBlock().getState(false) instanceof Jukebox live
+                    ? live
+                    : snapshot;
             ItemStack record = jukebox.getRecord();
             MusicBoxSong currentSong = MusicBoxSongManager.findByItem(record).orElse(null);
             if (currentSong != null && currentSong.shouldUseVanillaJukeboxPlayback()) {

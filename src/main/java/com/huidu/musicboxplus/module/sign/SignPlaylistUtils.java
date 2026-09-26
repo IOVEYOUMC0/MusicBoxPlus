@@ -61,13 +61,23 @@ public final class SignPlaylistUtils {
         return future;
     }
 
+    // The four (or fewer) lines an info sign shows. Exposed separately so a caller that refreshes
+    // the display on a timer can compare the text it would write against what is already there and
+    // skip the write -- see SignPlayer#refreshInfoDisplay.
+    public static List<String> playlistInfoLines(IPlayList list) {
+        return SongUtils.generateCompactPlaylistLore(list, 1, 2);
+    }
+
     public static void setPlayListInfo(Location signLocation, IPlayList list) {
+        setPlayListInfo(signLocation, playlistInfoLines(list));
+    }
+
+    public static void setPlayListInfo(Location signLocation, List<String> signText) {
         if (signLocation == null || signLocation.getWorld() == null || !Bukkit.isOwnedByCurrentRegion(signLocation)) {
             return;
         }
         Block block = signLocation.getBlock();
         if (block.getState() instanceof Sign sign) {
-            List<String> signText = SongUtils.generateCompactPlaylistLore(list, 1, 2);
             SignSide side = sign.getSide(Side.FRONT);
             for (int i = 0; i < 4; i++) {
                 String str = signText.size() > i ? signText.get(i) : "";

@@ -12,7 +12,7 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
     private final String name;
     private final DisplayOptions displayOptions;
     private final TextDisplayVisual visual;
-    private short lastRenderedTick = Short.MIN_VALUE;
+    private int lastRenderedTick = Integer.MIN_VALUE;
 
     public TextDisplayPlayer(String name, IPlayList list, Location location, int range) {
         this(name, list, location, range, 1.0f, DisplayOptions.defaults());
@@ -47,7 +47,7 @@ public class TextDisplayPlayer extends AbstractBlockPlayer implements TextDispla
     @Override
     public void tick() {
         super.tick();
-        short currentTick = this.getTick();
+        int currentTick = this.getTick();
         if (currentTick == this.lastRenderedTick) {
             return;
         }

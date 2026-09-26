@@ -23,6 +23,60 @@ public final class StringUtils {
         return title;
     }
 
+    // Whether every character fits in the one-byte-per-character space a .nbs header string uses.
+    // Anything read by NbsReader qualifies by construction; a file or folder name taken from the
+    // operating system usually does not, which is what makes it a better name than the header.
+    public static boolean fitsSingleByteString(String text) {
+        if (text == null) {
+            return true;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) > 0xFF) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether text read out of a .nbs header names nothing at all: empty, or nothing but '?'. That
+    // is what every character above U+00FF used to become when this plugin wrote a title, and what
+    // other tools still produce for characters their encoding cannot hold.
+    public static boolean isMeaninglessHeaderText(String text) {
+        if (text == null || text.isEmpty()) {
+            return true;
+        }
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c != '?' && !Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // The name to show for a song that came out of a .nbs file.
+    //
+    // A .nbs header string is one byte per character -- NoteBlockAPI reads a title as
+    // `(char) byte`, and so does NbsReader -- so a CJK title cannot be stored in the file at all.
+    // When the header names nothing (empty or all '?'), or when it lives entirely inside that
+    // single-byte space while the file name does not, the file name is the name the song is meant
+    // to be known by: either a tool mangled the title on the way in, or the author titled the song
+    // in Latin and named the file in their own language. The file name is also the one thing about
+    // a song that no .nbs tool can mangle.
+    //
+    // A Latin-1 title like "Café" is inside the single-byte space only if the file name is too, so
+    // those keep winning -- which is what the corpus and the Western case rely on.
+    public static String songNameFromHeader(String headerText, String fileName) {
+        String fallback = fileName == null ? "" : fileName;
+        if (isMeaninglessHeaderText(headerText)) {
+            return fallback;
+        }
+        if (fitsSingleByteString(headerText) && !fitsSingleByteString(fallback)) {
+            return fallback;
+        }
+        return headerText;
+    }
+
     public static String t(String str) {
         return MiniMessageUtils.processText(str);
     }

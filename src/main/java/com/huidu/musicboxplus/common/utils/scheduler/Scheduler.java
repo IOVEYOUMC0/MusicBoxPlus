@@ -174,10 +174,20 @@ public final class Scheduler {
         if (!pluginEnabled()) {
             if (Bukkit.isOwnedByCurrentRegion(entity)) {
                 run.run();
+            } else if (retired != null) {
+                retired.run();
             }
             return MbTask.of(null);
         }
-        return MbTask.of(entity.getScheduler().run(plugin(), wrap(run), retired));
+        // The entity scheduler returns null when the entity was already removed/retired, and in
+        // that case it runs NEITHER callback -- not even `retired`. Callers use `retired` as a
+        // guaranteed fallback (a fan-in barrier that must count down, an inventory that must be
+        // put back), so dropping it silently strands them forever rather than failing loudly.
+        ScheduledTask task = entity.getScheduler().run(plugin(), wrap(run), retired);
+        if (task == null && retired != null) {
+            retired.run();
+        }
+        return MbTask.of(task);
     }
 
     // Runs inline on the calling thread when it already owns the entity's region, so the body

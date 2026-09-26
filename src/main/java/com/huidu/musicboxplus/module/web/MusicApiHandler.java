@@ -25,12 +25,14 @@ final class MusicApiHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        if ("OPTIONS".equals(exchange.getRequestMethod())) {
-            support.handleOptionsRequest(exchange);
+        // Rate limit first. Answering OPTIONS above it made preflight a free, unmetered route:
+        // the same work per request, none of it counted.
+        if (support.checkRateLimit(exchange)) {
             return;
         }
 
-        if (support.checkRateLimit(exchange)) {
+        if ("OPTIONS".equals(exchange.getRequestMethod())) {
+            support.handleOptionsRequest(exchange);
             return;
         }
 
@@ -215,14 +217,8 @@ final class MusicApiHandler implements HttpHandler {
         return PlayerMusicManager.getInstance().validateMusicName(title);
     }
 
+    // Single implementation, shared with the file-import path.
     private String normalizeDescription(String description) {
-        if (description == null) return "";
-        if (description.length() > 1000) {
-            description = description.substring(0, 1000);
-        }
-        // Strip the MiniMessage/legacy-color injection vectors (< > & U+00A7) in addition to
-        // control chars, so a description can't inject formatting/hover-spoof into the disc lore
-        // rendered for other players. Newlines/tabs are preserved for multi-line lore.
-        return description.replaceAll("[<>&\\u00a7\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f-\\x9f]", "");
+        return com.huidu.musicboxplus.module.edit.io.NBSImporter.sanitizeDescription(description);
     }
 }

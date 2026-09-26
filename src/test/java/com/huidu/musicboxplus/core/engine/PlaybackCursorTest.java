@@ -134,6 +134,14 @@ class PlaybackCursorTest {
         assertEquals(500, ticks.get(0), "the first tick after a seek is the one asked for");
     }
 
+    @Test
+    void longSongPositionsDoNotWrapAtShortRange() throws Exception {
+        PlaybackCursor cursor = playing(firstSong());
+        cursor.seek(40_000);
+        assertEquals(40_000, cursor.tick() + 1,
+                "the cursor must keep positions beyond the legacy short range");
+    }
+
     // The playable range is closed at both ends: a song of length L plays ticks 0 through L.
     @Test
     void playbackCoversTheClosedRangeThenFinishes() throws Exception {

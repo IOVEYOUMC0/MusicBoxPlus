@@ -122,6 +122,14 @@ public class MidiImporter {
                 MusicNote note = new MusicNote(pitch, tick);
                 note.addInstrument(instrument);
                 music.addNote(note);
+                // Abort as soon as the cap is crossed rather than after the loop. The file size
+                // check upstream is no help here -- a 5 MB MIDI can hold well over a million note
+                // events -- so the old order materialised every note (each with an index string)
+                // before rejecting the file, hundreds of MB transiently for one import.
+                if (music.getNoteCount() > MusicFileImporter.MAX_IMPORT_NOTES) {
+                    throw new IOException("Imported file has too many notes (>"
+                            + MusicFileImporter.MAX_IMPORT_NOTES + ")");
+                }
             } else if (!existingNote.getInstruments().contains(instrument)) {
                 existingNote.addInstrument(instrument);
             }

@@ -120,6 +120,14 @@ class DownstreamApiContractTest {
             "getPlayerAt 的返回类型必须留在 api 包内，不能泄漏 core 的实现类型");
     }
 
+    @Test
+    void playerTickUsesAnIntForLongSongs() throws Exception {
+        Class<?> player = load("com.huidu.musicboxplus.api.player.MusicBoxSongPlayer");
+        Method getTick = player.getMethod("getTick");
+        assertEquals(int.class, getTick.getReturnType(),
+            "播放位置必须使用 int，short 会在 32767 tick 后溢出");
+    }
+
     // No third-party type may appear in a public signature of the api package. While one did,
     // the library behind it could never be relocated into this plugin, and every downstream
     // plugin compiled against the interface carried a dependency on it. There are none left,

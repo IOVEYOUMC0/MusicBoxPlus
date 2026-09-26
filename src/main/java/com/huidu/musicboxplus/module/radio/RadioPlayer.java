@@ -29,6 +29,10 @@ implements PlayerSongPlayer {
 
     private final int cachedSongLength;
     private int tickCounter = 0;
+    // Reused source position for the listener's own head. NoteEmitter already relies on playSound
+    // reading the coordinates before it returns, so moving one Location instead of allocating a
+    // fresh one per tick is safe; getLocation() allocated one per listener per tick here.
+    private final Location scratchSource = new Location(null, 0, 0, 0);
 
     public RadioPlayer(IPlayList list, PlayerWrapper wrapper) {
         super(PlaybackSetup.compiledSongOf(list));
@@ -115,9 +119,21 @@ implements PlayerSongPlayer {
         }
 
         // The sound follows the listener's head, so there is no range falloff to apply.
-        // getEyeLocation() 内部是 getLocation()+add() 两次分配，改为单次分配后原地抬 Y
-        Location playbackLocation = player.getLocation();
-        playbackLocation.setY(playbackLocation.getY() + player.getEyeHeight());
+        // One reusable Location, moved to the listener's eye height. getEyeLocation() allocates
+        // twice (getLocation() then add()), and even the single-allocation version this replaced
+        // still allocated per listener per tick.
+        Location playbackLocation = scratchSource;
+        playbackLocation.setWorld(player.getWorld());
+        playbackLocation.setX(player.getX());
+        playbackLocation.setY(player.getY() + player.getEyeHeight());
+        playbackLocation.setZ(player.getZ());
+        // The yaw is not decoration: NoteEmitter derives the stereo offset direction from it, so a
+        // reused Location left at yaw 0 panned every note along world +X instead of the listener's
+        // left axis -- hard-panned notes came out left/right only when facing north or south, and
+        // the fake-stereo pair for a mono song collapsed into front/back when facing east or west.
+        // The Location this replaced was player.getLocation(), which carried the yaw with it.
+        playbackLocation.setYaw(player.getYaw());
+        playbackLocation.setPitch(player.getPitch());
         float baseVolume = NoteEmitter.baseVolume(this.volume, playbackVolume, 100);
         // A radio pans songs that carry panning, and widens the ones that do not by sending each
         // note to both sides. The second form costs an extra packet per note per listener, which
@@ -141,7 +157,7 @@ implements PlayerSongPlayer {
         return this.musicBoxModel;
     }
 
-    public short getCurrentTick() {
+    public int getCurrentTick() {
         return this.getTick();
     }
 

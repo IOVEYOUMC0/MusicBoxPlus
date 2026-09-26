@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.module.jukebox.listener;
 
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.utils.FaceUtils;
+import com.huidu.musicboxplus.common.utils.scheduler.MbTask;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.core.player.AbstractBlockPlayer;
 import com.huidu.musicboxplus.core.song.MusicBoxSongManager;
@@ -83,13 +84,20 @@ public class JukeboxChestListener implements Listener {
             if (!notified.add(jukeboxLocation) || !PENDING.add(jukeboxLocation)) {
                 continue;
             }
-            Scheduler.regionLater(jukeboxLocation, () -> {
+            MbTask task = Scheduler.regionLater(jukeboxLocation, () -> {
                 PENDING.remove(jukeboxLocation);
                 AbstractBlockPlayer found = AbstractBlockPlayer.findByLocation(jukeboxLocation);
                 if (found instanceof JukeboxPlayer) {
                     found.getMusicBoxModel().getPlayList().updatePlaylist();
                 }
             }, 1L);
+            // The scheduler refuses new tasks once the plugin is disabled and hands back an empty
+            // handle instead. The key is only ever cleared by the task, so leaving it in would
+            // mark this jukebox permanently pending and suppress every future chest refresh for
+            // it across a re-enable on the same JVM.
+            if (task.handle() == null) {
+                PENDING.remove(jukeboxLocation);
+            }
         }
     }
 }

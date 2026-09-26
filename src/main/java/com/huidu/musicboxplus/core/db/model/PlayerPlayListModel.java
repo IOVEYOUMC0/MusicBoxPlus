@@ -21,6 +21,25 @@ implements SongContainer {
     private String name;
     private final List<MusicBoxSong> songs = new LinkedList<MusicBoxSong>();
 
+    // Song hashes that are stored for this playlist but whose song is not in the current in-memory
+    // index -- a .nbs that was renamed, moved or removed, or one that had not finished loading when
+    // the playlist was read.
+    //
+    // They are deliberately invisible: getSongs() returns only what resolved, so the GUI never shows
+    // a broken entry. But savePlayList() rewrites the playlist's rows from getSongs() alone, so
+    // without carrying them here every save -- and addSong/removeSong/addSongsBulk all save --
+    // deleted them from the database for good. Reading a playlist preserved them; touching one
+    // destroyed them. See AbstractBase.extractPlayList and savePlayList.
+    //
+    // Nothing removes an entry from this list, which is the point: a song whose file is temporarily
+    // missing must not lose its place in every playlist that referenced it. A hash that is gone for
+    // good therefore stays in the table, invisible, which costs one row.
+    private final List<Integer> unresolvedHashes = new LinkedList<Integer>();
+
+    public List<Integer> getUnresolvedHashes() {
+        return this.unresolvedHashes;
+    }
+
     public Optional<PlayerWrapper> getOwnerWrapper() {
         Player player = Bukkit.getPlayer(this.owner);
         if (player == null) {

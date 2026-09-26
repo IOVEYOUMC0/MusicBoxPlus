@@ -45,6 +45,15 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
     // owner entity live — that would be a cross-region entity access on Folia.
     private volatile Location ownerLocationSnapshot;
     private volatile boolean ownerDeadSnapshot;
+    // Also a snapshot, for the same reason: the vanish probe walks the entity's metadata map (up to
+    // four hasMetadata calls plus a list allocation on a hit) and reads the game mode, and playTick
+    // ran it once per tick per speaker for an answer that changes a few times an hour. tick() runs
+    // on the owner's region, which is the only thread allowed to read that entity anyway.
+    private volatile boolean ownerVanishedSnapshot;
+    // Scratch source for the owner's own listener. NoteEmitter reuses one Location per tick for the
+    // same reason; playSound reads the coordinates before returning, so the object can be moved
+    // between calls instead of cloned per tick.
+    private final Location scratchSource = new Location(null, 0, 0, 0);
 
     // Playback arrangement for this speaker's song, resolved once. A speaker plays one song per
     // player instance, and speed only changes the tempo, not which notes sit on a tick.
@@ -176,6 +185,7 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
             this.ownerLocationSnapshot = owner.getLocation();
         }
         this.ownerDeadSnapshot = false;
+        this.ownerVanishedSnapshot = isPlayerVanished(owner);
         this.rangeModel.tick();
     }
 
@@ -224,8 +234,11 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
                 if (ownerListener) {
                     // Radio mode emits at eye height. Match that local source position while
                     // keeping the physical speaker position for other listeners.
-                    playbackLocation = entityLocation.clone();
-                    playbackLocation.setY(playbackLocation.getY() + player.getEyeHeight());
+                    playbackLocation = scratchSource;
+                    playbackLocation.setWorld(entityLocation.getWorld());
+                    playbackLocation.setX(entityLocation.getX());
+                    playbackLocation.setY(entityLocation.getY() + player.getEyeHeight());
+                    playbackLocation.setZ(entityLocation.getZ());
                 }
                 NoteEmitter.emitTick(player, playbackLocation, compiled, tick, baseVolume,
                     this.soundCategory, this.enable10Octave, stereoWidth);
@@ -233,7 +246,7 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         }
         if (this.ownerUuid != null && player.getUniqueId().equals(this.ownerUuid)) {
             this.model.nextTick(compiled != null ? compiled.lengthTicks() : 0, tick);
-            if (!this.isPlayerVanished(player) && hasNotes) {
+            if (!this.ownerVanishedSnapshot && hasNotes) {
                 this.spawnNote(player);
             }
         }
@@ -271,8 +284,10 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
     }
 
     private void spawnNote(Player player) {
-        Location loc = player.getLocation();
-        player.getWorld().spawnParticle(Particle.NOTE, loc.getX(), loc.getY() + 2.3, loc.getZ(), 1);
+        // Coordinates straight from the entity: getLocation() would allocate a Location per tick
+        // for a particle that only ever reads x/y/z.
+        player.getWorld().spawnParticle(Particle.NOTE, player.getX(), player.getY() + 2.3,
+                player.getZ(), 1);
     }
 
 
@@ -310,7 +325,7 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         return this.owner;
     }
 
-    public short getCurrentTick() {
+    public int getCurrentTick() {
         return this.getTick();
     }
 }

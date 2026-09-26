@@ -262,9 +262,10 @@ public final class TextDisplayStore {
                     "Failed to spawn restored text display '" + name + "'", e);
         } finally {
             RESTORING.remove(key(name));
-            // The restored handle now contains the filtered playlist (including an empty one), so
-            // persist it immediately instead of waiting for the periodic safety save.
-            saveSoon();
+            // No saveSoon() here. restoreAll() already saves once after its loop, and every save
+            // captures EVERY live display on its region thread and re-serialises the whole file --
+            // so a per-display save turned restoring N displays into N+1 full passes over N
+            // displays (N^2 region tasks) for a file that only changes once, at the end.
         }
     }
 
@@ -464,11 +465,25 @@ public final class TextDisplayStore {
     }
 
     // Fire-and-forget save for a change that must not wait for the next tick of the timer.
+    //
+    // Coalesced: one queued save covers every caller until it starts, because a save is a full
+    // capture of every display plus a whole-file serialisation. Creating or moving a batch of
+    // displays used to queue one of those per change. The flag is cleared BEFORE the save runs, so
+    // a change made while a save is in flight still queues the next one instead of being lost.
+    private static final java.util.concurrent.atomic.AtomicBoolean SAVE_QUEUED =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
     public static void saveSoon() {
         if (!loaded || saveClosed) {
             return;
         }
-        com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(TextDisplayStore::saveIfChanged);
+        if (!SAVE_QUEUED.compareAndSet(false, true)) {
+            return;
+        }
+        com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(() -> {
+            SAVE_QUEUED.set(false);
+            saveIfChanged();
+        });
     }
 
     private static synchronized void saveIfChanged() {

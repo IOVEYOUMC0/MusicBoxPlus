@@ -143,7 +143,7 @@ public final class GUIActions {
             // Repaint when playback exists, not one tick later: a song being played for the first
             // time compiles asynchronously, so the old fixed delay repainted while there was still
             // no active player -- and a null play/pause item makes updateSlots delete the button.
-            player.play(new SingletonPlayList(data.getData()), (short) -1, data::refreshInventory);
+            player.play(new SingletonPlayList(data.getData()), -1, data::refreshInventory);
         }
         catch (Exception e) {
             logger.severe("Failed to play music for player: " + e.getMessage());

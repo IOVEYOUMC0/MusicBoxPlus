@@ -133,7 +133,10 @@ final class WebApiSupport {
     // Baseline hardening for every API response: the editor is served inside a session URL, so
     // it must not be frameable, its responses must not be sniffed as another type, and the
     // session token in the URL must not leak via a Referer header.
-    private void applySecurityHeaders(HttpExchange exchange) {
+    // static + package-private: WebAssetHandler serves the one response that actually carries
+    // the session token in its URL, so Referrer-Policy has to be on that page, not only on the
+    // fetch responses it makes afterwards.
+    static void applySecurityHeaders(HttpExchange exchange) {
         exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
         exchange.getResponseHeaders().set("X-Frame-Options", "DENY");
         exchange.getResponseHeaders().set("Referrer-Policy", "no-referrer");
@@ -175,7 +178,10 @@ final class WebApiSupport {
                 String domain = trimmed.substring(2);
                 try {
                     String host = new URI(requestOrigin).getHost();
-                    if (host.endsWith(domain) || host.equals(domain)) {
+                    // The dot matters: a bare endsWith made "*.example.com" match
+                    // "evilexample.com", handing any attacker-registered lookalike the
+                    // same access as a real subdomain.
+                    if (host != null && (host.equals(domain) || host.endsWith("." + domain))) {
                         return true;
                     }
                 } catch (URISyntaxException e) {

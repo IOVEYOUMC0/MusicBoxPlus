@@ -79,6 +79,10 @@ public class RecentSongsGUI {
         int skipElements = clampedPage * indexLimit;
         List<Integer> songSlots = layoutParser.getSlotsForChar(mapping.getSongs());
         int itemIndex = skipElements;
+        // Hoisted out of the slot loop: the lore template is per-page constant (only {price} is
+        // substituted per slot), and this loop runs once per song slot.
+        List<String> shopLoreTemplate = this.buyMode
+                ? GUIConfigManager.getInstance().getShopLoreConfig().getShopLore() : List.of();
         for (int slot : songSlots) {
             if (itemIndex >= recentSongs.size()) break;
             MusicBoxSong song = recentSongs.get(itemIndex);
@@ -87,7 +91,7 @@ public class RecentSongsGUI {
             if (this.buyMode) {
                 double price = EconomyUtils.getDiscPrice();
                 List<String> lore = new java.util.ArrayList<>();
-                for (String line : GUIConfigManager.getInstance().getShopLoreConfig().getShopLore()) {
+                for (String line : shopLoreTemplate) {
                     lore.add(line.replace("{price}", String.format("%.0f", price)));
                 }
                 stack = ItemUtils.addLore(stack, lore);

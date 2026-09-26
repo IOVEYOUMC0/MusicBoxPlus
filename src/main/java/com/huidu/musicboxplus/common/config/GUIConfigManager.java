@@ -31,6 +31,40 @@ public class GUIConfigManager {
     private volatile SongItemConfig songItemConfig;
     private volatile Set<String> guiTitleKeywords;
 
+    // The small section objects, parsed once per loadConfig and then shared.
+    //
+    // Every one of these getters used to build a fresh object on each call -- several YAML path
+    // lookups plus StringUtils.t() (a MiniMessage parse and legacy serialisation) per list -- while
+    // the callers sit inside per-slot render loops: a 45-slot shop page re-parsed the same constant
+    // strings 45 times per open, and the control panel does it again on every 2 Hz refresh. The
+    // values do not change until the next loadConfig, which is what invalidates this cache.
+    //
+    // Safe to share because every caller only reads the fields (verified across
+    // module/gui/**); the one object whose identity is used as a cache key, SongItemConfig, is
+    // already shared through its own field and is not part of this record.
+    private record SectionConfigs(PlaylistItemConfig playlistItem, LoopModeConfig loopMode,
+                                  ToggleStatusConfig toggleStatus,
+                                  PlaybackStatusConfig playbackStatus,
+                                  VolumeControlConfig volumeControl, ShopLoreConfig shopLore) {
+    }
+
+    private volatile SectionConfigs sectionConfigs;
+
+    // Lazily rebuilt rather than eagerly in loadConfig(): getInstance() constructs the manager
+    // before the config file is parsed in some paths, and a getter must never hand out a half-built
+    // object. The first caller after a (re)load pays for all six parsers once.
+    private SectionConfigs sectionConfigs() {
+        SectionConfigs cached = sectionConfigs;
+        if (cached != null) {
+            return cached;
+        }
+        SectionConfigs built = new SectionConfigs(parsePlaylistItemConfig(), parseLoopModeConfig(),
+                parseToggleStatusConfig(), parsePlaybackStatusConfig(), parseVolumeControlConfig(),
+                parseShopLoreConfig());
+        sectionConfigs = built;
+        return built;
+    }
+
     private static final Set<String> DEFAULT_GUI_TITLE_KEYWORDS = new HashSet<>(Arrays.asList(
         "MusicBox", "Playlist", "Control", "Volume", "Search",
         "Music", "Player", "Menu", "Shop", "Song", "Sign", "Settings", "Editor"
@@ -38,12 +72,21 @@ public class GUIConfigManager {
     
     private static final int INVENTORY_COLS = 9;
     
+    // One definition of "the rows of a layout", shared by the row count and every slot-index walk
+    // below. They used to disagree: a YAML block scalar keeps its trailing newline, and counting
+    // that empty field made the menu a row taller than the layout it was built from.
+    // Trailing line breaks only -- a deliberate blank FIRST row is a real row and shifts every
+    // slot index after it, so strip() would have traded one mismatch for another.
+    static String[] layoutRows(String layout) {
+        return layout == null ? new String[0] : layout.replaceAll("\\R+$", "").split("\\R", -1);
+    }
+
     // Slot index of the first occurrence of c in the layout, -1 if there is none.
     public static int getSlotForChar(String layout, char c) {
         if (layout == null) {
             return -1;
         }
-        String[] lines = layout.split("\\R", -1);
+        String[] lines = layoutRows(layout);
         for (int row = 0; row < Math.min(lines.length, 6); row++) {
             String line = lines[row];
             for (int col = 0; col < line.length() && col < INVENTORY_COLS; col++) {
@@ -61,7 +104,7 @@ public class GUIConfigManager {
         if (layout == null) {
             return slots;
         }
-        String[] lines = layout.split("\\R", -1);
+        String[] lines = layoutRows(layout);
         for (int row = 0; row < Math.min(lines.length, 6); row++) {
             String line = lines[row];
             for (int col = 0; col < line.length() && col < INVENTORY_COLS; col++) {
@@ -77,7 +120,7 @@ public class GUIConfigManager {
         if (layout == null || layout.isBlank()) {
             return Math.max(1, Math.min(6, fallback));
         }
-        int rows = layout.split("\\R", -1).length;
+        int rows = layoutRows(layout).length;
         return Math.max(1, Math.min(6, rows));
     }
 
@@ -131,6 +174,8 @@ public class GUIConfigManager {
                 "加载内置 GUI 默认配置失败: " + e.getMessage()));
         }
         this.progressBarConfigs.clear();
+        // The section objects are rebuilt from the config that was just parsed.
+        this.sectionConfigs = null;
         this.loadGUITitleKeywords();
         this.loadGUIConfigs();
         this.buttonRegistry.load(this.config);
@@ -300,7 +345,7 @@ public class GUIConfigManager {
         if (rows < 1 || rows > 6) {
             rows = 3;
         }
-        String[] lines = layout.split("\\R", -1);
+        String[] lines = layoutRows(layout);
         for (int row = 0; row < Math.min(rows, lines.length); row++) {
             String line = lines[row];
             for (int col = 0; col < Math.min(INVENTORY_COLS, line.length()); col++) {
@@ -417,6 +462,10 @@ public class GUIConfigManager {
     }
 
     public PlaylistItemConfig getPlaylistItemConfig() {
+        return sectionConfigs().playlistItem();
+    }
+
+    private PlaylistItemConfig parsePlaylistItemConfig() {
         PlaylistItemConfig playlistItemConfig = new PlaylistItemConfig();
         if (this.config == null) {
             return playlistItemConfig;
@@ -455,6 +504,10 @@ public class GUIConfigManager {
 
 
     public LoopModeConfig getLoopModeConfig() {
+        return sectionConfigs().loopMode();
+    }
+
+    private LoopModeConfig parseLoopModeConfig() {
         LoopModeConfig loopModeConfig = new LoopModeConfig();
         if (this.config == null) {
             return loopModeConfig;
@@ -468,6 +521,10 @@ public class GUIConfigManager {
     }
 
     public ToggleStatusConfig getToggleStatusConfig() {
+        return sectionConfigs().toggleStatus();
+    }
+
+    private ToggleStatusConfig parseToggleStatusConfig() {
         ToggleStatusConfig toggleStatusConfig = new ToggleStatusConfig();
         if (this.config == null) {
             return toggleStatusConfig;
@@ -478,6 +535,10 @@ public class GUIConfigManager {
     }
 
     public PlaybackStatusConfig getPlaybackStatusConfig() {
+        return sectionConfigs().playbackStatus();
+    }
+
+    private PlaybackStatusConfig parsePlaybackStatusConfig() {
         PlaybackStatusConfig playbackStatusConfig = new PlaybackStatusConfig();
         if (this.config == null) {
             return playbackStatusConfig;
@@ -489,6 +550,10 @@ public class GUIConfigManager {
 
 
     public VolumeControlConfig getVolumeControlConfig() {
+        return sectionConfigs().volumeControl();
+    }
+
+    private VolumeControlConfig parseVolumeControlConfig() {
         VolumeControlConfig volumeControlConfig = new VolumeControlConfig();
         if (this.config == null) {
             return volumeControlConfig;
@@ -860,6 +925,10 @@ public class GUIConfigManager {
     }
 
     public ShopLoreConfig getShopLoreConfig() {
+        return sectionConfigs().shopLore();
+    }
+
+    private ShopLoreConfig parseShopLoreConfig() {
         ShopLoreConfig shopLoreConfig = new ShopLoreConfig();
         if (this.config == null) {
             return shopLoreConfig;
@@ -1941,7 +2010,7 @@ public class GUIConfigManager {
         public List<Integer> getSlotsForChars(String chars) {
             List<Integer> slots = new ArrayList<>();
             if (chars == null || chars.isEmpty()) return slots;
-            String[] rows = layout.split("\\n");
+            String[] rows = layoutRows(layout);
             for (int row = 0; row < rows.length; row++) {
                 String line = rows[row];
                 for (int col = 0; col < line.length() && col < 9; col++) {

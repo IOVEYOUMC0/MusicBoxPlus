@@ -82,6 +82,12 @@ public class PlayerWrapper {
     // or rapid song switches each rewrite the whole list on the DB.
     private static final long RECENT_SAVE_DELAY_MILLIS = 30_000L;
     private final Object recentSaveLock = new Object();
+    // Serialises the DB writes themselves, and is never taken by a server thread -- unlike
+    // recentSaveLock, which play() -> addRecentSong() takes on the player's own thread. Two flushes
+    // can otherwise be in flight at once (the second is schedulable the moment the first clears
+    // recentSaveTask), and saveRecentSongsBatch is a DELETE + re-insert, so an older snapshot
+    // committing last would roll the list back a song until the next flush.
+    private final Object recentWriteLock = new Object();
     private volatile List<MusicBoxSong> recentSaveSnapshot;
     private volatile com.huidu.musicboxplus.common.utils.scheduler.MbTask recentSaveTask;
 
@@ -286,17 +292,17 @@ public class PlayerWrapper {
     }
 
     public void play(IPlayList song) {
-        this.play(song, (short)-1);
+        this.play(song, -1);
     }
 
-    public void play(IPlayList playList, short tick) {
+    public void play(IPlayList playList, int tick) {
         this.play(playList, tick, null);
     }
 
     // afterStart is how a caller learns that playback actually exists. Waiting a fixed number of
     // ticks instead does not work: a song whose arrangement is not compiled yet takes an async
     // detour and comes back later than any guess.
-    public void play(IPlayList playList, short tick, Runnable afterStart) {
+    public void play(IPlayList playList, int tick, Runnable afterStart) {
         int delayTicks;
         if (!MusicBox.getInstance().isPlaybackModuleEnabled()) {
             return;
@@ -315,19 +321,19 @@ public class PlayerWrapper {
         }
     }
 
-    private void startPlayInternal(IPlayList playList, short tick) {
+    private void startPlayInternal(IPlayList playList, int tick) {
         this.startPlayInternal(playList, tick, null);
     }
 
     // afterStart runs on the same thread that created the player, immediately after it exists, so
     // callers that need to touch the new player keep working whichever path whenReady takes.
-    private void startPlayInternal(IPlayList playList, short tick, Runnable afterStart) {
+    private void startPlayInternal(IPlayList playList, int tick, Runnable afterStart) {
         this.startPlayInternal(playList, tick, afterStart, 0L);
     }
 
     // A non-zero request version belongs to a user-initiated play() call. Automatic restarts
     // (speed/mode changes and playlist transitions) use zero and are never discarded here.
-    private void startPlayInternal(IPlayList playList, short tick, Runnable afterStart, long requestVersion) {
+    private void startPlayInternal(IPlayList playList, int tick, Runnable afterStart, long requestVersion) {
         PlaybackSetup.whenReady(playList, this::dispatchToListener, () -> {
             if (requestVersion != 0L && requestVersion != this.playRequestVersion.get()) {
                 return;
@@ -366,7 +372,7 @@ public class PlayerWrapper {
         }
     }
 
-    private void restartPlayback(IPlayList playList, short tick) {
+    private void restartPlayback(IPlayList playList, int tick) {
         this.seamlessPlayerSwap = true;
         try {
             // A restart always follows a song that was just playing, so its arrangement is in
@@ -423,25 +429,37 @@ public class PlayerWrapper {
     }
 
     private void flushRecentSongs(java.util.UUID playerId) {
+        List<MusicBoxSong> toSave;
         synchronized (recentSaveLock) {
-            List<MusicBoxSong> toSave = recentSaveSnapshot;
+            toSave = recentSaveSnapshot;
             recentSaveSnapshot = null;
             recentSaveTask = null;
-            if (toSave != null) {
-                saveRecentSongsSync(playerId, toSave);
-            }
+        }
+        // Outside recentSaveLock: the DB write can block for seconds (MySQL latency, SQLite's 10s
+        // busy_timeout). Held inside, it parked whatever server thread called play() ->
+        // addRecentSong() next on the same monitor, which is also how the write slipped past
+        // AbstractBase.getConnection()'s main-thread warning. Ordering between flushes is kept by
+        // recentWriteLock inside saveRecentSongsSync, which no server thread ever contends for.
+        if (toSave != null) {
+            saveRecentSongsSync(playerId, toSave);
         }
     }
 
+    // Every write to this player's recent-songs row goes through here, and they are serialised on
+    // recentWriteLock rather than on recentSaveLock: saveRecentSongsBatch is a DELETE + re-insert,
+    // so two overlapping flushes could otherwise commit out of order and roll the list back a song.
+    // The shutdown flush queues behind an in-flight one for the same reason -- it must land last.
     private void saveRecentSongsSync(java.util.UUID playerId, List<MusicBoxSong> songsToSave) {
-        try {
-            List<Integer> hashes = new ArrayList<>(songsToSave.size());
-            for (MusicBoxSong s : songsToSave) {
-                hashes.add(s.getHash());
+        synchronized (recentWriteLock) {
+            try {
+                List<Integer> hashes = new ArrayList<>(songsToSave.size());
+                for (MusicBoxSong s : songsToSave) {
+                    hashes.add(s.getHash());
+                }
+                DatabaseLoader.getBase().saveRecentSongsBatch(playerId, hashes);
+            } catch (Exception e) {
+                RuntimeDatabaseUtils.logFailure("save recent songs", e);
             }
-            DatabaseLoader.getBase().saveRecentSongsBatch(playerId, hashes);
-        } catch (Exception e) {
-            RuntimeDatabaseUtils.logFailure("save recent songs", e);
         }
     }
 
@@ -591,7 +609,7 @@ public class PlayerWrapper {
         float max = speedConfig.getMaxSpeed();
         float normalized = Math.max(min, Math.min(max, playbackSpeedMultiplier));
         boolean wasPaused = this.activePlayer != null && this.activePlayer.isPaused();
-        short tick = this.activePlayer != null ? this.activePlayer.getTick() : -1;
+        int tick = this.activePlayer != null ? this.activePlayer.getTick() : -1;
         IPlayList playList = this.activePlayer != null ? this.activePlayer.getPlayList() : null;
         this.playbackSpeedMultiplier = normalized;
         this.refreshBossBarTitle();
@@ -726,7 +744,7 @@ public class PlayerWrapper {
     }
 
     public void play(SongContainer container, Runnable afterStart) {
-        this.play(ListPlaylist.fromContainer(container, false, false), (short) -1, afterStart);
+        this.play(ListPlaylist.fromContainer(container, false, false), -1, afterStart);
     }
 
     public void nullActivePlayer(MusicBoxSongPlayer playerModel) {

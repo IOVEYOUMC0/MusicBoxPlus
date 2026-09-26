@@ -13,7 +13,7 @@ final class TextDisplayContent {
     private TextDisplayContent() {
     }
 
-    static Component build(String name, TextDisplayPlayer.DisplayOptions options, MusicBoxSong current, short currentTick, float speedMultiplier) {
+    static Component build(String name, TextDisplayPlayer.DisplayOptions options, MusicBoxSong current, int currentTick, float speedMultiplier) {
         Component content = Component.empty();
         boolean hasLine = false;
         if (options.isShowName()) {

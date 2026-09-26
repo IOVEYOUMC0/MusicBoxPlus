@@ -23,7 +23,6 @@ import java.util.concurrent.*;
 
 public class MusicBoxSongContainer implements FullSongContainer {
     private static final int SONG_LOADER_THREADS = 8;
-    private static final int SONG_LOADER_QUEUE_CAPACITY = 512;
     private final MusicBoxSongContainer parent;
     private volatile List<MusicBoxSongContainer> subContainers;
     private volatile List<MusicBoxSong> songs;
@@ -45,12 +44,18 @@ public class MusicBoxSongContainer implements FullSongContainer {
 
     private static ExecutorService createSongLoader() {
         int threads = Math.max(2, Math.min(SONG_LOADER_THREADS, Runtime.getRuntime().availableProcessors()));
+        // Unbounded queue, no rejection policy. The task count is bounded by the number of song
+        // files, so the queue cannot grow without limit, and the bounded queue it replaces filled
+        // immediately (the submission loop is pure in-memory while each worker does a whole-file
+        // read) -- at which point CallerRunsPolicy ran one full song load, plus any MIDI conversion,
+        // on whichever thread submitted it. That submitter is the CompletableFuture continuation,
+        // i.e. a ForkJoinPool.commonPool thread shared with the rest of the JVM.
         return new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS,
-                new ArrayBlockingQueue<>(SONG_LOADER_QUEUE_CAPACITY), r -> {
+                new LinkedBlockingQueue<>(), r -> {
             Thread t = new Thread(r, "MusicBox-SongLoader");
             t.setDaemon(true);
             return t;
-        }, new ThreadPoolExecutor.CallerRunsPolicy());
+        });
     }
 
     private static ExecutorService getSongLoader() {

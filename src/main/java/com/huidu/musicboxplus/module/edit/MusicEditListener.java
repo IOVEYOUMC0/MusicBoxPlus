@@ -217,6 +217,16 @@ public class MusicEditListener implements Listener {
             return;
         }
 
+        // While the editor holds the player's real inventory in a backup, every item they can
+        // touch is a plugin-owned button (GOLD_BLOCK/TNT/END_CRYSTAL/...) that restore() will
+        // overwrite on exit -- so anything that leaves the inventory is minted from nothing.
+        // The guard is the swapped-out backup, NOT "the editor window is open": renaming closes
+        // the window and waits on chat input with no timeout, and the module can be disabled
+        // mid-session. Both leave the player carrying buttons with no window to key off.
+        if (PlayerInventoryState.hasSavedState(playerUUID)) {
+            event.setCancelled(true);
+        }
+
         if (!MusicBox.getInstance().isEditorModuleEnabled()) {
             return;
         }
@@ -323,6 +333,35 @@ public class MusicEditListener implements Listener {
                     }, 1L);
                 }
             }
+        }
+    }
+
+    // The other three ways a plugin-owned button can leave the inventory while the editor holds
+    // the backup. Same guard as onInventoryClick, and deliberately not gated on the module being
+    // enabled -- the backup outlives a mid-session disable.
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerDropItem(org.bukkit.event.player.PlayerDropItemEvent event) {
+        if (PlayerInventoryState.hasSavedState(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(ignoreCancelled = true)
+    public void onPlayerSwapHandItems(org.bukkit.event.player.PlayerSwapHandItemsEvent event) {
+        if (PlayerInventoryState.hasSavedState(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    // Death empties the live inventory onto the ground -- buttons, not the player's items, which
+    // are safe in the backup and come back when the editor closes. Dropping them duplicates every
+    // button on the corpse.
+    // ponytail: clears the drops instead of substituting the backed-up contents, so dying inside
+    // the editor also skips the death penalty. Swap the backup in here if that matters.
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onPlayerDeath(org.bukkit.event.entity.PlayerDeathEvent event) {
+        if (PlayerInventoryState.hasSavedState(event.getEntity().getUniqueId())) {
+            event.getDrops().clear();
         }
     }
 

@@ -53,11 +53,18 @@ public final class JukeboxPlayableHelper {
             warnOnce(songKey, "不是合法的命名空间键");
             return item;
         }
-        // Goes through RegistryAccess rather than Registry.JUKEBOX_SONG, deprecated since 1.21
-        Registry<JukeboxSong> registry = RegistryAccess.registryAccess().getRegistry(RegistryKey.JUKEBOX_SONG);
+        // Both lookups belong inside the lambda: this runs once per song stack render, and the
+        // registry fetch in particular is exactly the cost the memo below exists to avoid. Reading
+        // the registry here (rather than once per call) also keeps it correct across a datapack
+        // reload, which can replace the registry contents.
         JukeboxSong song = RESOLVED_SONGS.computeIfAbsent(songKey, k -> {
             NamespacedKey resolved = NamespacedKey.fromString(k);
-            return resolved == null ? null : registry.get(resolved);
+            if (resolved == null) {
+                return null;
+            }
+            Registry<JukeboxSong> registry =
+                    RegistryAccess.registryAccess().getRegistry(RegistryKey.JUKEBOX_SONG);
+            return registry.get(resolved);
         });
         if (song == null) {
             warnOnce(songKey, "在 jukebox_song 注册表里不存在（需要由数据包注册）");

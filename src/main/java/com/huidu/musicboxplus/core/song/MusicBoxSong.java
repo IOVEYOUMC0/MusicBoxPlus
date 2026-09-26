@@ -74,7 +74,11 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         } catch (IOException e) {
             throw new SongNullException("Song can't be loaded: " + e.getMessage());
         }
-        this.name = StringUtils.t(StringUtils.getOrEmpty(song.title(), () -> FileUtils.getFilename(this.file.getName())));
+        // The name comes from the file name whenever the header cannot be carrying it: the legacy
+        // info is one byte per character, so a Chinese song name never fits in it. See
+        // StringUtils.songNameFromHeader.
+        this.name = StringUtils.t(StringUtils.songNameFromHeader(song.title(),
+                FileUtils.getFilename(this.file.getName())));
         this.length = Math.max(1, song.lengthTicks());
         this.speed = song.ticksPerSecond();
         this.duration = this.speed == 0.0f ? 0 : (int)Math.floor((float)this.length / this.speed);

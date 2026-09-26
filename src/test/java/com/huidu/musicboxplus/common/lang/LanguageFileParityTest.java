@@ -93,4 +93,45 @@ class LanguageFileParityTest {
         assertEquals(List.of(), wrongShape,
             "这些键在两个文件里的值类型不一致（标量 vs 列表）");
     }
+
+    // The two tests above only compare the files against each other, so a Lang constant naming a
+    // key that exists in NEITHER file passed cleanly -- LanguageConfig then renders it to the
+    // player as "<red>Missing: key</red>". Four constants had drifted that way, each shadowed by a
+    // near-identically named live one (VOLUME_INCREASE vs VOLUME_INCREASED), so the name that
+    // compiled was not the name that worked.
+    @Test
+    void everyLangConstantResolvesToAKey() throws Exception {
+        Map<String, Object> en = load("language_en.yml");
+
+        List<String> unresolved = new ArrayList<>();
+        for (Lang lang : Lang.values()) {
+            if (!en.containsKey(lang.key())) {
+                unresolved.add(lang.name() + " -> " + lang.key());
+            }
+        }
+
+        assertEquals(List.of(), unresolved,
+            "这些 Lang 常量在 language_en.yml 里没有对应键，会向玩家渲染 Missing 占位");
+    }
+
+    // The other direction, and now an exact match. 47 keys used to sit here unreadable -- a whole
+    // retired `tag_*` set left behind when the command was rewritten onto differently-named keys
+    // (tag_alias_added vs the live tag_added_alias), so translators kept translating strings no
+    // player could ever see. Lang is the only reader of these files (Lang#toString is the single
+    // caller of LanguageConfig#get, always with its own key), so an unclaimed key is dead by
+    // definition and there is no legitimate reason to allow any.
+    @Test
+    void everyLanguageKeyIsClaimedByALangConstant() throws Exception {
+        Map<String, Object> en = load("language_en.yml");
+
+        java.util.Set<String> claimed = new java.util.HashSet<>();
+        for (Lang lang : Lang.values()) {
+            claimed.add(lang.key());
+        }
+        List<String> unclaimed = new ArrayList<>(new TreeSet<>(en.keySet()));
+        unclaimed.removeAll(claimed);
+
+        assertEquals(List.of(), unclaimed,
+            "这些键没有任何 Lang 常量引用，玩家永远看不到；删掉它们，或补上对应常量");
+    }
 }

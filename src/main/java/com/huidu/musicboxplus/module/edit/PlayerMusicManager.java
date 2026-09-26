@@ -654,7 +654,7 @@ public class PlayerMusicManager {
         return best > 0 ? best : MusicBox.getInstance().getConfigObject().getEditor().getDefaultLimit();
     }
 
-    public boolean canCreateMore(Player player) {
+    public boolean isMusicLimitReached(Player player) {
         int limit = getMusicLimit(player);
         if (limit == -1) {
             return false;

@@ -33,7 +33,7 @@ public interface MusicBoxSongPlayer {
     MusicBoxSongPlayerModel getMusicBoxModel();
 
     // Tick the player is currently on, or -1 before the first tick.
-    short getTick();
+    int getTick();
 
     // Jumps to a tick. Used to seek from the GUI and to restore a position after a reload.
     void setTick(int tick);

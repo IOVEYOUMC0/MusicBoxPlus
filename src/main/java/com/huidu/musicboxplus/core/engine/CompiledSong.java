@@ -1,12 +1,12 @@
 package com.huidu.musicboxplus.core.engine;
 
+import com.huidu.musicboxplus.core.nbs.NbsReader;
 import com.huidu.musicboxplus.core.nbs.RawNbsLayer;
 import com.huidu.musicboxplus.core.nbs.RawNbsNote;
 import com.huidu.musicboxplus.core.nbs.RawNbsSong;
 import com.huidu.musicboxplus.core.sound.SongInstruments;
 import com.huidu.musicboxplus.core.sound.StereoPan;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -98,8 +98,12 @@ public final class CompiledSong {
                 maxTick = note.tick();
             }
         }
-        // Playback runs the closed range [0, lengthTicks], so the arrangement needs one slot
-        // past the last tick.
+        // Check before adding one: Integer.MAX_VALUE would overflow and bypass the limit.
+        if (maxTick > NbsReader.MAX_TICKS) {
+            throw new IllegalArgumentException(
+                    "Song spans too many ticks to compile: " + maxTick + " (max " + NbsReader.MAX_TICKS + ")");
+        }
+        // Playback includes the last tick, so the arrangement needs one slot past it.
         int tickCount = Math.max(0, maxTick) + 1;
 
         int[] layerVolumeByIndex = new int[raw.layers().size()];
@@ -160,7 +164,10 @@ public final class CompiledSong {
 
         return new CompiledSong(tickStart, instrument, key, velocity, panning, finePitch,
                 layerVolume, layerPanning, SongInstruments.of(raw, soundOverrides), raw.title(),
-                raw.author(), Math.max(0, raw.lengthTicks()), raw.ticksPerSecond(), stereo);
+                // maxTick, not the header's lengthTicks: the scan above deliberately keeps notes
+                // that sit past the declared length, and PlaybackCursor stops at this value --
+                // passing the header value back would silently drop every note it just saved.
+                raw.author(), Math.max(0, maxTick), raw.ticksPerSecond(), stereo);
     }
 
     // Number of addressable ticks; valid ticks are 0..tickCount()-1.
@@ -237,9 +244,8 @@ public final class CompiledSong {
         return stereo;
     }
 
-    // instrument/key/panning/layerVolume/layerPanning 都是 byte（5 个），finePitch 是 i16 保留 short。
-    // 每音符：5 * byte + 1 * short = 7 字节。
-    private static final int BYTES_PER_NOTE = 5 * Byte.BYTES + Short.BYTES;
+    // Six byte arrays (including velocity) and one short array per note.
+    private static final int BYTES_PER_NOTE = 6 * Byte.BYTES + Short.BYTES;
 
     // Approximate retained size in bytes, for capacity planning. Counts the primitive arrays,
     // which dominate; object headers and the instrument name table are small and constant.

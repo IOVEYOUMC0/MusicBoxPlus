@@ -29,6 +29,35 @@ class CompiledSongTest {
         }
     }
 
+    @Test
+    void rejectsOversizedHeaderAndNoteTicksBeforeArraySizing() {
+        for (int tick : new int[] { NbsReader.MAX_TICKS + 1, Integer.MAX_VALUE }) {
+            for (boolean inHeader : new boolean[] { true, false }) {
+                RawNbsSong raw = new RawNbsSong(5, 16, inHeader ? tick : 0, 0,
+                        "", "", "", "", 1000, 4, false, 0, 0,
+                        inHeader ? List.of() : List.of(new RawNbsNote(tick, 0, 0, 45, 100, 100, 0)),
+                        List.of(), List.of());
+                assertThrows(IllegalArgumentException.class, () -> CompiledSong.compile(raw),
+                        "tick=" + tick + ", inHeader=" + inHeader);
+            }
+        }
+    }
+
+    @Test
+    void playsNotesBeyondTheHeaderAtTheTickLimit() {
+        RawNbsSong raw = new RawNbsSong(5, 16, 0, 0, "", "", "", "", 1000, 4, false, 0, 0,
+                List.of(new RawNbsNote(NbsReader.MAX_TICKS, 0, 0, 45, 100, 100, 0)),
+                List.of(), List.of());
+        CompiledSong song = CompiledSong.compile(raw);
+        PlaybackCursor cursor = new PlaybackCursor(song);
+        cursor.seek(NbsReader.MAX_TICKS);
+        cursor.setPlaying(true);
+        assertEquals(1, cursor.advance(cursor.tickPeriodNanos()));
+        assertEquals(NbsReader.MAX_TICKS, cursor.firstEmittedTick());
+        assertEquals(1, song.noteEnd(cursor.tick()) - song.noteStart(cursor.tick()));
+        assertTrue(cursor.finished());
+    }
+
     // Notes are grouped by tick while preserving their order within a tick, and every field
     // survives the move.
     private static void checkRoundTrip(List<String> failures, String name, RawNbsSong raw) {

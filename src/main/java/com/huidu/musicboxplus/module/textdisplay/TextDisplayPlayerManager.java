@@ -230,7 +230,7 @@ public final class TextDisplayPlayerManager {
         int range = player.getRange();
         float speedMultiplier = player.getMusicBoxModel().getPlaybackSpeedMultiplier();
         TextDisplayPlayer.DisplayOptions displayOptions = player.getDisplayOptions().copy();
-        short tick = player.getTick();
+        int tick = player.getTick();
         boolean playing = player.isPlaying();
         player.destroy();
         TextDisplayPlayer updated = new TextDisplayPlayer(player.getName(), list, newLocation, range, speedMultiplier, displayOptions);

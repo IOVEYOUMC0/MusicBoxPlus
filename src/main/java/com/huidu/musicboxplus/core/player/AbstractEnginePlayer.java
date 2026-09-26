@@ -48,6 +48,13 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         CLOCK.shutdown();
     }
 
+    // Re-arms clock() after a disable->enable on the same classloader. Without this the flag stays
+    // set from the previous onDisable and the plugin starts up silent: every player registers with
+    // a clock that will never be started again.
+    public static void resetClock() {
+        clockShutDown = false;
+    }
+
     public static int activePlayerCount() {
         return CLOCK.targetCount();
     }
@@ -187,8 +194,8 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
     }
 
     @Override
-    public short getTick() {
-        return (short) cursor.tick();
+    public int getTick() {
+        return cursor.tick();
     }
 
     @Override

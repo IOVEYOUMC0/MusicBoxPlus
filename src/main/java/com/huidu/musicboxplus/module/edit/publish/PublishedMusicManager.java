@@ -94,7 +94,13 @@ public class PublishedMusicManager {
         }
     }
 
-    private void savePendingRevenue() {
+    // synchronized because purchases run async while claims run on the server thread, and both
+    // call this; write-then-rename because config.save() truncates in place. Interleaved, the two
+    // produced a half-written file that loadPendingRevenue() swallows as a WARNING and starts from
+    // an empty map -- silently zeroing money authors are owed. savePublishedMusicSync in this same
+    // class already synchronizes, so this was an omission rather than a trade-off.
+    private synchronized void savePendingRevenue() {
+        File tmp = new File(revenueFile.getParentFile(), revenueFile.getName() + ".tmp");
         try {
             YamlConfiguration config = new YamlConfiguration();
             for (Map.Entry<UUID, Double> entry : pendingRevenue.entrySet()) {
@@ -102,9 +108,18 @@ public class PublishedMusicManager {
                     config.set(entry.getKey().toString(), entry.getValue());
                 }
             }
-            config.save(revenueFile);
+            config.save(tmp);
+            try {
+                Files.move(tmp.toPath(), revenueFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                Files.move(tmp.toPath(), revenueFile.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
         } catch (IOException e) {
             MusicBox.getInstance().getLogger().log(Level.WARNING, "保存待领取收入数据失败", e);
+            tmp.delete();
         }
     }
 

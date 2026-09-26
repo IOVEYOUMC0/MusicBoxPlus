@@ -38,8 +38,33 @@ implements Listener {
     private static final GUIInputManager instance = new GUIInputManager();
     private final Map<UUID, InputRequest> pendingInputs = new ConcurrentHashMap<UUID, InputRequest>();
 
+    // Not registered from the constructor. Bukkit unregisters a plugin's listeners when it is
+    // disabled, but this singleton's static initialiser does not run again on a same-classloader
+    // re-enable, so a constructor registration left the chat listener unregistered for good after a
+    // PlugMan disable+enable: every GUI text input (search, playlist create/rename, editor file
+    // names) silently stopped working, with no error and a healthy-looking plugin.
+    private volatile boolean registered = false;
+    private final InputListener chatListener = new InputListener();
+
     private GUIInputManager() {
-        Bukkit.getPluginManager().registerEvents(this, MusicBox.getInstance());
+    }
+
+    // Idempotent, and called from MusicBox#onEnable rather than from the initialiser so a re-enable
+    // reaches it.
+    public void register() {
+        if (registered) {
+            return;
+        }
+        registered = true;
+        Bukkit.getPluginManager().registerEvents(chatListener, MusicBox.getInstance());
+    }
+
+    // Drops the registration flag and every pending prompt. The requests hold callbacks that
+    // capture players, GUIs and wrappers; leaving them in a static map across a disable pins all of
+    // that, and a prompt can never be answered once the listener is gone anyway.
+    public void unregister() {
+        registered = false;
+        this.pendingInputs.clear();
     }
 
     public static GUIInputManager getInstance() {
@@ -101,25 +126,48 @@ implements Listener {
         this.pendingInputs.remove(playerId);
     }
 
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onPlayerChat(AsyncChatEvent event) {
-        this.handlePlayerChat(
-                event.getPlayer(),
-                PlainTextComponentSerializer.plainText().serialize(event.message()).trim(),
-                event::setCancelled
-        );
-    }
+    // The event handlers live in their own object so that the singleton's *state* and its
+    // *registration* have separate lifetimes: the singleton outlives a disable, the registration
+    // does not.
+    private final class InputListener implements Listener {
 
-    // Legacy chat event is deprecated, kept alongside AsyncChatEvent so servers with plugins
-    // that still fire the legacy event keep working; suppression is local to the handler.
-    @SuppressWarnings("deprecation")
-    @EventHandler(priority = EventPriority.LOWEST)
-    public void onLegacyPlayerChat(AsyncPlayerChatEvent event) {
-        this.handlePlayerChat(
-                event.getPlayer(),
-                event.getMessage().trim(),
-                event::setCancelled
-        );
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onPlayerChat(AsyncChatEvent event) {
+            // Asked before the message is serialised. handlePlayerChat rejects the ~100% of chat
+            // messages that have no pending request, and taking the message as an argument meant
+            // walking and serialising the whole Component tree on the async chat thread -- for every
+            // message of every player on the server -- only to discard the result.
+            if (!hasPendingInput(event.getPlayer())) {
+                return;
+            }
+            handlePlayerChat(
+                    event.getPlayer(),
+                    PlainTextComponentSerializer.plainText().serialize(event.message()).trim(),
+                    event::setCancelled
+            );
+        }
+
+        // Legacy chat event is deprecated, kept alongside AsyncChatEvent so servers with plugins
+        // that still fire the legacy event keep working; suppression is local to the handler. Its
+        // message is already a String, so no guard is needed before reading it.
+        @SuppressWarnings("deprecation")
+        @EventHandler(priority = EventPriority.LOWEST)
+        public void onLegacyPlayerChat(AsyncPlayerChatEvent event) {
+            if (!hasPendingInput(event.getPlayer())) {
+                return;
+            }
+            handlePlayerChat(
+                    event.getPlayer(),
+                    event.getMessage().trim(),
+                    event::setCancelled
+            );
+        }
+
+        @EventHandler
+        public void onPlayerQuit(PlayerQuitEvent event) {
+            UUID playerId = event.getPlayer().getUniqueId();
+            pendingInputs.remove(playerId);
+        }
     }
 
     private void handlePlayerChat(Player player, String message, Consumer<Boolean> cancelAction) {
@@ -150,12 +198,6 @@ implements Listener {
             player.sendMessage(Lang.GUI_INPUT_ERROR.toComponent("{error}", e.getMessage()));
             logger.error("Error processing input for player {}: {}", player.getName(), e.getMessage(), e);
         }
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        UUID playerId = event.getPlayer().getUniqueId();
-        this.pendingInputs.remove(playerId);
     }
 
     public boolean hasPendingInput(Player player) {

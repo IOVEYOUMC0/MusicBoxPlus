@@ -128,6 +128,10 @@ public final class ReloadPlaybackState {
 
     // Destroys all active block players and clears player wrappers ahead of a reload.
     public void stopPlayers() {
+        // The sampler's period is derived from the config value a reload may have just changed, and
+        // it is only read when the sampler is armed. Stopping it here lets the first rebuilt
+        // RangePlayerModel re-arm it with the new value.
+        com.huidu.musicboxplus.core.player.PlayerPositionSnapshot.stop();
         for (AbstractBlockPlayer player : new ArrayList<>(AbstractBlockPlayer.getAll())) {
             // Text players are tracked by name in TextDisplayPlayerManager, so they need no
             // block re-read to be rebuilt, and BlockPlaybackSnapshot cannot hold their
@@ -287,7 +291,7 @@ public final class ReloadPlaybackState {
                            List<BlockPlaybackSnapshot> blockSnapshots) {
     }
 
-    private record PlayerPlaybackSnapshot(UUID playerId, PlayerPlaylistSnapshot playlist, short tick, boolean paused,
+    private record PlayerPlaybackSnapshot(UUID playerId, PlayerPlaylistSnapshot playlist, int tick, boolean paused,
                                           boolean speaker, boolean silent, LoopMode loopMode, float speed) {
     }
 
@@ -297,7 +301,7 @@ public final class ReloadPlaybackState {
     // ownerUuid rides along because SignPlayer.isOwnerOrAdmin treats a null owner as "everyone
     // owns this". Recreating a captured sign through createSign (owner null) therefore handed the
     // destroy button, the protect toggle and song switching to every player on the server.
-    private record BlockPlaybackSnapshot(BlockPlaybackType type, Location location, int songHash, short tick,
+    private record BlockPlaybackSnapshot(BlockPlaybackType type, Location location, int songHash, int tick,
                                          java.util.UUID ownerUuid) {
     }
 

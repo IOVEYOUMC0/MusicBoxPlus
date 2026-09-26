@@ -258,7 +258,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
         if (musicPlayer instanceof AbstractBlockPlayer) {
             AbstractBlockPlayer blockPlayer = (AbstractBlockPlayer) musicPlayer;
             blockPlayer.setStoredPlaybackSpeedMultiplier(blockPlayer.getMusicBoxModel().getPlaybackSpeedMultiplier() + delta);
-            short currentTick = blockPlayer.getTick();
+            int currentTick = blockPlayer.getTick();
             boolean wasPlaying = blockPlayer.isPlaying();
             Location location = blockPlayer.getLocation();
             if (location == null) {
@@ -357,7 +357,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
                 this.refresh();
                 return;
             }
-            short currentTick = player.getTick();
+            int currentTick = player.getTick();
             if (currentTick != this.lastTick) {
                 this.lastTick = currentTick;
                 this.updateProgressBar();
@@ -432,7 +432,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
             PlayerSongPlayer psp = (PlayerSongPlayer) musicPlayer;
             PlayerWrapper wrapper = GUIActions.playerWrapperOf(psp);
             this.spModel.getPlayList().setSong(song);
-            wrapper.play(this.spModel.getPlayList(), (short)0);
+            wrapper.play(this.spModel.getPlayList(), 0);
             this.refresh();
         } else if (musicPlayer instanceof SignPlayer) {
             this.spModel.getPlayList().setSong(song);

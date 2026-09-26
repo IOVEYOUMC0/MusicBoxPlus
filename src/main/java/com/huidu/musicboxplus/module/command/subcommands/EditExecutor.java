@@ -157,7 +157,7 @@ public class EditExecutor implements SubCommand {
             return;
         }
 
-        if (musicManager.canCreateMore(player)) {
+        if (musicManager.isMusicLimitReached(player)) {
             int limit = musicManager.getMusicLimit(player);
             int current = musicManager.getMusicCount(player.getUniqueId());
             MessageUtils.send(player, Lang.EDIT_CREATE_LIMIT, "{limit}", String.valueOf(limit));
@@ -303,7 +303,7 @@ public class EditExecutor implements SubCommand {
             return;
         }
 
-        if (musicManager.canCreateMore(player)) {
+        if (musicManager.isMusicLimitReached(player)) {
             int limit = musicManager.getMusicLimit(player);
             int current = musicManager.getMusicCount(player.getUniqueId());
             MessageUtils.send(player, Lang.EDIT_CREATE_LIMIT, "{limit}", String.valueOf(limit));

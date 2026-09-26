@@ -25,6 +25,14 @@ public final class NbsReader {
     // same limits, while songs placed directly in the library otherwise bypassed them entirely.
     public static final int MAX_FILE_BYTES = 5 * 1024 * 1024;
     public static final int MAX_NOTES = 100_000;
+    // Neither limit above constrains the tick counter: an empty tick group (a non-zero tickJump
+    // followed immediately by the layerJump-0 terminator) costs 4 bytes, adds no note, and can
+    // advance the song by 65535 ticks. 30 KB of those puts one note past tick 5e8, and
+    // CompiledSong sizes its arrangement arrays by the largest tick -- multi-GB int[] from a file
+    // that passes every other check. The format's own header length field is a u16, so anything
+    // beyond this is malformed by construction; the ceiling is left far above that for songs
+    // whose header lies about their length.
+    public static final int MAX_TICKS = 1 << 20;
 
     private NbsReader() {
     }
@@ -54,15 +62,46 @@ public final class NbsReader {
         return h.toSong(lengthTicks, List.copyOf(notes), List.copyOf(layers), List.copyOf(instruments));
     }
 
+    // How much of the file the metadata-only path will read before giving up and reading all of it.
+    // A header is a few hundred bytes in practice; the note section that follows is what makes a
+    // song file large (the biggest in the reference corpus is under 400 KB).
+    private static final int METADATA_PREFIX_BYTES = 64 * 1024;
+
     // Metadata-only read for songs that only need the header (title, length, tempo, author).
     // The full note graph is skipped, so catalog/reload paths over a large library no longer
     // parse every note just to display a title and a duration.
     //
-    // v3+ carries lengthTicks in the header, so parsing can stop before the note section.
-    // v1/v2 must still walk the note section to derive the length from the last note's tick.
+    // v3+ carries lengthTicks in the header, so parsing can stop before the note section. v1/v2
+    // must still walk the note section to derive the length from the last note's tick.
+    //
+    // Reads a bounded prefix rather than the whole file: on a library of a few thousand songs the
+    // difference is the difference between reading ~15 MB and reading ~1.5 GB per startup, and the
+    // note section being skipped is exactly the part that was read and thrown away. v1/v2 (no
+    // header length -- they need the note walk), an over-long header, and a truncated file all fall
+    // back to the full read, so nothing that used to parse stops parsing.
     public static RawNbsSong readMetadata(Path file) throws IOException {
         checkFileSize(file);
-        return readMetadata(Files.readAllBytes(file));
+        long size = Files.size(file);
+        if (size <= METADATA_PREFIX_BYTES) {
+            return readMetadata(Files.readAllBytes(file));
+        }
+        byte[] prefix = readPrefix(file);
+        try {
+            RawNbsSong metadata = readMetadata(prefix);
+            if (needsNoteWalk(metadata.version())) {
+                return readMetadata(Files.readAllBytes(file));
+            }
+            return metadata;
+        } catch (IOException e) {
+            // Header longer than the prefix, or the prefix cut through something the parse needed.
+            return readMetadata(Files.readAllBytes(file));
+        }
+    }
+
+    private static byte[] readPrefix(Path file) throws IOException {
+        try (InputStream in = Files.newInputStream(file)) {
+            return in.readNBytes(METADATA_PREFIX_BYTES);
+        }
     }
 
     public static RawNbsSong readMetadata(byte[] data) throws IOException {
@@ -172,6 +211,9 @@ public final class NbsReader {
                 break;
             }
             tick += tickJump;
+            if (tick > MAX_TICKS) {
+                throw new IOException("NBS file spans too many ticks (max " + MAX_TICKS + ")");
+            }
             int layer = -1;
             while (true) {
                 int layerJump = c.u16("layerJump");

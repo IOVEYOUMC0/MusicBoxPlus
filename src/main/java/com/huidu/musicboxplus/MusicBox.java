@@ -65,7 +65,14 @@ public final class MusicBox extends JavaPlugin {
     private volatile boolean reloading = false;
     private final ConcurrentHashMap<String, SmartConfigManager> configManagers = new ConcurrentHashMap<>();
 
-    private MusicBoxConfig configObject;
+    // Volatile, like `loaded` and `shuttingDown` below it. Every writer assigns a fully built
+    // config, but readers are not all on the main thread: the web API reads it on the
+    // MusicBox-Web-* worker threads and the GUI render path reads it per slot. Without the
+    // happens-before edge a reader can see the new reference with default (null) sub-objects --
+    // ModuleFlags then silently falls back to the defaults and the volume/editor accessors NPE --
+    // or keep serving the pre-reload config. Cheap on x86, a real partial-publication hazard on
+    // the aarch64 hosts Paper commonly runs on.
+    private volatile MusicBoxConfig configObject;
     private volatile boolean loaded = false;
     private volatile boolean shuttingDown = false;
     private Metrics bStats;
@@ -94,6 +101,13 @@ public final class MusicBox extends JavaPlugin {
     @Override
     public void onEnable() {
         instance = this;
+        // Three latches are set during onDisable and, being static/instance state that survives a
+        // disable->enable on the same instance (PlugMan, /reload), never cleared. Left set, the
+        // plugin comes back up looking healthy -- listeners registered, no errors -- while the
+        // playback clock refuses to start and every async task is silently dropped.
+        shuttingDown = false;
+        com.huidu.musicboxplus.core.player.AbstractEnginePlayer.resetClock();
+        AsyncTaskManager.reset();
         migrateLegacyDataFolder();
 
         // Touch classes that onDisable references so the Paper plugin classloader is
@@ -113,6 +127,9 @@ public final class MusicBox extends JavaPlugin {
         ConfigManager.getInstance(this);
         LanguageConfig.getInstance(this);
         GUIInputManager.getInstance();
+        // Explicitly, not from the singleton's initialiser: a same-classloader re-enable does not
+        // re-run static initialisers, and Bukkit dropped the registration at disable.
+        GUIInputManager.getInstance().register();
         new GUIConfigManager(this);
         GUIActions.init();
 
@@ -398,9 +415,10 @@ public final class MusicBox extends JavaPlugin {
                             return;
                         }
                         try {
-                            if (usesPublishedMusicLibrary()) {
-                                PublishedMusicManager.getInstance().loadAllPublishedMusic();
-                            }
+                            // The published catalog was already refreshed by
+                            // moduleRuntimeSync.syncAll() above (ModuleRuntimeSync refreshes an
+                            // existing manager and only constructs -- and loads -- when there is
+                            // none), so loading it again here parsed every listing twice.
                             CompletableFuture<Void> playerMusicReload = usesPlayerMusicLibrary()
                                     ? PlayerMusicManager.getInstance().reloadAsync()
                                     : CompletableFuture.completedFuture(null);
@@ -433,10 +451,17 @@ public final class MusicBox extends JavaPlugin {
                 initBStats();
                 initWebServer();
                 loaded = true;
+                reloadPlaybackState.restore(playbackSnapshot);
+                // Both paths are needed and no longer fight each other. restore() rebuilds the
+                // signs that had a live player at capture time; this one covers the rest -- a
+                // protected sign whose chunk was unloaded at startup, or every sign at once after
+                // the module is toggled back on. It used to race restore() and could replace a
+                // correctly-owned sign with an unowned one; now the owner comes off the block
+                // itself, so whichever lands second rebuilds with the same owner, and
+                // createSignWithOwner no-ops where restore() already put a live player.
                 if (isSignsModuleEnabled()) {
                     SignPlayer.restorePreventedPlayers();
                 }
-                reloadPlaybackState.restore(playbackSnapshot);
                 DebugLogger.debugPerformance("plugin reload", startTime);
                 getLogger().info(logText(
                         "Plugin reload finished in " + (System.currentTimeMillis() - startTime) + "ms",
@@ -727,10 +752,15 @@ public final class MusicBox extends JavaPlugin {
             case "config":
                 reloadMainConfig();
                 reloadLanguageConfig();
+                // Caches that hold config-derived values have to be dropped here, not just on a full
+                // reload. VolumeManager, for one, snapshots volume.default/step/min/max into a
+                // Settings object that is only rebuilt by its CacheCleaner, so editing those keys and
+                // running /musicboxplus reload config changed nothing at all until a restart -- with
+                // no error and no log line to explain it.
+                com.huidu.musicboxplus.common.utils.cache.CacheUtils.clearAllCaches();
+                // Also refreshes the published catalog: ModuleRuntimeSync refreshes an existing
+                // manager, so the explicit load that used to follow this parsed everything twice.
                 moduleRuntimeSync.syncAll();
-                if (usesPublishedMusicLibrary()) {
-                    PublishedMusicManager.getInstance().loadAllPublishedMusic();
-                }
                 LanguageConfig.getInstance().reload();
                 ConfigManager.getInstance().reload();
                 initBStats();
@@ -739,12 +769,14 @@ public final class MusicBox extends JavaPlugin {
             case "lang":
                 reloadLanguageConfig();
                 LanguageConfig.getInstance().reload();
+                com.huidu.musicboxplus.common.utils.cache.CacheUtils.clearAllCaches();
                 break;
             case Paths.SONGS_DIR:
                 return reloadSongs().thenRun(() -> logPartialReloadComplete(type, startTime));
             case "gui":
                 reloadGUI();
                 ConfigManager.getInstance().reload();
+                com.huidu.musicboxplus.common.utils.cache.CacheUtils.clearAllCaches();
                 break;
             case "database":
                 CompletableFuture<Void> databaseReload;
@@ -801,6 +833,20 @@ public final class MusicBox extends JavaPlugin {
     public void onDisable() {
         shuttingDown = true;
         getLogger().info(logText("Disabling MusicBox", "正在禁用 MusicBox"));
+        // Both flags, not just shuttingDown. A disable that lands while a reload is in flight
+        // (or before startup completes) otherwise leaves `reloading` true for the rest of the
+        // process: the next enable's startupAsync() returns a failed future immediately and every
+        // later reload answers "Already reloading", so the plugin comes up with no songs, no GUI
+        // and no database until the server is restarted. `loaded` is cleared for the same reason
+        // the other latch comments give -- it is state that survives a same-instance re-enable.
+        reloading = false;
+        loaded = false;
+        reloadLock.lock();
+        try {
+            reloadCondition.signalAll();
+        } finally {
+            reloadLock.unlock();
+        }
         shutdownSteps.runAll();
         // Outside the shutdown chain because it touches another plugin's registry, not our own
         // resources; unregistering prevents a dangling expansion from resolving against a disabled
@@ -814,6 +860,25 @@ public final class MusicBox extends JavaPlugin {
             papiExpansion = null;
         }
         getLogger().info(logText("MusicBox disabled", "MusicBox 已禁用"));
+    }
+
+    // bStats' Metrics owns a NON-daemon thread ("bStats-Metrics") that only stops when its task
+    // next fires and sees the plugin disabled -- up to six minutes later. Until then it pins this
+    // classloader and every static cache it held, and because the thread is not a daemon it can
+    // also hold the JVM open for minutes after a server stop. Not shutting it down leaked one such
+    // thread per enable.
+    public void shutdownBStats() {
+        Metrics metrics = this.bStats;
+        this.bStats = null;
+        if (metrics != null) {
+            metrics.shutdown();
+        }
+    }
+
+    // Called from the shutdown chain. See ModuleRuntimeSync.reset() for why a disable has to null
+    // the module listener handles rather than just letting Bukkit unregister them.
+    public void resetModuleRuntimeSync() {
+        moduleRuntimeSync.reset();
     }
 
     // Force-links every class onDisable touches by listing it in an array literal: the reference
