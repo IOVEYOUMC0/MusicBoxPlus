@@ -120,3 +120,23 @@ run/
 /libs
 
 lombok.config
+
+.upstream_noteblockapi/
+
+# Local temp / editor folders
+.tmp_blackboxpro/
+.tmp_lang_check/
+.vscode/
+
+# Local reference projects / decompiled research dirs
+JW_Piano/
+NoteBlockAPI/
+boombox/
+musicedit/
+Reference/
+
+# Local tool / editor config not part of the plugin
+.claude/
+
+# Build/test output outside the default build/ dir
+**/target/

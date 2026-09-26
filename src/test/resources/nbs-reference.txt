@@ -1,0 +1,32 @@
+# 扩展语料的交叉校验基准，由照 openNBS 公开规范独立实现的读取器生成
+# （scratchpad/genref2.py + nbsread.py，与 Java 侧无共享代码）。
+# 语料在仓库之外，Java 侧找不到目录时跳过，不算失败。
+# 格式: relpath|version|vanillaCount|lengthTicks|songHeight|noteCount|customInstrCount
+#      |notesSha16|stringsSha16|layersSha16|tempoRaw|layerCount
+# 字符串与层也进指纹：此前只比标量与音符，字符编码和层字段的分歧全在盲区里。
+# 字符串按码位序列入哈希，与两侧各自用什么编码写盘无关。
+# 解析失败的行: relpath|ERROR|异常类型
+Africa.nbs|0|10|3166|38|6332|0|69545e8dd48b305a|8481755debfadbaf|b21ba4f52f3084e0|1250|38
+Bad_Piggies_Theme.nbs|5|16|1727|35|7256|0|a968266b794227fe|358cbd9754f21658|13101c900ffe8153|1040|35
+Billie_Jean.nbs|0|10|2239|32|4821|0|aca45e5c735f3002|a6cf6d971e0bdfd8|412397a17ac6e271|775|32
+Call_Me_Maybe.nbs|0|10|800|10|1105|0|e35ec3ceb971b882|56e359674126a633|024c9c564b6c1650|800|10
+Dance_Monkey.nbs|4|16|448|23|593|0|adde2b33ad82d285|8481755debfadbaf|1c27a2a0588ff863|650|23
+Drop_Down.nbs|5|16|765|51|892|0|ec31c660de9c99bf|cfdecf485bedaffe|2b7fd7a9e6bcf6c0|1500|51
+FNAF.nbs|0|10|1088|32|2098|0|fea8193d01104ab0|8481755debfadbaf|46dc5eaa3308f885|800|32
+Faded.nbs|0|10|1478|22|1582|0|78b019c4c2c63b27|8481755debfadbaf|48a982a72725ea79|575|22
+Gravity_Falls_Theme.nbs|0|10|424|23|767|0|dafcc55c1a59fe9b|bfd634988d933c2f|9bd18d377bde0dfb|1075|23
+Interstellar.nbs|0|10|2460|35|4232|0|edcc062f270bc0ee|8481755debfadbaf|7ab13a298b336002|525|35
+Megalovania.nbs|5|16|2560|35|7978|0|46c0cb19084087da|b8bed731c783b194|f4e102fd94330c5f|1600|35
+Monster.nbs|5|16|2288|44|5428|1|fc99b01b810de61e|1121929864d5ca95|08d0175b444a2b8b|1133|44
+Moonlight.nbs|5|16|543|42|1132|0|80369f6851691c90|85ef4f4d24a0e43f|0b6d683d9123e399|1053|42
+Never_Gonna_Give_You_Up.nbs|5|16|3218|20|4438|0|bf68c769ee633227|0ed9cf8608c955b8|2e677d31e8f0580a|1506|20
+PPAP.nbs|0|10|351|23|341|0|09a43c797748f96f|88ea2932cbd4466c|fc3bd2b763a08673|1000|23
+Revenge.nbs|5|16|1792|14|3627|0|f94b3a258e8e2b26|c3dd9a7b934f61a0|4f742f64f2e046b6|800|14
+Rude.nbs|0|10|2142|23|5525|0|3dffb4a3111b9ffd|8481755debfadbaf|330f51f4177062d5|950|23
+Russian_Anthem.nbs|0|10|642|23|426|0|e6505c65304cfdae|8481755debfadbaf|a6b5554c78ba9788|500|23
+Soviet_Anthem.nbs|0|10|400|35|489|0|f073d50cc397641d|8481755debfadbaf|08b81d7664d8d289|525|35
+Sponge_Bob_Main_Theme.nbs|0|10|392|23|200|0|39c7269c614a029e|8481755debfadbaf|de5112e76826450f|925|23
+Steves_Lava_Chicken.nbs|5|16|290|64|734|0|67897c29a093a232|55a83aa43cfefb38|8bdfd017bd392ec7|1053|64
+SubterraneanHell.nbs|5|16|3423|34|23834|0|dc59fa9e4c5cef86|cfb6f30736361526|66cfcdf4ad7d3da2|1200|34
+Tokyo_Teddy_Bear.nbs|5|16|5375|129|80389|1|5f6bcef83c7bfae7|55abdce66b8d7bb5|d193b50a2c2d3923|2720|129
+What_is_Love.nbs|0|10|2304|10|3961|0|b4e273d4bacc0ec3|0072671d28838a0d|dba302dbc90a9857|1000|10

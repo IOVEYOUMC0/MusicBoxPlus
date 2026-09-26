@@ -1,10 +1,13 @@
 musicbox.use - Allow command /musicbox and /musicbox play
+musicbox.play.other - Allow playing songs for other players
 musicbox.speaker - Allow use speaker mode
 musicbox.shop - Allow use disc shop (/musicbox shop)|(/musicbox shop [Song name])
+musicbox.shopmusic - Allow use player music shop (/musicbox shopmusic)|(/musicbox shopmusic publish)
 musicbox.shop.other - Open shop to other players
-musicbox.get - Allow get any disc (/musicbox get)|(/musicbox get [Song name])
-musicbox.get - Allow get any disc (/musicbox get)|(/musicbox get [Song name])
+musicbox.give - Allow give any disc (/musicbox give)|(/musicbox give [Song name])
+musicbox.edit - Allow create and edit music (/musicbox edit create)|(/musicbox edit gui)|(/musicbox edit list)|(/musicbox edit delete)
 musicbox.admin - Reload plugin and protected music sign's
 musicbox.sign - Allow setup sign's
-
 musicbox.silent.other - Change other player silent mode
+musicbox.reload - Reload configuration
+musicbox.jukebox - Allow use jukeboxes

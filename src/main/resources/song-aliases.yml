@@ -1,0 +1,59 @@
+﻿# MusicBox song alias configuration
+#
+# Use this file to define aliases, tags and custom record properties per song.
+# Song names are matched against the NBS song title (case-insensitive).
+#
+# Custom record support:
+# - `jukebox-playable` uses a 1.21+ jukebox playable key.
+# - This only does anything when `customRecords.enabled: true` in config.yml.
+# - If the key does not contain a namespace, `customRecords.defaultNamespace`
+#   will be prefixed automatically.
+# - `item-model` can point at a 1.21.4+ item model key such as
+#   `musicboxplus:custom_disc_1`.
+# - `custom-model-data` and `custom-material` remain available as a fallback
+#   resource pack workflow.
+# - `craft-engine-item` can point at a CraftEngine custom item ID. When
+#   CraftEngine is installed and the ID exists, MusicBox uses that item as the
+#   visible disc base and then adds MusicBox playback metadata.
+
+songs:
+  example-song:
+    aliases:
+      - "example"
+      - "demo"
+    tags:
+      - "popular"
+      - "electronic"
+
+    # Full namespaced sound event key.
+    # With vanillaJukeboxPlayback disabled, this is metadata only.
+    # With vanillaJukeboxPlayback enabled, vanilla jukeboxes may use this OGG.
+    jukebox-playable: "musicboxplus:custom_disc_1"
+
+    # Optional item appearance overrides
+    # CraftEngine is optional; if unavailable or missing, MusicBox falls back below.
+    craft-engine-item: "default:music_disc_1"
+    item-model: "musicboxplus:custom_disc_1"
+    custom-model-data: 10001
+    custom-material: "MUSIC_DISC_CAT"
+
+  another-song:
+    aliases:
+      - "another"
+    tags:
+      - "classical"
+
+    # Namespace will be added automatically if omitted
+    jukebox-playable: "custom_disc_2"
+    craft-engine-item: ""
+    item-model: "musicboxplus:custom_disc_2"
+    custom-model-data: 10002
+    custom-material: "MUSIC_DISC_13"
+
+# Notes:
+# 1. Leave `jukebox-playable` empty to disable custom record behavior for a song.
+# 2. Aliases and tags are used by the song search system.
+# 3. `item-model` only applies on server versions exposing ItemMeta#setItemModel.
+# 4. `custom-model-data` requires a matching resource pack model override.
+# 5. `custom-material` must be a valid Bukkit Material name.
+# 6. `craft-engine-item` does not require MusicBox to depend on CraftEngine.
