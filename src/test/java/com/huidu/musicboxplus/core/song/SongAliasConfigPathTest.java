@@ -73,6 +73,15 @@ class SongAliasConfigPathTest {
         config.set("songs", List.of(dotted, plain));
 
         YamlConfiguration reloaded = saveAndReload(config, "list.yml");
+        // The branch condition SongAliasConfig.loadSongData dispatches on. The round trip below is not
+        // enough on its own: if a reloaded sequence did not report isList, the reader would fall
+        // through to the legacy section path, find no section (the value is a list) and silently load
+        // nothing -- aliases gone, no error.
+        assertTrue(reloaded.isList("songs"),
+                "a reloaded sequence must report isList(\"songs\"), or loadSongData takes the wrong branch");
+        assertFalse(reloaded.isConfigurationSection("songs"),
+                "a sequence must not also look like a section");
+
         List<Map<?, ?>> entries = reloaded.getMapList("songs");
         assertEquals(2, entries.size(), "both entries should round-trip, got " + entries);
         assertEquals(DOTTED, entries.get(0).get("name"),
