@@ -535,6 +535,16 @@ public class MusicEditGUI implements InventoryHolder {
                 setInventoryItemIfChanged(inventory, slot, item);
             }
         } else if (changedSlots != null) {
+            // Per-tick playback repaints only the columns the playhead moved between: at 20 Hz that is
+            // at most two columns (12 slots by default), each rebuilt from the note and the current
+            // highlight state.
+            //
+            // Reviewed for caching the rendered ItemStack per cell state and left alone: the empty
+            // and note cells carry their own pitch and tick in the name and lore, so a cache is one
+            // entry per cell (54 of them) times the highlight/selection states, invalidated on every
+            // config or alias reload -- and the absolute cost is small (12 items per server tick,
+            // tens of microseconds each), the same order that the review's own progress-bar finding
+            // was judged not worth the risk for.
             for (int slot : changedSlots) {
                 Integer index = editAreaSlotIndexes.get(slot);
                 if (index == null) continue;

@@ -141,6 +141,12 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
             }
             return;
         }
+        // Folia: one dispatch per listener, because each listener's region thread is the only place
+        // that may emit for them. Reviewed for the allocations it costs per listener per tick (the
+        // lambda below, the scheduler's task wrapper) and left as it is: batching listeners is what
+        // the non-Folia branch above does precisely because they all run on one thread, and Folia
+        // gives no such thread. Reusing one Runnable per listener would mean staging firstTick/count
+        // in shared fields, which two dispatches for the same listener can overlap in.
         for (UUID uuid : playerList.keySet()) {
             Player listener = resolveListener(uuid);
             if (listener == null) {
