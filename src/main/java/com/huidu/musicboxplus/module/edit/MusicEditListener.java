@@ -556,8 +556,7 @@ public class MusicEditListener implements Listener {
         }
 
         if (message.trim().isEmpty()) {
-            MusicEditGUI.restoreTextInputSession(player.getUniqueId(), data);
-            MessageUtils.send(player, Lang.EDIT_INPUT_EMPTY_RETRY);
+            retryTextInput(player, data, Lang.EDIT_INPUT_EMPTY_RETRY);
             return;
         }
 
@@ -571,12 +570,12 @@ public class MusicEditListener implements Listener {
         switch (data.type) {
             case "name":
                 if (input.length() > 32) {
-                    MessageUtils.send(player, Lang.OPERATION_FAILED);
+                    retryTextInput(player, data, Lang.EDIT_INPUT_INVALID_RETRY);
                     return;
                 }
                 String safeName = sanitizeInput(input, 32);
                 if (safeName.isEmpty()) {
-                    MessageUtils.send(player, Lang.OPERATION_FAILED);
+                    retryTextInput(player, data, Lang.EDIT_INPUT_INVALID_RETRY);
                     return;
                 }
                 data.music.setName(safeName);
@@ -613,7 +612,25 @@ public class MusicEditListener implements Listener {
 
             default:
                 MessageUtils.send(player, Lang.OPERATION_FAILED);
+                // Unreachable with the types this code sets, but a session that is consumed without
+                // either a submit or a cancel leaves the menu closed and openingSubGUI pinned.
+                if (data.cancelHandler != null) {
+                    data.cancelHandler.run();
+                }
         }
+    }
+
+    // Puts the prompt back instead of swallowing the input session.
+    //
+    // getTextInputSession already removed the session from the manager, so returning after a rejected
+    // value left the player with no prompt and no way to retry. It also pinned the editor's
+    // openingSubGUI flag true, because clearing it is the cancelHandler's job and that only ran on
+    // submit or cancel -- which made isForceClose() true for the rest of the editor session, so
+    // pressing ESC stopped restoring the player's real inventory. The empty-input branch already
+    // restored the session and asked for a retry; the rejected-value branches did not.
+    private void retryTextInput(Player player, MusicEditTextInputManager.TextInputData data, Lang message) {
+        MusicEditGUI.restoreTextInputSession(player.getUniqueId(), data);
+        MessageUtils.send(player, message);
     }
     
     private String sanitizeInput(String input, int maxLength) {

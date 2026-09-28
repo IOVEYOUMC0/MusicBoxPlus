@@ -60,6 +60,30 @@ public final class MiniMessageUtils {
         return input != null && input.contains("<") && input.contains(">");
     }
 
+    // Makes a string safe to place inside a MiniMessage template: `<` becomes `\<`, so the text can
+    // only ever render as itself.
+    //
+    // This is for values that come from somewhere the plugin does not control -- a song title read
+    // out of a .nbs header, a file name, a playlist name, chat input. Substituting one of those into
+    // a language template and then parsing the result let the data be markup: a song called
+    // `<click:run_command:/op me>` was a component, not a title.
+    //
+    // Deliberately narrow, and the narrowness matters. It escapes MiniMessage's own delimiters and
+    // nothing else, so legacy `&` and section codes in a value still work -- which is load-bearing,
+    // because the intentional-markup call sites all pass Lang.X.toString(), and that serialises to
+    // legacy codes rather than to MiniMessage. Widening this to strip `&` as well would turn every
+    // one of those into literal text.
+    //
+    // What it does not do is stop a value from *restyling* the message via `&`/`§` codes: those can
+    // only change colour and formatting, never introduce a component, so it is a cosmetic residual
+    // rather than an injection one.
+    public static String escapeTags(String input) {
+        if (input == null || input.isEmpty() || input.indexOf('<') < 0) {
+            return input;
+        }
+        return MINI_MESSAGE.escapeTags(input);
+    }
+
     public static String processText(String input) {
         if (input == null || input.isEmpty()) {
             return "";

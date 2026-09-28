@@ -4,7 +4,6 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.event.MusicBoxPlaybackStartEvent;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent.DestroyReason;
-import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
@@ -434,18 +433,12 @@ implements PositionPlayer {
             return;
         }
 
-        boolean inRange = this.rangePlayerModel.isPlayerInRange(player);
-        Boolean wasInRange = this.playerList.get(player.getUniqueId());
-        if (inRange) {
-            if (wasInRange == null || !wasInRange) {
-                this.playerList.put(player.getUniqueId(), true);
-                fireRangeStateChange(player, true);
-            }
-        } else if (wasInRange != null && wasInRange) {
-            this.playerList.put(player.getUniqueId(), false);
-            fireRangeStateChange(player, false);
-        }
-        if (!inRange) {
+        // Range membership, and the MusicBoxRangeStateChangeEvent that reports it, belong to the
+        // range scan: RangePlayerModel adds and removes listeners there and fires the event on the
+        // actual transition. playTick only runs for listeners the scan currently holds, so
+        // re-deriving the transition here could never see one -- see
+        // RangePlayerModel.fireRangeStateChange.
+        if (!this.rangePlayerModel.isPlayerInRange(player)) {
                 return;
         }
         CompiledSong compiled = this.compiledSong;
@@ -469,16 +462,6 @@ implements PositionPlayer {
         float stereoWidth = 0F;
         NoteEmitter.emitTick(player, targetLocation, compiled, tick, baseVolume,
             this.soundCategory, this.enable10Octave, stereoWidth);
-    }
-
-    // Range enter/leave is dispatched on the listener's own region thread; a throwing listener
-    // must not abort the tick loop, so the event is isolated like the other playTick callEvents.
-    private void fireRangeStateChange(Player player, boolean inRange) {
-        try {
-            Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(this, player, inRange));
-        } catch (Exception ex) {
-            logger.debug("Exception dispatching MusicBoxRangeStateChangeEvent: {}", ex.getMessage());
-        }
     }
 
     public void setStoredPlaybackSpeedMultiplier(float playbackSpeedMultiplier) {

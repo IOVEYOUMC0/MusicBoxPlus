@@ -1,7 +1,6 @@
 package com.huidu.musicboxplus.module.speaker;
 
 import com.huidu.musicboxplus.MusicBox;
-import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.api.player.PlayerSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
@@ -203,17 +202,10 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
             return;
         }
 
+        // Range membership, and the MusicBoxRangeStateChangeEvent that reports it, belong to the range
+        // scan; see RangePlayerModel.fireRangeStateChange. playTick only runs for listeners the scan
+        // currently holds, so deriving the transition here could never see one.
         boolean inRange = this.rangeModel.isPlayerInRange(player);
-        Boolean wasInRange = this.playerList.get(player.getUniqueId());
-        if (inRange) {
-            if (wasInRange == null || !wasInRange) {
-                this.playerList.put(player.getUniqueId(), true);
-                fireRangeStateChange(player, true);
-            }
-        } else if (wasInRange != null && wasInRange) {
-            this.playerList.put(player.getUniqueId(), false);
-            fireRangeStateChange(player, false);
-        }
         CompiledSong compiled = this.compiledSong;
         boolean hasNotes = compiled != null && compiled.noteStart(tick) < compiled.noteEnd(tick);
         if (inRange && hasNotes) {
@@ -249,17 +241,6 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
             if (!this.ownerVanishedSnapshot && hasNotes) {
                 this.spawnNote(player);
             }
-        }
-    }
-
-    // Range enter/leave is dispatched on the listener's own region thread; a throwing listener
-    // must not abort the tick loop, so the event is isolated like the other playTick callEvents.
-    private void fireRangeStateChange(Player player, boolean inRange) {
-        try {
-            Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(this, player, inRange));
-        } catch (Exception ex) {
-            java.util.logging.Logger.getLogger(SpeakerPlayer.class.getName())
-                    .log(java.util.logging.Level.FINEST, "Exception dispatching range state change", ex);
         }
     }
 

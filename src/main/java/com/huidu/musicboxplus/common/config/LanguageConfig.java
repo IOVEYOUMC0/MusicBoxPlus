@@ -3,6 +3,7 @@ package com.huidu.musicboxplus.common.config;
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.MusicBoxConfig;
 import com.huidu.musicboxplus.common.utils.LogLocale;
+import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
 import com.huidu.musicboxplus.common.utils.StorageAccess;
 import com.huidu.musicboxplus.common.utils.StringUtils;
 import org.bukkit.configuration.Configuration;
@@ -16,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LanguageConfig {
     private static final String DEFAULT_LANGUAGE_FILE = "language_en.yml";
@@ -318,17 +321,59 @@ public class LanguageConfig {
     }
 
     private String getResolvedRaw(String key, String... replacements) {
-        String message = getRaw(key);
-        if (replacements.length > 0 && replacements.length % 2 == 0) {
-            for (int i = 0; i < replacements.length; i += 2) {
-                String placeholder = replacements[i];
-                String value = replacements[i + 1];
-                if (placeholder != null && value != null) {
-                    message = message.replace(placeholder, value);
-                }
+        return substitute(getRaw(key), replacements);
+    }
+
+    // Placeholder substitution, as a pure function so it can be tested without a running plugin.
+    //
+    // One regex pass, with every value escaped -- rather than `message.replace(placeholder, value)`
+    // once per pair. Both halves are load-bearing:
+    //
+    //  * A value the plugin does not control (a song title from a .nbs header, a file name, a
+    //    playlist name, chat input) used to be substituted into the template and then the whole
+    //    result was parsed as MiniMessage, so the data *became* markup: a song called
+    //    `<click:run_command:/op me>` was a component, not a title. Escaping it means the worst a
+    //    value can do is render as itself.
+    //  * Sequential replace() rescanned the text it had already inserted, so a value that itself
+    //    contained a later placeholder -- a song literally named "{mode}" -- was substituted twice.
+    //    A Matcher never sees what it appends.
+    //
+    // Placeholders are matched longest-first: Java alternation takes the first branch that matches at
+    // a position rather than the longest one, so "{song}" would otherwise shadow "{song_name}".
+    static String substitute(String message, String... replacements) {
+        if (message == null || message.isEmpty() || replacements.length == 0
+                || replacements.length % 2 != 0) {
+            return message;
+        }
+        Map<String, String> values = new LinkedHashMap<>(replacements.length / 2);
+        for (int i = 0; i < replacements.length; i += 2) {
+            String placeholder = replacements[i];
+            String value = replacements[i + 1];
+            if (placeholder != null && !placeholder.isEmpty() && value != null) {
+                values.put(placeholder, MiniMessageUtils.escapeTags(value));
             }
         }
-        return message;
+        if (values.isEmpty()) {
+            return message;
+        }
+        List<String> ordered = new ArrayList<>(values.keySet());
+        ordered.sort(Comparator.comparingInt(String::length).reversed());
+
+        StringBuilder alternation = new StringBuilder();
+        for (String placeholder : ordered) {
+            if (alternation.length() > 0) {
+                alternation.append('|');
+            }
+            alternation.append(Pattern.quote(placeholder));
+        }
+        Matcher matcher = Pattern.compile(alternation.toString()).matcher(message);
+        StringBuilder resolved = new StringBuilder(message.length() + 16);
+        while (matcher.find()) {
+            matcher.appendReplacement(resolved,
+                    Matcher.quoteReplacement(values.get(matcher.group())));
+        }
+        matcher.appendTail(resolved);
+        return resolved.toString();
     }
 
     public void reload() {

@@ -29,7 +29,7 @@ public class StopExecutor implements SubCommand {
             }
             target = Bukkit.getPlayer(args[0]);
             if (target == null) {
-                MessageUtils.send(sender, Lang.PLAYER_NOT_FOUND.toString().replace("{player}", args[0]));
+                MessageUtils.send(sender, Lang.PLAYER_NOT_FOUND, "{player}", args[0]);
                 return;
             }
         } else if (sender instanceof Player) {
@@ -59,7 +59,7 @@ public class StopExecutor implements SubCommand {
             if (sender.equals(target)) {
                 MessageUtils.send(sender, Lang.MUSIC_STOPPED);
             } else {
-                MessageUtils.send(sender, Lang.MUSIC_STOPPED_OTHER.toString().replace("{player}", target.getName()));
+                MessageUtils.send(sender, Lang.MUSIC_STOPPED_OTHER, "{player}", target.getName());
                 MessageUtils.send(target, Lang.MUSIC_STOPPED_BY_OTHER);
             }
             return;
@@ -81,14 +81,14 @@ public class StopExecutor implements SubCommand {
             if (sender.equals(target)) {
                 MessageUtils.send(sender, Lang.MUSIC_STOPPED);
             } else {
-                MessageUtils.send(sender, Lang.MUSIC_STOPPED_OTHER.toString().replace("{player}", target.getName()));
+                MessageUtils.send(sender, Lang.MUSIC_STOPPED_OTHER, "{player}", target.getName());
                 MessageUtils.send(target, Lang.MUSIC_STOPPED_BY_OTHER);
             }
         } else {
             if (sender.equals(target)) {
                 MessageUtils.send(sender, Lang.NO_MUSIC_PLAYING);
             } else {
-                MessageUtils.send(sender, Lang.NO_MUSIC_PLAYING_OTHER.toString().replace("{player}", target.getName()));
+                MessageUtils.send(sender, Lang.NO_MUSIC_PLAYING_OTHER, "{player}", target.getName());
             }
         }
     }

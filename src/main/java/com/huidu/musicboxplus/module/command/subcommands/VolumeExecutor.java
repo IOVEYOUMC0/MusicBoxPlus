@@ -39,7 +39,7 @@ public class VolumeExecutor implements SubCommand {
             case "+":
             case "increase":
                 int newVolUp = vm.increaseVolume(player);
-                MessageUtils.send(player, Lang.VOLUME_INCREASED.toString().replace("{volume}", String.valueOf(newVolUp)));
+                MessageUtils.send(player, Lang.VOLUME_INCREASED, "{volume}", String.valueOf(newVolUp));
                 vm.sendVolumeMessage(player);
                 break;
                 
@@ -47,7 +47,7 @@ public class VolumeExecutor implements SubCommand {
             case "-":
             case "decrease":
                 int newVolDown = vm.decreaseVolume(player);
-                MessageUtils.send(player, Lang.VOLUME_DECREASED.toString().replace("{volume}", String.valueOf(newVolDown)));
+                MessageUtils.send(player, Lang.VOLUME_DECREASED, "{volume}", String.valueOf(newVolDown));
                 vm.sendVolumeMessage(player);
                 break;
                 
@@ -66,7 +66,7 @@ public class VolumeExecutor implements SubCommand {
                         return;
                     }
                     int newVolume = vm.setVolumeByAmount(player, amount);
-                    MessageUtils.send(player, Lang.VOLUME_SET.toString().replace("{volume}", String.valueOf(newVolume)));
+                    MessageUtils.send(player, Lang.VOLUME_SET, "{volume}", String.valueOf(newVolume));
                     vm.sendVolumeMessage(player);
                 } catch (NumberFormatException e) {
                     MessageUtils.send(player, Lang.VOLUME_INVALID);

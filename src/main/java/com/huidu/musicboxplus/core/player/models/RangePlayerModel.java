@@ -1,6 +1,7 @@
 package com.huidu.musicboxplus.core.player.models;
 
 import com.huidu.musicboxplus.MusicBox;
+import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
@@ -200,6 +201,34 @@ public class RangePlayerModel {
     private void onPlayerEnterRange(Player player) {
         if (destroyed) return;
         model.addPlayer(player);
+        fireRangeStateChange(player, true);
+    }
+
+    // Fired from the transition itself, not from playTick.
+    //
+    // playTick used to derive it by comparing the range cache with the dispatch map, and could never
+    // observe a disagreement: the scan marks an entering listener in that map before any playTick
+    // runs for them, and on the way out removes the listener in the same scan. On Paper, where the
+    // scan and the dispatch both run on the main thread, the event therefore never fired at all --
+    // a documented public API that downstream plugins could not receive. Here the transition is not
+    // inferred, it is the thing being handled.
+    //
+    // Dispatched to the listener's own region, which is the thread playTick ran on, so a handler that
+    // touches the player keeps working under Folia. Isolated because a throwing handler must not
+    // abort the scan for every other listener.
+    private void fireRangeStateChange(Player player, boolean inRange) {
+        if (player == null || model == null) {
+            return;
+        }
+        Runnable fire = () -> {
+            try {
+                Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(model, player, inRange));
+            } catch (Exception ex) {
+                MusicBox.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "Exception dispatching MusicBoxRangeStateChangeEvent", ex);
+            }
+        };
+        Scheduler.entity(player, fire);
     }
 
     private void onPlayerEnterRange(UUID uuid) {
@@ -214,6 +243,7 @@ public class RangePlayerModel {
     private void onPlayerLeaveRange(Player player) {
         if (destroyed) return;
         model.removePlayer(player);
+        fireRangeStateChange(player, false);
     }
 
     private void onPlayerLeaveRange(UUID uuid) {
