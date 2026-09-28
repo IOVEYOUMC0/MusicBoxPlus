@@ -295,6 +295,19 @@ implements ExpiringCacheCleaner {
         return instances;
     }
 
+    /**
+     * Drops the static registry at shutdown.
+     *
+     * It is keyed by config name, so it never grows past the number of configs, but it holds the
+     * managers of the session that just ended -- and through their `plugin` field the plugin instance
+     * itself. Live lookups do not go through it: MusicBox keeps its own per-instance map, so a
+     * re-enable that reuses the same MusicBox still gets the same managers back and nothing about
+     * config loading changes.
+     */
+    public static void shutdown() {
+        instances.clear();
+    }
+
     private static class ConfigCache {
         final long timestamp;
         final File file;

@@ -63,6 +63,16 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
     // own thread during playTick.
     protected final Map<UUID, Boolean> playerList = new ConcurrentHashMap<>();
 
+    // The live Player object behind each listener, as a cache for dispatch. Every tick resolves a
+    // Player per listener, and the range scan that admits them already holds the reference, so
+    // looking it up in Bukkit's global player table again is wasted work (40 songs x 10 listeners x
+    // 20/s = 8000 lookups/s). It stays a cache rather than becoming the membership set on purpose:
+    // listeners are also admitted by UUID alone while offline (RangePlayerModel.onPlayerEnterRange),
+    // and those must keep playing the moment they come back, so UUIDs stay authoritative and a miss
+    // still falls back to Bukkit.getPlayer. Refreshed with put, not putIfAbsent: a player who quits
+    // and rejoins inside one scan interval must not be answered from the dead object.
+    final Map<UUID, Player> resolvedListeners = new ConcurrentHashMap<>();
+
     protected volatile byte volume = 100;
     protected volatile boolean enable10Octave;
     protected volatile SoundCategory soundCategory = SoundCategory.RECORDS;
@@ -132,7 +142,7 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
             return;
         }
         for (UUID uuid : playerList.keySet()) {
-            Player listener = Bukkit.getPlayer(uuid);
+            Player listener = resolveListener(uuid);
             if (listener == null) {
                 continue;
             }
@@ -149,7 +159,7 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
 
     private void dispatchTicksInline(int firstTick, int count) {
         for (UUID uuid : playerList.keySet()) {
-            Player listener = Bukkit.getPlayer(uuid);
+            Player listener = resolveListener(uuid);
             if (listener == null || !listener.isOnline()) {
                 continue;
             }
@@ -244,6 +254,7 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
     public void addPlayer(Player player) {
         if (player != null) {
             playerList.putIfAbsent(player.getUniqueId(), true);
+            resolvedListeners.put(player.getUniqueId(), player);
         }
     }
 
@@ -253,9 +264,22 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         }
     }
 
+    /**
+     * The live Player for a listener: the reference recorded when they were added, or the global
+     * player table for a listener admitted by UUID only (offline at the time).
+     *
+     * A recorded object can only go stale by the player leaving, and {@link Player#isOnline()} is
+     * checked by every caller before anything is played, so the worst case is one skipped dispatch
+     * until the next range scan drops them.
+     */
+    Player resolveListener(UUID uuid) {
+        Player known = resolvedListeners.get(uuid);
+        return known != null ? known : Bukkit.getPlayer(uuid);
+    }
+
     public void removePlayer(Player player) {
         if (player != null) {
-            playerList.remove(player.getUniqueId());
+            removePlayer(player.getUniqueId());
         }
     }
 
@@ -271,6 +295,7 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
     public void removePlayer(UUID uuid) {
         if (uuid != null) {
             playerList.remove(uuid);
+            resolvedListeners.remove(uuid);
         }
     }
 
@@ -300,5 +325,6 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         cursor.setPlaying(false);
         clock().unregister(target);
         playerList.clear();
+        resolvedListeners.clear();
     }
 }

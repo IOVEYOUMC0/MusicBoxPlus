@@ -372,11 +372,36 @@ implements PositionPlayer {
         LocationKey key = new LocationKey(location);
         AbstractBlockPlayer cached = infoSignIndex.get(key);
         if (cached != null && !cached.isDestroyed()) return Optional.of((T) cached);
-        for (AbstractBlockPlayer player : players.values()) {
-            if (player.isDestroyed()) continue;
-            if (player.getInfoSign() != null && player.getInfoSign().equals(location)) {
-                infoSignIndex.put(key, player);
-                return Optional.of((T) player);
+
+        // Only the block players that could own this sign, not the whole registry.
+        //
+        // This used to walk every block player and compare getInfoSign(), and the negative result was
+        // never cached -- so with the signs module on, *every* right-click on *any* sign (an ordinary
+        // sign, a music sign without an info sign, a sign that is not ours) paid a full pass. 500
+        // placed music signs made that 500 Location.equals per click.
+        //
+        // An info sign is found by SignUtils.findSign, which offsets the search vertically and nothing
+        // else, so the player it belongs to is in the same chunk column; the 3x3 neighbourhood covers
+        // that with room to spare and keeps the scan bounded whatever the player count. Chosen over
+        // caching the negative result, which is what the review suggested: a negative cache needs
+        // invalidating on every block player creation, destruction and info-sign reassignment, and
+        // missing one of those makes an info sign silently stop working -- a functional regression in
+        // exchange for a few hundred pointer comparisons.
+        World world = location.getWorld();
+        if (world == null) {
+            return Optional.empty();
+        }
+        int chunkX = location.getBlockX() >> 4;
+        int chunkZ = location.getBlockZ() >> 4;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (AbstractBlockPlayer player : findByChunk(world, chunkX + dx, chunkZ + dz)) {
+                    if (player.isDestroyed()) continue;
+                    if (player.getInfoSign() != null && player.getInfoSign().equals(location)) {
+                        infoSignIndex.put(key, player);
+                        return Optional.of((T) player);
+                    }
+                }
             }
         }
         return Optional.empty();

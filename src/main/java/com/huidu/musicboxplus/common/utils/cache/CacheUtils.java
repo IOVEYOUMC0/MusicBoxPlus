@@ -31,7 +31,13 @@ public final class CacheUtils {
             return;
         }
         initialized = false;
-        CacheUtils.clearAllCaches();
+        clearAllCaches();
+        // The registry itself is deliberately kept. Its entries are owned by long-lived singletons
+        // (VolumeManager, and the SmartConfigManager instances behind MusicBox.configManagers) that a
+        // same-classloader re-enable reuses rather than recreates, so emptying it here would leave
+        // those caches permanently unclearable -- reload config would silently stop taking effect,
+        // which is the very bug this registry exists to fix. It is bounded by the number of distinct
+        // cache names.
         LOGGER.info("Cache manager shutdown complete");
     }
 

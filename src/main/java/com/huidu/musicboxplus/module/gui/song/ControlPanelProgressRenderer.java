@@ -156,9 +156,11 @@ final class ControlPanelProgressRenderer {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
-            meta.displayName(MiniMessageUtils.processComponent(displayName));
+            // Dynamic variants: this name/lore is rebuilt from the current tick on every refresh, so
+            // it is memoized separately and cannot flush the static GUI strings' cache.
+            meta.displayName(MiniMessageUtils.processDynamicComponent(displayName));
             if (lore != null && !lore.isEmpty()) {
-                meta.lore(MiniMessageUtils.processComponents(lore));
+                meta.lore(MiniMessageUtils.processDynamicComponents(lore));
             }
             if (modelData > 0) {
                 meta.setCustomModelData(modelData);

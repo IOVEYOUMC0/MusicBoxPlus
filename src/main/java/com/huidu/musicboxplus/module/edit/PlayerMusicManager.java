@@ -30,6 +30,7 @@ public class PlayerMusicManager {
     private final Map<UUID, PlayerMusic> pendingSaveSnapshots = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> pendingSaveSignatures = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> lastSavedSignatures = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> lastWrittenNoteSignatures = new ConcurrentHashMap<>();
     private final Map<UUID, CompletableFuture<Boolean>> saveChains = new ConcurrentHashMap<>();
 
     public static PlayerMusicManager getInstance() {
@@ -85,14 +86,23 @@ public class PlayerMusicManager {
                 "SELECT id, name, author, author_uuid, time_signature, bpm, beat_subdivision, created_at, updated_at, description FROM player_music"
             );
 
-            Map<String, List<ResultSetRow>> notesMap = new HashMap<>();
-            List<ResultSetRow> noteRows = base.executeQuery(
-                "SELECT music_id, pitch, tick, instruments FROM player_music_notes"
+            // Notes are grouped straight into MusicNote while the ResultSet streams. Collecting the
+            // rows first meant holding one ResultSetRow + builder map per note of the whole server
+            // at once (~300 B/note, ~150 MB at 500k notes) only to copy each into a MusicNote a
+            // moment later. Grouping as rows arrive also keeps the same per-song order the old
+            // `notesMap` had, which was populated in query order too, so no ORDER BY is needed.
+            Map<String, List<MusicNote>> notesMap = new HashMap<>();
+            base.executeStreamQuery(
+                "SELECT music_id, pitch, tick, instruments FROM player_music_notes",
+                noteRow -> {
+                    String noteMusicId = noteRow.getString("music_id");
+                    MusicNote note = this.parseNoteRow(noteRow);
+                    if (noteMusicId == null || note == null) {
+                        return;
+                    }
+                    notesMap.computeIfAbsent(noteMusicId, k -> new ArrayList<>()).add(note);
+                }
             );
-            for (ResultSetRow noteRow : noteRows) {
-                String musicId = noteRow.getString("music_id");
-                notesMap.computeIfAbsent(musicId, k -> new ArrayList<>()).add(noteRow);
-            }
 
             for (ResultSetRow row : musicRows) {
                 try {
@@ -111,21 +121,11 @@ public class PlayerMusicManager {
                     String description = row.getString("description");
                     if (description == null) description = "";
 
-                    List<MusicNote> notes = new ArrayList<>();
-                    List<ResultSetRow> noteList = notesMap.get(idStr);
-                    if (noteList != null) {
-                        for (ResultSetRow noteRow : noteList) {
-                            int pitch = noteRow.getInt("pitch");
-                            int tick = noteRow.getInt("tick");
-                            String instrumentsStr = noteRow.getString("instruments");
-                            List<MusicNote.NoteInstrument> instruments = Arrays.stream(instrumentsStr.split(","))
-                                .map(String::trim)
-                                .filter(s -> !s.isEmpty())
-                                .map(this::parseInstrument)
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toList());
-                            notes.add(new MusicNote(pitch, tick, instruments));
-                        }
+                    // remove() hands the list over to PlayerMusic (whose constructor copies it) and
+                    // drops the map entry, so nothing is aliased or held twice.
+                    List<MusicNote> notes = notesMap.remove(idStr);
+                    if (notes == null) {
+                        notes = new ArrayList<>();
                     }
 
                     PlayerMusic music = new PlayerMusic(uniqueId, name, author, authorUUID, timeSignature, bpm,
@@ -154,6 +154,32 @@ public class PlayerMusicManager {
 
     private MusicNote.NoteInstrument parseInstrument(String name) {
         return MusicNote.NoteInstrument.parseStored(name);
+    }
+
+    /**
+     * Builds one note from a `player_music_notes` row, or null when the row cannot describe a note.
+     *
+     * A malformed row is skipped rather than throwing: the read now happens inside a single
+     * streaming query, so an NPE here would abort the whole reload and leave the previous cache in
+     * place. Before, the note loop ran inside the per-song try/catch, so one bad row only cost the
+     * owning song -- skipping the row is strictly friendlier than either.
+     */
+    MusicNote parseNoteRow(ResultSetRow row) {
+        Integer pitch = row.getInt("pitch");
+        Integer tick = row.getInt("tick");
+        if (pitch == null || tick == null) {
+            return null;
+        }
+        String instrumentsStr = row.getString("instruments");
+        List<MusicNote.NoteInstrument> instruments = instrumentsStr == null
+            ? Collections.emptyList()
+            : Arrays.stream(instrumentsStr.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(this::parseInstrument)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return new MusicNote(pitch, tick, instruments);
     }
 
     public boolean saveMusic(PlayerMusic music) {
@@ -315,6 +341,41 @@ public class PlayerMusicManager {
         return result;
     }
 
+    /**
+     * Fingerprint of the notes alone, used to decide whether `player_music_notes` needs rewriting.
+     *
+     * Deliberately folded over the note list in storage order, not sorted order: the list only
+     * changes when notes are added or removed, so an unchanged song folds to an unchanged value.
+     * Two different orderings of the same set can fold differently, which only costs a redundant
+     * rewrite -- unlike a false match, which would drop a save. The whole-snapshot signature above
+     * keeps the sorted fold, so a pure reorder is still recognised as "already saved".
+     */
+    static int calculateNotesSignature(PlayerMusic music) {
+        int result = 1;
+        for (MusicNote note : music.getNotes()) {
+            result = 31 * result + note.getPitch();
+            result = 31 * result + note.getTick();
+            result = 31 * result + note.getInstruments().hashCode();
+        }
+        return result;
+    }
+
+    /**
+     * True when this instance has no record of committing exactly these notes.
+     *
+     * The record is per process: after a restart the first save of each song rewrites its notes in
+     * full, as before. On a database shared by several servers, a metadata-only save leaves whatever
+     * another server wrote in the note table alone -- previously it deleted and replaced that
+     * server's notes with this one's stale copy.
+     */
+    boolean needsNoteRewrite(UUID musicId, int notesSignature) {
+        return !Objects.equals(lastWrittenNoteSignatures.get(musicId), notesSignature);
+    }
+
+    void markNotesWritten(UUID musicId, int notesSignature) {
+        lastWrittenNoteSignatures.put(musicId, notesSignature);
+    }
+
     public boolean saveMusicSync(PlayerMusic music) {
         cacheMusic(music);
 
@@ -390,36 +451,48 @@ public class PlayerMusicManager {
                 music.getDescription()
             );
 
-            base.executeUpdate(connection, "DELETE FROM player_music_notes WHERE music_id = ?", music.getUniqueId().toString());
+            // The note table is only rewritten when the notes actually changed. It used to be
+            // DELETE-then-re-INSERT on every save, so renaming a 20k-note song re-inserted all 20k
+            // rows to change one string in player_music. The fingerprint is a per-process record of
+            // what this instance last committed, so a first save after startup still writes in full.
+            int notesSignature = calculateNotesSignature(music);
+            boolean notesRewritten = needsNoteRewrite(music.getUniqueId(), notesSignature);
+            if (notesRewritten) {
+                base.executeUpdate(connection, "DELETE FROM player_music_notes WHERE music_id = ?", music.getUniqueId().toString());
 
-            if (!music.getNotes().isEmpty()) {
-                try (PreparedStatement ps = connection.prepareStatement(
-                    base.resolveTableNames(
-                        "INSERT INTO player_music_notes (music_id, pitch, tick, instruments) VALUES (?, ?, ?, ?)")
-                )) {
-                    String musicIdStr = music.getUniqueId().toString();
-                    int batchSize = Math.max(1, MusicBox.getInstance().getConfigObject().getPerformance().getDatabaseBatchSize());
-                    int count = 0;
-                    for (MusicNote note : music.getNotes()) {
-                        String instrumentsStr = note.getInstruments().stream()
-                            .map(Enum::name)
-                            .collect(Collectors.joining(","));
-                        ps.setString(1, musicIdStr);
-                        ps.setInt(2, note.getPitch());
-                        ps.setInt(3, note.getTick());
-                        ps.setString(4, instrumentsStr);
-                        ps.addBatch();
-                        count++;
-                        if (count % batchSize == 0) {
-                            ps.executeBatch();
-                            ps.clearBatch();
+                if (!music.getNotes().isEmpty()) {
+                    try (PreparedStatement ps = connection.prepareStatement(
+                        base.resolveTableNames(
+                            "INSERT INTO player_music_notes (music_id, pitch, tick, instruments) VALUES (?, ?, ?, ?)")
+                    )) {
+                        String musicIdStr = music.getUniqueId().toString();
+                        int batchSize = Math.max(1, MusicBox.getInstance().getConfigObject().getPerformance().getDatabaseBatchSize());
+                        int count = 0;
+                        for (MusicNote note : music.getNotes()) {
+                            String instrumentsStr = note.getInstruments().stream()
+                                .map(Enum::name)
+                                .collect(Collectors.joining(","));
+                            ps.setString(1, musicIdStr);
+                            ps.setInt(2, note.getPitch());
+                            ps.setInt(3, note.getTick());
+                            ps.setString(4, instrumentsStr);
+                            ps.addBatch();
+                            count++;
+                            if (count % batchSize == 0) {
+                                ps.executeBatch();
+                                ps.clearBatch();
+                            }
                         }
+                        ps.executeBatch();
                     }
-                    ps.executeBatch();
                 }
             }
 
             connection.commit();
+            if (notesRewritten) {
+                // Only after the commit: a rolled-back transaction must not claim the notes are in.
+                markNotesWritten(music.getUniqueId(), notesSignature);
+            }
             return true;
         } catch (SQLException e) {
             if (connection != null) {
@@ -484,6 +557,7 @@ public class PlayerMusicManager {
                 pendingSaveSnapshots.remove(musicId);
                 pendingSaveSignatures.remove(musicId);
                 lastSavedSignatures.remove(musicId);
+                lastWrittenNoteSignatures.remove(musicId);
                 saveChains.remove(musicId);
             } catch (Exception e) {
                 MusicBox.getInstance().getLogger().log(Level.SEVERE, "Failed to delete player music: " + musicId, e);
@@ -586,6 +660,7 @@ public class PlayerMusicManager {
         pendingSaveSnapshots.remove(musicId);
         pendingSaveSignatures.remove(musicId);
         lastSavedSignatures.remove(musicId);
+        lastWrittenNoteSignatures.remove(musicId);
         saveChains.remove(musicId);
     }
     
@@ -694,6 +769,7 @@ public class PlayerMusicManager {
         pendingSaveSnapshots.clear();
         pendingSaveSignatures.clear();
         lastSavedSignatures.clear();
+        lastWrittenNoteSignatures.clear();
         saveChains.clear();
         synchronized (LOCK) {
             if (instance == this) {

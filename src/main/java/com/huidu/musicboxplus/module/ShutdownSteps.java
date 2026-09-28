@@ -119,6 +119,8 @@ public final class ShutdownSteps {
         });
 
         safeDisable("shutdown cache utils", CacheUtils::shutdown);
+        safeDisable("shutdown config managers",
+                com.huidu.musicboxplus.common.config.SmartConfigManager::shutdown);
         safeDisable("shutdown song container loader", MusicBoxSongContainer::shutdownLoader);
         safeDisable("destroy player wrappers", plugin::destroyAllPlayers);
         safeDisable("shutdown volume manager", VolumeManager::shutdown);

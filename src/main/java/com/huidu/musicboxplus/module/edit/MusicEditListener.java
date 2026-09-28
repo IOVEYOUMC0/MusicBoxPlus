@@ -40,6 +40,10 @@ public class MusicEditListener implements Listener {
         void handleClick(InventoryHolder holder, int rawSlot, boolean isRightClick, boolean isShiftClick);
     }
     
+    // Populated once, from the static initialiser below. Deliberately never cleared: the initialiser
+    // does not run again when the plugin is re-enabled on the same classloader (PlugMan-style), so
+    // emptying it here would leave every GUI click unhandled for the rest of the JVM's life -- the
+    // same failure mode the GUIInputManager registration bug had.
     private static final Map<Class<? extends InventoryHolder>, GUIHandler> GUI_HANDLERS = new ConcurrentHashMap<>();
     
     static {
@@ -430,6 +434,15 @@ public class MusicEditListener implements Listener {
             cleanupTask.cancel();
             cleanupTask = null;
         }
+        // Static state that outlives the listener. openGUIs is cleared by restoreAllPending(), which
+        // runs earlier in the shutdown chain; these three were simply left behind. A text-input
+        // session holds the player, the song and callbacks that capture a GUI, and a soft reload kept
+        // it alive: the player could still answer a prompt from the previous session and have it
+        // delivered into a GUI that belongs to the old classloader. musicLocks and warnedPlayers are
+        // bounded but equally session-scoped.
+        MusicEditTextInputManager.cleanupAllSessions();
+        musicLocks.clear();
+        warnedPlayers.clear();
     }
     
     private static void startCleanupTask() {

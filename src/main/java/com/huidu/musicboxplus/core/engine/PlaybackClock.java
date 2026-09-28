@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.core.engine;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 import java.util.function.LongSupplier;
 
@@ -68,6 +69,16 @@ public final class PlaybackClock {
 
     private volatile Thread thread;
     private volatile boolean running;
+
+    // Bumped by start() and by shutdown(), and checked by the run loop, so a loop belonging to an
+    // earlier session can never come back to life.
+    //
+    // shutdown() joins for SHUTDOWN_JOIN_MILLIS only. A clock thread still inside a target's
+    // playTicks() -- a slow region dispatch, a plugin's listener -- is therefore still running when
+    // shutdown() returns. It used to re-read the shared `running` flag, which the next start() sets
+    // back to true, and carry on: two clock threads advancing the same cursors, dispatching every
+    // tick twice and at double speed. The session number retires that loop for good.
+    private final AtomicLong generation = new AtomicLong();
 
     public PlaybackClock(LongSupplier nanoTime, String threadName) {
         this.nanoTime = nanoTime;
@@ -164,7 +175,8 @@ public final class PlaybackClock {
             return;
         }
         running = true;
-        Thread t = new Thread(this::run, threadName);
+        long session = generation.incrementAndGet();
+        Thread t = new Thread(() -> run(session), threadName);
         t.setDaemon(true);
         this.thread = t;
         t.start();
@@ -173,10 +185,14 @@ public final class PlaybackClock {
     // Waits for the clock thread to actually leave step(). Returning while a tick is still being
     // dispatched means that dispatch reaches a plugin that is already disabled, which Bukkit
     // rejects with "Plugin attempted to register task while disabled".
+    //
+    // The wait is bounded, so the thread may still be in playTicks() when this returns; bumping the
+    // generation is what makes that safe, by retiring it before a later start() can adopt it.
     public void shutdown() {
         Thread t;
         synchronized (this) {
             running = false;
+            generation.incrementAndGet();
             t = this.thread;
             this.thread = null;
         }
@@ -195,8 +211,8 @@ public final class PlaybackClock {
         return running;
     }
 
-    private void run() {
-        while (running) {
+    private void run(long session) {
+        while (running && generation.get() == session) {
             long sleep;
             try {
                 sleep = step();

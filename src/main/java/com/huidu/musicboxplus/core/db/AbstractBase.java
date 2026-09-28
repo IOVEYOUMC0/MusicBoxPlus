@@ -202,7 +202,7 @@ public abstract class AbstractBase {
         return this.initialized;
     }
 
-    protected List<String> getColumns(ResultSet set) throws SQLException {
+    protected static List<String> getColumns(ResultSet set) throws SQLException {
         ResultSetMetaData meta = set.getMetaData();
         List<String> columns = new ArrayList<>();
         for (int i = 1; i <= meta.getColumnCount(); i++) {
@@ -211,16 +211,24 @@ public abstract class AbstractBase {
         return columns;
     }
 
-    protected List<ResultSetRow> extractSet(ResultSet set) throws SQLException {
-        List<ResultSetRow> rows = new ArrayList<>();
-        List<String> columns = this.getColumns(set);
+    /**
+     * Pumps every row of an open ResultSet into {@code consumer}, building one ResultSetRow at a
+     * time. See {@link #streamQuery} for why the streaming form exists; this is its testable core.
+     */
+    static void forEachRow(ResultSet set, RowConsumer consumer) throws SQLException {
+        List<String> columns = getColumns(set);
         while (set.next()) {
             ResultSetRow.ResultSetRowBuilder row = ResultSetRow.builder();
             for (String column : columns) {
                 row.addResultRow(column, set.getObject(column));
             }
-            rows.add(row.build());
+            consumer.accept(row.build());
         }
+    }
+
+    protected static List<ResultSetRow> extractSet(ResultSet set) throws SQLException {
+        List<ResultSetRow> rows = new ArrayList<>();
+        forEachRow(set, rows::add);
         return Collections.unmodifiableList(rows);
     }
 
@@ -343,6 +351,38 @@ public abstract class AbstractBase {
     protected List<ResultSetRow> query(@Language(value = "SQL") String query, Object... args) {
         try (Connection connection = this.getConnection()) {
             return this.query(connection, query, args);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** Receives one row at a time from {@link #streamQuery}. */
+    @FunctionalInterface
+    public interface RowConsumer {
+        void accept(ResultSetRow row);
+    }
+
+    /**
+     * Runs a query and hands each row to {@code consumer} while the driver's ResultSet is still
+     * open, instead of collecting every row into a List first.
+     *
+     * Use this for tables that hold one row per note/event rather than one row per record.
+     * {@link #extractSet} keeps every ResultSetRow alive until the query returns, and a row costs a
+     * ResultSetRow, an unmodifiable LinkedHashMap and a builder's two ArrayLists -- roughly 300 B
+     * for a four-column table. `player_music_notes` is 4 columns and holds every note of every
+     * player song, so a library with 500k notes needed ~150 MB of heap just to be read, before the
+     * notes were copied a second time into MusicNote objects. Here each row becomes garbage as soon
+     * as the consumer returns.
+     *
+     * The consumer runs on the calling thread and must not retain the row: the backing map is not
+     * reused, but keeping a reference defeats the point of streaming. An exception from the
+     * consumer propagates to the caller and aborts the query, matching query()'s failure mode.
+     */
+    protected void streamQuery(@Language(value = "SQL") String query, RowConsumer consumer, Object... args) {
+        try (Connection connection = this.getConnection();
+             PreparedStatement prepared = this.prepare(connection, query, args);
+             ResultSet set = prepared.executeQuery()) {
+            forEachRow(set, consumer);
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
@@ -871,6 +911,11 @@ public abstract class AbstractBase {
 
     public List<ResultSetRow> executeQuery(String query, Object... args) {
         return this.query(query, args);
+    }
+
+    /** Public counterpart of {@link #streamQuery} for callers outside this package. */
+    public void executeStreamQuery(String query, RowConsumer consumer, Object... args) {
+        this.streamQuery(query, consumer, args);
     }
 
     public int executeUpdate(String query, Object... args) {

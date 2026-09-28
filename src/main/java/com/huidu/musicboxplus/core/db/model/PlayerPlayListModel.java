@@ -9,9 +9,11 @@ import com.huidu.musicboxplus.core.song.songContainers.types.SongContainer;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public class PlayerPlayListModel
@@ -35,6 +37,9 @@ implements SongContainer {
     // missing must not lose its place in every playlist that referenced it. A hash that is gone for
     // good therefore stays in the table, invisible, which costs one row.
     private final List<Integer> unresolvedHashes = new LinkedList<Integer>();
+
+    // Membership cache behind hasSong(). Dropped by every mutation; see hasSong.
+    private Set<MusicBoxSong> membership;
 
     public List<Integer> getUnresolvedHashes() {
         return this.unresolvedHashes;
@@ -75,6 +80,7 @@ implements SongContainer {
                 this.songs.remove(song);
                 return false;
             }
+            this.membership = null;
         }
         return true;
     }
@@ -88,19 +94,26 @@ implements SongContainer {
                     this.songs.add(index, song);
                     return false;
                 }
+                this.membership = null;
             }
         }
         return true;
     }
 
+    // One membership set instead of a LinkedList scan per candidate. Adding a container with m songs
+    // to a playlist that already holds n was O(n*m) pointer chasing -- and the caller filtered the
+    // same candidates with hasSong() first, so it was paid twice per song. The set is built from the
+    // list here rather than reused from membership: this path decides what gets written to the
+    // database, so it must not depend on a cache that getSongs() callers can invalidate.
     public boolean addSongsBulk(List<MusicBoxSong> songsToAdd) {
         if (songsToAdd == null || songsToAdd.isEmpty()) {
             return true;
         }
 
+        Set<MusicBoxSong> present = new HashSet<>(this.songs);
         List<MusicBoxSong> addedSongs = new LinkedList<>();
         for (MusicBoxSong song : songsToAdd) {
-            if (song == null || this.songs.contains(song)) {
+            if (song == null || !present.add(song)) {
                 continue;
             }
             this.songs.add(song);
@@ -112,11 +125,35 @@ implements SongContainer {
         }
 
         if (this.save()) {
+            this.membership = null;
             return true;
         }
 
         this.songs.removeAll(addedSongs);
         return false;
+    }
+
+    /**
+     * Whether this playlist already holds the song.
+     *
+     * Answered from a set built on first use: the add-song picker calls this once for every song item
+     * it renders, and each call used to scan the whole LinkedList.
+     *
+     * The set is only ever used for display, so a stale one is harmless -- the worst case is a lore
+     * line that offers to add a song the playlist already holds, and the add itself re-checks against
+     * the list. It is dropped by every mutation below. MusicBoxSong does not override equals, so set
+     * membership means the same thing as the list's identity-based contains.
+     */
+    public boolean hasSong(MusicBoxSong song) {
+        if (song == null) {
+            return false;
+        }
+        Set<MusicBoxSong> known = this.membership;
+        if (known == null) {
+            known = new HashSet<>(this.songs);
+            this.membership = known;
+        }
+        return known.contains(song);
     }
 
     @Override

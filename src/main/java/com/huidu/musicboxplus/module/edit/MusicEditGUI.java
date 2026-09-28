@@ -79,6 +79,9 @@ public class MusicEditGUI implements InventoryHolder {
     // flashPreviewHighlight.
     private final Set<Integer> previewHighlightSlots = new HashSet<>();
     private final Map<Integer, Integer> editAreaSlotIndexes = new HashMap<>();
+    // Scratch set for the playback timer, which runs every server tick: reused instead of allocating
+    // a fresh HashSet 20 times a second. Only read by updateInventory(Set) within the same tick.
+    private final Set<Integer> playbackChangedSlots = new HashSet<>();
     private String[] layoutLines = new String[0];
     private final EditHistory editHistory = new EditHistory();
     private int currentPlayTick = -1;
@@ -1217,29 +1220,30 @@ public class MusicEditGUI implements InventoryHolder {
         double tickDurationMillis = 60000.0 / (bpm * music.getBeatSubdivision());
         int editCols = calculateEditColumns();
         
-        java.util.NavigableMap<Integer, List<MusicNote>> tickIndex = music.getTickIndexMap();
-        Integer[] tickKeys = tickIndex.tailMap(startTick, true).keySet().toArray(new Integer[0]);
-        if (tickKeys.length == 0) {
+        // Playback reads the song through PlayerMusic's per-tick accessors instead of taking a copy
+        // of the whole tick index first. getTickIndexMap() returns `new TreeMap<>(tickIndexMap)`, so
+        // pressing play built a full copy of every note in the song on the main thread (100k notes =
+        // 100k tree entries) and the loop then walked an Integer[] of every remaining tick, boxed.
+        // Both are gone: the loop asks for the notes at one tick, which is a small list copy.
+        int from = Math.max(0, startTick);
+        if (music.firstNoteTickAtOrAfter(from) == null) {
             isPlaying = false;
             currentPlayTick = -1;
             updateInventory();
             MessageUtils.send(player, Lang.EDIT_NO_NOTES_TO_PLAY);
             return;
         }
-        
-        startTimedPlayback(tickIndex, tickKeys, Math.max(0, startTick), tickDurationMillis, editCols);
+
+        startTimedPlayback(music.lastNoteTick(), from, tickDurationMillis, editCols);
 
         MessageUtils.send(player, Lang.EDIT_PLAYBACK_STARTED);
     }
 
-    private void startTimedPlayback(java.util.NavigableMap<Integer, List<MusicNote>> tickIndex,
-                                    Integer[] tickKeys,
+    private void startTimedPlayback(int endTick,
                                     int startTick,
                                     double tickDurationMillis,
                                     int editCols) {
-        final int[] currentIndex = {0};
         final int[] timelineTick = {startTick};
-        final int endTick = tickKeys[tickKeys.length - 1];
         final double[] accumulator = {tickDurationMillis};
         final long[] lastNano = {System.nanoTime()};
         final int maxBurstPerServerTick = 32;
@@ -1257,16 +1261,18 @@ public class MusicEditGUI implements InventoryHolder {
             boolean needsInventoryRefresh = false;
             boolean needsHotbarRefresh = false;
             boolean needsFullInventoryRefresh = false;
-            Set<Integer> changedSlots = new HashSet<>();
+            // Reused across ticks: this runs every server tick while a song plays.
+            Set<Integer> changedSlots = playbackChangedSlots;
+            changedSlots.clear();
             while (accumulator[0] >= tickDurationMillis && timelineTick[0] <= endTick && processed < maxBurstPerServerTick) {
                 accumulator[0] -= tickDurationMillis;
                 int previousPlayTick = currentPlayTick;
                 int previousTickOffset = tickOffset;
-                if (currentIndex[0] < tickKeys.length && tickKeys[currentIndex[0]] == timelineTick[0]) {
-                    needsHotbarRefresh |= playPlaybackTick(tickIndex, timelineTick[0], editCols);
-                    currentIndex[0]++;
+                List<MusicNote> tickNotes = music.getNotesAtTick(timelineTick[0]);
+                if (!tickNotes.isEmpty()) {
+                    needsHotbarRefresh |= playPlaybackTick(tickNotes, timelineTick[0], editCols);
                 } else {
-                    needsHotbarRefresh |= updatePlaybackPosition(tickIndex, timelineTick[0], editCols);
+                    needsHotbarRefresh |= updatePlaybackPosition(timelineTick[0], editCols);
                 }
                 if (tickOffset != previousTickOffset) {
                     needsFullInventoryRefresh = true;
@@ -1299,13 +1305,9 @@ public class MusicEditGUI implements InventoryHolder {
         scheduledTaskIds.add(task);
     }
 
-    private boolean playPlaybackTick(java.util.NavigableMap<Integer, List<MusicNote>> tickIndex, int tick, int editCols) {
-        List<MusicNote> tickNotes = tickIndex.get(tick);
-        boolean needsHotbarRefresh = updatePlaybackPosition(tickIndex, tick, editCols);
+    private boolean playPlaybackTick(List<MusicNote> tickNotes, int tick, int editCols) {
+        boolean needsHotbarRefresh = updatePlaybackPosition(tick, editCols);
 
-        if (tickNotes == null) {
-            return needsHotbarRefresh;
-        }
         for (MusicNote n : tickNotes) {
             for (MusicNote.NoteInstrument instrument : n.getInstruments()) {
                 playNoteSound(n.getPitch(), instrument);
@@ -1314,14 +1316,14 @@ public class MusicEditGUI implements InventoryHolder {
         return needsHotbarRefresh;
     }
 
-    private boolean updatePlaybackPosition(java.util.NavigableMap<Integer, List<MusicNote>> tickIndex, int tick, int editCols) {
+    private boolean updatePlaybackPosition(int tick, int editCols) {
         currentPlayTick = tick;
 
-        if (currentPageHasRemainingNotes(tickIndex, tick, editCols)) {
+        if (currentPageHasRemainingNotes(tick, editCols)) {
             return false;
         }
 
-        Integer nextNoteTick = tickIndex.ceilingKey(tick);
+        Integer nextNoteTick = music.firstNoteTickAtOrAfter(tick);
         if (nextNoteTick == null) {
             return false;
         }
@@ -1334,10 +1336,10 @@ public class MusicEditGUI implements InventoryHolder {
         return true;
     }
 
-    private boolean currentPageHasRemainingNotes(java.util.NavigableMap<Integer, List<MusicNote>> tickIndex, int tick, int editCols) {
+    private boolean currentPageHasRemainingNotes(int tick, int editCols) {
         int pageStart = tickOffset * editCols;
         int pageEnd = pageStart + editCols - 1;
-        Integer nextVisibleNoteTick = tickIndex.ceilingKey(Math.max(tick, pageStart));
+        Integer nextVisibleNoteTick = music.firstNoteTickAtOrAfter(Math.max(tick, pageStart));
         return nextVisibleNoteTick != null && nextVisibleNoteTick <= pageEnd;
     }
 
