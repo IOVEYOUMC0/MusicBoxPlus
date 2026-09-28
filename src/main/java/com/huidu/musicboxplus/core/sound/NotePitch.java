@@ -71,12 +71,25 @@ public final class NotePitch {
     // pack's sample for the matching octave instead.
     // Returns bucket 0..4, mapping to _-2 / _-1 / no suffix / _1 / _2.
     public static int bucketIndex(int key, int finePitch) {
-        return bucketOffset(key, finePitch) / WINDOW_CENTS;
+        return bucketOfOffset(bucketOffset(key, finePitch));
     }
 
     // Pitch of the note within its own bucket, for bucket mode.
     public static float bucketPitch(int key, int finePitch) {
-        return PITCH_TABLE[bucketOffset(key, finePitch) % WINDOW_CENTS];
+        return pitchOfOffset(bucketOffset(key, finePitch));
+    }
+
+    // The two halves of bucket mode, for a caller that needs both of them for the same note.
+    //
+    // bucketIndex() and bucketPitch() each fold the note on their own, and folding is a loop (see
+    // foldIntoRange); the emit path needs the bucket for the sound name and the pitch for the sound
+    // event, so it was paying for two folds per note per listener. One fold, then these two.
+    public static int bucketOfOffset(int bucketOffset) {
+        return bucketOffset / WINDOW_CENTS;
+    }
+
+    public static float pitchOfOffset(int bucketOffset) {
+        return PITCH_TABLE[bucketOffset % WINDOW_CENTS];
     }
 
     // Sound-name suffix for a bucket; empty string for the middle one.
@@ -91,7 +104,7 @@ public final class NotePitch {
     // Notes beyond the five buckets fold back by whole octaves into the outermost one:
     // the pack has no samples for them anyway, and folding at least preserves the pitch
     // class, which sounds far closer than clamping to the endpoint.
-    private static int bucketOffset(int key, int finePitch) {
+    public static int bucketOffset(int key, int finePitch) {
         int offset = totalCents(key, finePitch) - LOWEST_BUCKET_START_CENTS;
         return foldIntoRange(offset, 0, ALL_BUCKETS_CENTS - 1);
     }

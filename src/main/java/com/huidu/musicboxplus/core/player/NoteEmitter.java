@@ -163,10 +163,13 @@ public final class NoteEmitter {
             float pitch;
             boolean naturalBucket;
             if (tenOctave) {
-                int bucket = NotePitch.bucketIndex(key, finePitch);
+                // One fold for both values: the emit path needs the bucket for the sound name and the
+                // pitch for the event, and bucketIndex/bucketPitch would have folded the note twice.
+                int bucketOffset = NotePitch.bucketOffset(key, finePitch);
+                int bucket = NotePitch.bucketOfOffset(bucketOffset);
                 naturalBucket = bucket == NotePitch.NATURAL_BUCKET;
                 sound = instruments.soundName(instrument, bucket);
-                pitch = NotePitch.bucketPitch(key, finePitch);
+                pitch = NotePitch.pitchOfOffset(bucketOffset);
             } else {
                 naturalBucket = true;
                 sound = instruments.baseSoundName(instrument);

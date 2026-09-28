@@ -79,6 +79,24 @@ class NotePitchTest {
         assertEquals(List.of(), diffs, "分档模式在 finePitch 非负时必须与 NoteBlockAPI 一致");
     }
 
+    // The emit path needs both bucket values for the same note and now folds the note once, deriving
+    // them with bucketOfOffset/pitchOfOffset. If those ever stop agreeing with bucketIndex/bucketPitch,
+    // the sound name and the sound's pitch would come from different octaves.
+    @Test
+    void oneFoldGivesTheSameBucketAndPitchAsTheTwoLookups() {
+        List<String> diffs = new ArrayList<>();
+        for (int key = 0; key <= 120; key++) {
+            for (int fine = -1200; fine <= 1200; fine += 11) {
+                int offset = NotePitch.bucketOffset(key, fine);
+                if (NotePitch.bucketOfOffset(offset) != NotePitch.bucketIndex(key, fine)
+                        || NotePitch.pitchOfOffset(offset) != NotePitch.bucketPitch(key, fine)) {
+                    diffs.add("key=" + key + " fine=" + fine);
+                }
+            }
+        }
+        assertEquals(List.of(), diffs, "单次折叠必须给出与两次查询相同的桶与音高");
+    }
+
     // Negative finePitch right on a bucket boundary: the old implementation subtracts the bucket
     // base to get 0, adds the negative offset and indexes out of bounds with an
     // ArrayIndexOutOfBoundsException. This implementation locates notes by total cents, so they

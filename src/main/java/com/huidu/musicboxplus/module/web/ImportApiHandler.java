@@ -165,12 +165,18 @@ final class ImportApiHandler implements HttpHandler {
 
     private UploadedImportFile parseMultipartUpload(HttpExchange exchange, String contentType) throws IOException {
         String boundary = extractMultipartBoundary(contentType);
-        if (boundary == null || boundary.isEmpty()) {
-            throw new IllegalArgumentException("Missing multipart boundary");
+        if (boundary == null) {
+            throw new IllegalArgumentException("Missing or invalid multipart boundary");
         }
 
         int multipartLimit = (int) Math.min(
                 support.getMaxRequestSize(), MusicFileImporter.MAX_IMPORT_FILE_BYTES + 64L * 1024L);
+        // Read whole, then hand the file part over as a copy of the body. That is two copies of the
+        // upload in memory at once (~10 MB each at the limit, briefly), which was reviewed: removing
+        // it means threading an (array, offset, length) view through MusicFileImporter and the NBS and
+        // MIDI importers, and a streaming multipart parser instead of this one. Both are larger
+        // changes than the transient allocation is worth on a path only an admin reaches, and the
+        // read is capped by maxRequestSize / MAX_IMPORT_FILE_BYTES.
         byte[] body = support.readRequestBodyBytes(exchange, multipartLimit);
         byte[] delimiter = ("--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
         byte[] partDelimiter = ("\r\n--" + boundary).getBytes(StandardCharsets.ISO_8859_1);
@@ -246,13 +252,29 @@ final class ImportApiHandler implements HttpHandler {
         return new String(headers.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
     }
 
-    private String extractMultipartBoundary(String contentType) {
+    // RFC 2046 caps a multipart boundary at 70 characters. The limit matters here because the body
+    // is searched for "--" + boundary, once per candidate position, with the boundary supplied by the
+    // client: a longer one multiplies the work the scan can be made to do on a body the client also
+    // chooses. Rejecting it as malformed keeps that factor at a constant.
+    static final int MAX_BOUNDARY_LENGTH = 70;
+
+    /**
+     * The multipart boundary from a Content-Type header, or null when it is absent, empty, or longer
+     * than {@link #MAX_BOUNDARY_LENGTH}.
+     */
+    static String extractMultipartBoundary(String contentType) {
+        if (contentType == null) {
+            return null;
+        }
         for (String segment : contentType.split(";")) {
             String trimmed = segment.trim();
             if (trimmed.toLowerCase(Locale.ROOT).startsWith("boundary=")) {
                 String boundary = trimmed.substring("boundary=".length());
                 if (boundary.length() >= 2 && boundary.startsWith("\"") && boundary.endsWith("\"")) {
                     boundary = boundary.substring(1, boundary.length() - 1);
+                }
+                if (boundary.isEmpty() || boundary.length() > MAX_BOUNDARY_LENGTH) {
+                    return null;
                 }
                 return boundary;
             }
