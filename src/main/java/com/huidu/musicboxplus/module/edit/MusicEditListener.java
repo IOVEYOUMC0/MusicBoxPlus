@@ -483,9 +483,20 @@ public class MusicEditListener implements Listener {
             // reach this GUI. The timer would then hold the player, the music and the inventory
             // for the rest of the server's life.
             gui.stopAutoSaveTask();
-            if (gui.isPlaying()) {
-                gui.stopMusic();
+            if (!gui.isPlaying()) {
+                continue;
             }
+            Player owner = gui.getPlayer();
+            if (owner == null) {
+                continue;
+            }
+            // On the player's own region: stopMusic() rewrites the editor's toolbar into their
+            // hotbar, and this method is reached from the shutdown/reload chain, which on Folia runs
+            // on the global region thread and owns nobody. Scheduler.entity runs it inline when the
+            // caller does own the region (Paper's main thread, and the quit path) and skips it when
+            // the plugin is already disabled, which is why the backup -- not this repaint -- is what
+            // gives the player their inventory back.
+            Scheduler.entity(owner, gui::stopMusic);
         }
         openGUIs.clear();
     }

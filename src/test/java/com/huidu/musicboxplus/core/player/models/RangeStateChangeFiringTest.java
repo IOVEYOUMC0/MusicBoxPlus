@@ -52,6 +52,27 @@ class RangeStateChangeFiringTest {
         return code.replaceAll("(?s)/\\*.*?\\*/", "").replaceAll("(?m)//.*$", "");
     }
 
+    // Body of the first method whose declaration contains the given signature, by brace matching.
+    private static String methodBody(String source, String signature) {
+        int declaration = source.indexOf(signature);
+        assertTrue(declaration >= 0, "method not found: " + signature);
+        int open = source.indexOf('{', declaration);
+        assertTrue(open >= 0, "no body after: " + signature);
+        int depth = 0;
+        for (int i = open; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+                if (depth == 0) {
+                    return source.substring(open, i + 1);
+                }
+            }
+        }
+        throw new AssertionError("unbalanced braces after: " + signature);
+    }
+
     @Test
     void theTransitionItselfFiresItAndNoPlayTickDoes() throws Exception {
         assertTrue(Files.exists(RANGE_MODEL), "RangePlayerModel moved: " + RANGE_MODEL);
@@ -73,5 +94,33 @@ class RangeStateChangeFiringTest {
         }
         assertEquals(List.of(), offenders,
                 "playTick cannot observe a range transition, so it must not try to fire this event");
+    }
+
+    // The scan has two shapes. Paper walks the world's players and calls the Player overloads; Folia
+    // walks the shared position snapshot, which deliberately holds only UUIDs, and calls the UUID
+    // overloads. Only the Player overloads reported the transition, so on Folia this public event
+    // never fired at all -- the same symptom the Paper side had, on the other platform.
+    @Test
+    void theUuidTransitionsReportTheEventToo() throws Exception {
+        String model = stripComments(Files.readString(RANGE_MODEL, StandardCharsets.UTF_8));
+
+        assertTrue(methodBody(model, "private void onPlayerEnterRange(Player player)")
+                        .contains("fireRangeStateChange(player, true)"),
+                "the Paper enter path must still report the transition");
+        assertTrue(methodBody(model, "private void onPlayerLeaveRange(Player player)")
+                        .contains("fireRangeStateChange(player, false)"),
+                "the Paper leave path must still report the transition");
+        assertTrue(methodBody(model, "private void onPlayerEnterRange(UUID uuid)")
+                        .contains("fireRangeStateChange(uuid, true)"),
+                "the Folia enter path must report the transition");
+        assertTrue(methodBody(model, "private void onPlayerLeaveRange(UUID uuid)")
+                        .contains("fireRangeStateChange(uuid, false)"),
+                "the Folia leave path must report the transition");
+
+        String byId = methodBody(model, "private void fireRangeStateChange(UUID uuid, boolean inRange)");
+        assertTrue(byId.contains("Bukkit.getPlayer(uuid)"),
+                "the id has to be resolved before the event can be delivered on a region");
+        assertTrue(byId.contains("fireRangeStateChange(player, inRange)"),
+                "the resolved player must go through the same region-dispatched path");
     }
 }

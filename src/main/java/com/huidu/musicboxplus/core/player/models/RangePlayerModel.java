@@ -215,7 +215,9 @@ public class RangePlayerModel {
     //
     // Dispatched to the listener's own region, which is the thread playTick ran on, so a handler that
     // touches the player keeps working under Folia. Isolated because a throwing handler must not
-    // abort the scan for every other listener.
+    // abort the scan for every other listener. The scan has two shapes -- a Player loop on Paper and
+    // a UUID loop over the position snapshot on Folia -- so both have to report the transition; see
+    // the UUID overload below.
     private void fireRangeStateChange(Player player, boolean inRange) {
         if (player == null || model == null) {
             return;
@@ -231,6 +233,20 @@ public class RangePlayerModel {
         Scheduler.entity(player, fire);
     }
 
+    // Transition by id, for the Folia scan: that path deliberately holds only UUIDs (it reads the
+    // shared position snapshot so it never touches a Player off its region), which meant the event
+    // above fired on Paper only -- the same "public API nobody can receive" failure the Paper side
+    // had, just moved to the other platform. Resolving the id is a plain player-table lookup with no
+    // entity state behind it, and the event itself is then delivered on the player's own region.
+    private void fireRangeStateChange(UUID uuid, boolean inRange) {
+        Player player = uuid == null ? null : Bukkit.getPlayer(uuid);
+        if (player == null) {
+            // Offline: there is no region to deliver on, and nothing can be listening for them.
+            return;
+        }
+        fireRangeStateChange(player, inRange);
+    }
+
     private void onPlayerEnterRange(UUID uuid) {
         if (destroyed) return;
         if (model instanceof MusicBoxSongPlayerModel playerModel) {
@@ -238,6 +254,7 @@ public class RangePlayerModel {
         } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
             enginePlayer.addPlayer(uuid);
         }
+        fireRangeStateChange(uuid, true);
     }
 
     private void onPlayerLeaveRange(Player player) {
@@ -253,6 +270,7 @@ public class RangePlayerModel {
         } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
             enginePlayer.removePlayer(uuid);
         }
+        fireRangeStateChange(uuid, false);
     }
 
     private void finishRangeScan(long now) {

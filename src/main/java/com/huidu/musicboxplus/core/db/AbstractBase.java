@@ -395,6 +395,11 @@ public abstract class AbstractBase {
         if (plugin != null && plugin.isShuttingDown()) {
             return;
         }
+        // isPrimaryThread() is CraftServer.isPrimaryThread() -> TickThread.isTickThread(), so on
+        // Folia this fires for a *region* thread too, not just the global one. That is the right
+        // thing to warn about there as well -- a blocking query stalls every player that region
+        // owns, which is worse than stalling one main thread -- but the wording below says "main
+        // thread" because that is what it is on Paper.
         if (Bukkit.isPrimaryThread()) {
             String message = "[数据库警告] 操作 '" + operation + "' 在主线程执行，这可能导致服务器卡顿！请使用异步方法。";
             MusicBox.getInstance().getLogger().warning(message);

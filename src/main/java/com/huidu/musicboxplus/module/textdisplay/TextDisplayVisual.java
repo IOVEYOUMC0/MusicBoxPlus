@@ -84,16 +84,27 @@ final class TextDisplayVisual {
 
     void render(Component component) {
         this.renderedText = component;
-        Location a = this.anchor;
-        if (a == null) {
+        if (this.anchor == null) {
             return;
         }
-        Scheduler.region(a, () -> {
-            if (this.display != null && this.display.isValid()) {
-                this.display.text(component);
-            }
-            if (this.backDisplay != null && this.backDisplay.isValid()) {
-                this.backDisplay.text(component);
+        applyText(this.display, component);
+        applyText(this.backDisplay, component);
+    }
+
+    // Entity mutations go through each display's own scheduler, not the anchor's region.
+    //
+    // The anchor says where the display was spawned, not where it is now: adjustPosition() changes the
+    // configured x/z offset by an unbounded amount, so a display can be nudged into a neighbouring
+    // chunk, and Folia can split a region between two chunks at any time. Scheduling on the anchor's
+    // region then mutates an entity that thread does not own. teleport() already dispatches this way
+    // for exactly that reason.
+    private static void applyText(TextDisplay display, Component component) {
+        if (display == null) {
+            return;
+        }
+        Scheduler.entity(display, () -> {
+            if (display.isValid()) {
+                display.text(component);
             }
         });
     }
@@ -150,58 +161,74 @@ final class TextDisplayVisual {
         if (a == null) {
             return;
         }
+        // The spawn has to happen on the location's region, so the back display is created here and
+        // every mutation below is dispatched to the entity that owns it (see applyText).
         Scheduler.region(a, () -> {
-            if (this.display == null || !this.display.isValid()) {
+            TextDisplay front = this.display;
+            if (front == null || !front.isValid()) {
                 return;
             }
-            this.display.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
-            if (options.isBillboardFixed()) {
-                this.display.setRotation(options.getFixedYaw(), 0.0f);
-            }
+            applyBillboardTo(front, 0.0f);
             boolean wantsBack = wantsBackDisplay();
             if (wantsBack && (this.backDisplay == null || !this.backDisplay.isValid())) {
                 this.backDisplay = spawnDisplay(base(a, 180.0f));
             } else if (!wantsBack && this.backDisplay != null) {
-                this.backDisplay.remove();
+                TextDisplay stale = this.backDisplay;
                 this.backDisplay = null;
+                removeDisplay(stale);
             }
-            if (this.backDisplay != null && this.backDisplay.isValid()) {
-                this.backDisplay.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
-                if (options.isBillboardFixed()) {
-                    this.backDisplay.setRotation(options.getFixedYaw() + 180.0f, 0.0f);
-                }
+            applyBillboardTo(this.backDisplay, 180.0f);
+        });
+    }
+
+    private void applyBillboardTo(TextDisplay display, float yawOffset) {
+        if (display == null) {
+            return;
+        }
+        Scheduler.entity(display, () -> {
+            if (!display.isValid()) {
+                return;
+            }
+            display.setBillboard(options.isBillboardFixed() ? Display.Billboard.FIXED : Display.Billboard.CENTER);
+            if (options.isBillboardFixed()) {
+                display.setRotation(options.getFixedYaw() + yawOffset, 0.0f);
             }
         });
+    }
+
+    private static void removeDisplay(TextDisplay display) {
+        if (display == null) {
+            return;
+        }
+        Scheduler.entity(display, display::remove);
     }
 
     void remove() {
-        Location a = this.anchor;
-        if (a == null) {
+        try {
             removeInternal();
-            return;
+        } catch (Exception e) {
+            // Teardown of the owning player must survive this: the entities are gone or going, and
+            // the registry entries are cleared here either way.
+            DebugLogger.debug("Failed to clear text display visual: " + e.getMessage());
         }
-        Scheduler.region(a, () -> {
-            try {
-                removeInternal();
-            } catch (Exception e) {
-                DebugLogger.debug("Failed to clear text display visual: " + e.getMessage());
-            }
-        });
     }
 
     private void removeInternal() {
-        if (this.interaction != null) {
-            TextDisplayPlayerManager.unregisterInteraction(this.interaction);
-            this.interaction.remove();
-            this.interaction = null;
+        // Same reasoning as applyText: each entity is removed by whoever owns it. A display left on
+        // the anchor's region because it was spawned there is not necessarily still there.
+        Interaction interaction = this.interaction;
+        TextDisplay front = this.display;
+        TextDisplay back = this.backDisplay;
+        this.interaction = null;
+        this.display = null;
+        this.backDisplay = null;
+        if (interaction != null) {
+            // Map-only, so it is safe on any thread; done first so a display that is already gone
+            // can never leave the interaction registered.
+            TextDisplayPlayerManager.unregisterInteraction(interaction);
+            Scheduler.entity(interaction, interaction::remove);
         }
-        if (this.display != null) {
-            this.display.remove();
-            this.display = null;
-        }
-        if (this.backDisplay != null) {
-            this.backDisplay.remove();
-            this.backDisplay = null;
-        }
+        removeDisplay(front);
+        removeDisplay(back);
     }
 }

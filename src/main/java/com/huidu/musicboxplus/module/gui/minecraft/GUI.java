@@ -38,8 +38,13 @@ implements InventoryHolder {
     private void createInventory(String title, int rows) {
         int slots = rows * 9;
         Component titleComponent = MiniMessageUtils.processComponent(title);
+        // "primary thread" means "a server tick thread" here: on Folia Bukkit.isPrimaryThread() is
+        // CraftServer.isPrimaryThread() -> TickThread.isTickThread(), which is true on EVERY region
+        // thread, not just the global one. That is what this guard is for -- it catches an async or
+        // HTTP thread creating a GUI (the real bug it was added for) -- but it is not an ownership
+        // test, so nothing here may use it to decide whether world or entity state is reachable.
         if (!Bukkit.isPrimaryThread()) {
-            throw new IllegalStateException("GUI必须在主线程创建，请使用 BukkitUtils.runSyncTask() 包装调用");
+            throw new IllegalStateException("GUI必须在服务器线程创建，请使用 Scheduler.global() 包装调用");
         }
         try {
             this.inventory = Bukkit.createInventory(this, slots, titleComponent);
@@ -63,8 +68,10 @@ implements InventoryHolder {
     
     private void createInventory(Component title, int rows) {
         int slots = rows * 9;
+        // Same as the String overload above: a tick-thread check, not an ownership check (on Folia
+        // every region thread answers true).
         if (!Bukkit.isPrimaryThread()) {
-            throw new IllegalStateException("GUI必须在主线程创建，请使用 BukkitUtils.runSyncTask() 包装调用");
+            throw new IllegalStateException("GUI必须在服务器线程创建，请使用 Scheduler.global() 包装调用");
         }
         try {
             this.inventory = Bukkit.createInventory(this, slots, title);

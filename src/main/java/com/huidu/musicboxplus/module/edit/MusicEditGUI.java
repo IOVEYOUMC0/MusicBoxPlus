@@ -1449,6 +1449,12 @@ public class MusicEditGUI implements InventoryHolder {
         return music;
     }
 
+    // The editing player. Needed by callers that must reach that player's own region before touching
+    // them -- the shutdown chain in particular (see MusicEditListener.restoreAllPending).
+    Player getPlayer() {
+        return player;
+    }
+
     public boolean isPlaying() {
         return isPlaying;
     }
