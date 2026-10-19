@@ -88,7 +88,8 @@ plugins/MusicBoxPlus/
 ├── language_en.yml      # English language file
 ├── language_zh_cn.yml   # Chinese language file
 ├── songs/               # Song library directory
-└── data.db              # SQLite database (default)
+├── data.db              # SQLite database (default)
+└── jukebox-resume.yml   # Jukeboxes the plugin last saw stopped, so a reload does not restart them
 ```
 
 Each song folder can define its own folder item in `folder.yml`; no separate GUI entry is needed:

@@ -119,6 +119,10 @@ public final class MusicBox extends JavaPlugin {
         eagerLoadShutdownClasses();
         MusicBoxAPI.setService(new MusicBoxApiServiceImpl());
 
+        // Before anything can ask whether a jukebox should resume: the startup restore scan runs a
+        // tick after startup completes, and the first ChunkLoadEvent can be earlier than that.
+        com.huidu.musicboxplus.module.jukebox.JukeboxPlaybackState.load();
+
         new BundledResourceExtractor(this).ensureDefaults(getFile());
         CacheUtils.initialize();
         GUI.registerListener();
@@ -841,6 +845,15 @@ public final class MusicBox extends JavaPlugin {
         // the other latch comments give -- it is state that survives a same-instance re-enable.
         reloading = false;
         loaded = false;
+        // Which jukeboxes were left not playing has to outlive this disable: a /reload, a PlugMan
+        // reload or a stop all come back up through onEnable, whose restore scan would otherwise
+        // start every finished disc over. Written synchronously here, before the async executor and
+        // the region schedulers go away.
+        try {
+            com.huidu.musicboxplus.module.jukebox.JukeboxPlaybackState.saveIfDirty();
+        } catch (Throwable t) {
+            getLogger().log(Level.WARNING, logText("Failed to save jukebox playback state", "保存唱片机播放状态失败"), t);
+        }
         reloadLock.lock();
         try {
             reloadCondition.signalAll();

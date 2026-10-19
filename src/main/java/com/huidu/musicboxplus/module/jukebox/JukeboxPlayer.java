@@ -47,6 +47,10 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
 
     private JukeboxPlayer(IPlayList list, int range, Jukebox box, float speedMultiplier) {
         super(list, box.getLocation(), range, speedMultiplier);
+        // Playback is starting here, so any "this disc already finished" mark for the block is
+        // stale. Also the only place that sees a playback start for every entry point (click,
+        // hopper, redstone, playlist rotation, reload restore).
+        JukeboxPlaybackState.markPlaying(box.getLocation());
         SignUtils.findSign(box.getLocation()).ifPresent(sign -> {
             this.infoSign = sign.getLocation();
             SignPlaylistUtils.setPlayListInfo(this.infoSign, list);
@@ -231,6 +235,12 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
             if (song == null || song.shouldUseVanillaJukeboxPlayback()) {
                 continue;
             }
+            // A disc that had already finished (or was paused/stopped) must stay silent: "the block
+            // holds a disc" is not "should be playing". This is what stopped a reload from starting
+            // every played-to-the-end jukebox over from the beginning; see JukeboxPlaybackState.
+            if (!JukeboxPlaybackState.shouldResume(jukebox.getLocation(), song.getHash())) {
+                continue;
+            }
             JukeboxPlayer.createNew(jukebox);
         }
     }
@@ -324,5 +334,54 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
     @Override
     public Location getInfoSign() {
         return this.infoSign;
+    }
+
+    // ==================== "Is this jukebox supposed to be playing" ====================
+    //
+    // Only "the block holds a MusicBox disc" survives a restart, and the restore paths (startup scan
+    // and ChunkLoadEvent) read that as "should be playing". Without a remembered state, a disc that
+    // had already finished -- or that the player had paused or stopped -- started over on the next
+    // /reload, PlugMan reload or server restart. Vanilla never does that. See JukeboxPlaybackState.
+
+    private int currentSongHash() {
+        if (this.getMusicBoxModel() == null) {
+            return -1;
+        }
+        IPlayList list = this.getMusicBoxModel().getPlayList();
+        MusicBoxSong current = list != null ? (MusicBoxSong) list.getCurrent() : null;
+        return current != null ? current.getHash() : -1;
+    }
+
+    @Override
+    public boolean pause() {
+        if (!super.pause()) {
+            // A listener vetoed the pause, so the jukebox is still playing: nothing to remember.
+            return false;
+        }
+        JukeboxPlaybackState.markNotPlaying(this.getTargetLocation(), currentSongHash());
+        return true;
+    }
+
+    @Override
+    public boolean resume() {
+        if (!super.resume()) {
+            return false;
+        }
+        JukeboxPlaybackState.markPlaying(this.getTargetLocation());
+        return true;
+    }
+
+    // Both reasons mean the jukebox is idle while its disc stays in the block: a stop leaves the
+    // player alive only until the caller destroys it, and a song that reaches its end deliberately
+    // keeps the disc (see songEnd). Everything else -- handover (REPLACED), reload, shutdown, world
+    // unload, a disc taken out -- must NOT be recorded as finished: a handover is a new playback, the
+    // reload path restores the state itself, and the remaining cases have no disc left to restore.
+    @Override
+    public void destroy(DestroyReason reason) {
+        if (!this.isDestroyed()
+                && (reason == DestroyReason.SONG_END || reason == DestroyReason.MANUAL_STOP)) {
+            JukeboxPlaybackState.markNotPlaying(this.getTargetLocation(), currentSongHash());
+        }
+        super.destroy(reason);
     }
 }
