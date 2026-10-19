@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent.DestroyReason;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.common.Permissions;
+import com.huidu.musicboxplus.common.utils.NoteParticleColor;
 import com.huidu.musicboxplus.common.utils.SignUtils;
 import com.huidu.musicboxplus.core.player.AbstractBlockPlayer;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
@@ -26,12 +27,14 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
-import java.util.Random;
 
 public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musicboxplus.api.player.VanillaJukeboxPlayback {
     private Location infoSign;
     private static final long BLOCK_CHECK_INTERVAL_MS = 5000L;
-    private static final Random PARTICLE_RANDOM = new Random();
+    // The decorative note particle: one per second of real time, whatever the server tick rate is.
+    static final long PARTICLE_INTERVAL_MILLIS = 1000L;
+    // Wall-clock pace for the note particle; see tick().
+    private long nextParticleAt = 0L;
     // Wall-clock throttle for the "is the jukebox block still here / still holding a disc" check.
     // A song-tick gate cannot be used: the tick mirror freezes at 0 whenever the jukebox has no
     // listeners in range (playTick, the only thing that advances it, never runs), so tick % 100 == 0
@@ -238,25 +241,30 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         if (this.isDestroyed()) {
             return;
         }
+        long now = System.currentTimeMillis();
         Location loc = this.getTargetLocation();
         // Only while actually playing. A paused or stopped jukebox showing note particles reads
         // as still running, and vanilla shows none in that state either.
-        if (loc != null && this.isPlaying()) {
+        //
+        // Gated by the wall clock, not by the tick the timer happens to run on: this is the visual
+        // for a song that advances in real time, so pacing it in ticks made /tick rate raise the
+        // particle rate with it (at 100 tps the "one per second" below became five). One second is
+        // visually enough, as before.
+        if (loc != null && this.isPlaying() && now >= this.nextParticleAt) {
             World world = loc.getWorld();
             if (world != null) {
+                this.nextParticleAt = now + PARTICLE_INTERVAL_MILLIS;
                 // Playback is plugin-driven, so the block never enters vanilla's "playing" state
                 // and emits no note particles of its own; spawn them here instead.
                 double x = loc.getBlockX() + 0.5;
                 double y = loc.getBlockY() + 1.2;
                 double z = loc.getBlockZ() + 0.5;
-                // With a count of 0 the offset arguments carry particle data instead of spread,
-                // which is how the note color (0-24) is chosen. One particle per tick (~1s) is
-                // visually enough.
+                // With a count of 0 the offset argument carries the colour instead of a spread. It
+                // is a fraction of a hue turn, not a note number: see NoteParticleColor.
                 world.spawnParticle(Particle.NOTE, x, y, z, 0,
-                    PARTICLE_RANDOM.nextInt(25), 0, 0);
+                    NoteParticleColor.random(), 0, 0);
             }
         }
-        long now = System.currentTimeMillis();
         if (now < this.nextBlockCheckAt) {
             return;
         }
