@@ -40,6 +40,10 @@ public class MusicEditListener implements Listener {
         void handleClick(InventoryHolder holder, int rawSlot, boolean isRightClick, boolean isShiftClick);
     }
     
+    // Populated once, from the static initialiser below. Deliberately never cleared: the initialiser
+    // does not run again when the plugin is re-enabled on the same classloader (PlugMan-style), so
+    // emptying it here would leave every GUI click unhandled for the rest of the JVM's life -- the
+    // same failure mode the GUIInputManager registration bug had.
     private static final Map<Class<? extends InventoryHolder>, GUIHandler> GUI_HANDLERS = new ConcurrentHashMap<>();
     
     static {
@@ -430,6 +434,15 @@ public class MusicEditListener implements Listener {
             cleanupTask.cancel();
             cleanupTask = null;
         }
+        // Static state that outlives the listener. openGUIs is cleared by restoreAllPending(), which
+        // runs earlier in the shutdown chain; these three were simply left behind. A text-input
+        // session holds the player, the song and callbacks that capture a GUI, and a soft reload kept
+        // it alive: the player could still answer a prompt from the previous session and have it
+        // delivered into a GUI that belongs to the old classloader. musicLocks and warnedPlayers are
+        // bounded but equally session-scoped.
+        MusicEditTextInputManager.cleanupAllSessions();
+        musicLocks.clear();
+        warnedPlayers.clear();
     }
     
     private static void startCleanupTask() {
@@ -470,9 +483,20 @@ public class MusicEditListener implements Listener {
             // reach this GUI. The timer would then hold the player, the music and the inventory
             // for the rest of the server's life.
             gui.stopAutoSaveTask();
-            if (gui.isPlaying()) {
-                gui.stopMusic();
+            if (!gui.isPlaying()) {
+                continue;
             }
+            Player owner = gui.getPlayer();
+            if (owner == null) {
+                continue;
+            }
+            // On the player's own region: stopMusic() rewrites the editor's toolbar into their
+            // hotbar, and this method is reached from the shutdown/reload chain, which on Folia runs
+            // on the global region thread and owns nobody. Scheduler.entity runs it inline when the
+            // caller does own the region (Paper's main thread, and the quit path) and skips it when
+            // the plugin is already disabled, which is why the backup -- not this repaint -- is what
+            // gives the player their inventory back.
+            Scheduler.entity(owner, gui::stopMusic);
         }
         openGUIs.clear();
     }
@@ -556,8 +580,7 @@ public class MusicEditListener implements Listener {
         }
 
         if (message.trim().isEmpty()) {
-            MusicEditGUI.restoreTextInputSession(player.getUniqueId(), data);
-            MessageUtils.send(player, Lang.EDIT_INPUT_EMPTY_RETRY);
+            retryTextInput(player, data, Lang.EDIT_INPUT_EMPTY_RETRY);
             return;
         }
 
@@ -571,12 +594,12 @@ public class MusicEditListener implements Listener {
         switch (data.type) {
             case "name":
                 if (input.length() > 32) {
-                    MessageUtils.send(player, Lang.OPERATION_FAILED);
+                    retryTextInput(player, data, Lang.EDIT_INPUT_INVALID_RETRY);
                     return;
                 }
                 String safeName = sanitizeInput(input, 32);
                 if (safeName.isEmpty()) {
-                    MessageUtils.send(player, Lang.OPERATION_FAILED);
+                    retryTextInput(player, data, Lang.EDIT_INPUT_INVALID_RETRY);
                     return;
                 }
                 data.music.setName(safeName);
@@ -613,7 +636,25 @@ public class MusicEditListener implements Listener {
 
             default:
                 MessageUtils.send(player, Lang.OPERATION_FAILED);
+                // Unreachable with the types this code sets, but a session that is consumed without
+                // either a submit or a cancel leaves the menu closed and openingSubGUI pinned.
+                if (data.cancelHandler != null) {
+                    data.cancelHandler.run();
+                }
         }
+    }
+
+    // Puts the prompt back instead of swallowing the input session.
+    //
+    // getTextInputSession already removed the session from the manager, so returning after a rejected
+    // value left the player with no prompt and no way to retry. It also pinned the editor's
+    // openingSubGUI flag true, because clearing it is the cancelHandler's job and that only ran on
+    // submit or cancel -- which made isForceClose() true for the rest of the editor session, so
+    // pressing ESC stopped restoring the player's real inventory. The empty-input branch already
+    // restored the session and asked for a retry; the rejected-value branches did not.
+    private void retryTextInput(Player player, MusicEditTextInputManager.TextInputData data, Lang message) {
+        MusicEditGUI.restoreTextInputSession(player.getUniqueId(), data);
+        MessageUtils.send(player, message);
     }
     
     private String sanitizeInput(String input, int maxLength) {

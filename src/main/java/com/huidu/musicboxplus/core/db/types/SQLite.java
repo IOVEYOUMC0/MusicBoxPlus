@@ -64,6 +64,23 @@ public class SQLite extends AbstractBase {
         config.setMaximumPoolSize(4);
         config.setMinimumIdle(1);
         config.setMaxLifetime(1800000);
+        // 30 s of waiting for a free connection, on top of up to busy_timeout's 10 s of waiting for
+        // SQLite's own write lock. That mismatch with the number of threads that can issue JDBC --
+        // AsyncTaskManager's 16, the song loader's 8, the 2 scheduled threads, 26 in total -- was
+        // reviewed and deliberately left alone:
+        //
+        //   * A `Semaphore` sized to the pool, as suggested, only moves the queue. The waiting thread
+        //     is the same async thread either way, and releasing the permit would have to hang off a
+        //     proxy Connection's close(), so a caller that forgets to close one would block the pool
+        //     for good instead of getting Hikari's timeout exception. That is a new way to deadlock
+        //     in exchange for nothing.
+        //   * Failing fast instead of waiting would drop writes that would have succeeded a moment
+        //     later. SQLite serializes writers regardless, so a wait is the correct behaviour; the
+        //     pool size is not the bottleneck the wait is queueing on.
+        //   * What bounds the damage is that all of this is off the main thread, Hikari's timeout is
+        //     a real error rather than a hang, and the async queue is bounded (512) so the burst
+        //     cannot grow without limit. Callers of a failed save re-stage their snapshot, so a
+        //     timeout is retried rather than lost.
         config.setConnectionTimeout(30000);
         config.setLeakDetectionThreshold(60000);
         config.setPoolName("MusicBox-SQLite-Pool");

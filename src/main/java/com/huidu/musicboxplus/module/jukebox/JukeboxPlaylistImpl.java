@@ -26,7 +26,6 @@ class JukeboxPlaylistImpl implements IPlayList {
     private final Location jukeboxLoc;
     private MusicBoxSong cachedSong;
     private boolean shuffleMode = false;
-    private volatile List<ChestIndex> cachedOrderedSongs = Collections.emptyList();
     private static final Random SHARED_RANDOM = new Random();
 
     public JukeboxPlaylistImpl(Location jukebox) throws JukeboxPlaylistInitException {
@@ -37,12 +36,9 @@ class JukeboxPlaylistImpl implements IPlayList {
             throw new JukeboxPlaylistInitException("Location does not contains jukebox");
         }
         @Nullable Inventory inv = this.getChestInventory();
-        // Tracks whether getByIndex already filled the cache, so the chest isn't scanned twice
-        boolean cachePopulated = false;
         if (jc.isEmpty()) {
             if (inv != null) {
                 ChestIndex s = this.getByIndex(inv, 0);
-                cachePopulated = true;
                 if (s == null) {
                     startSongTemp = null;
                 } else {
@@ -62,16 +58,12 @@ class JukeboxPlaylistImpl implements IPlayList {
         this.cachedSong = startSongTemp;
         if (startSongTemp == null && inv != null) {
             ChestIndex s = this.getByIndex(inv, 0);
-            cachePopulated = true;
             if (s != null) {
                 startSongTemp = s.getSong();
                 inv.setItem(s.getIndex(), null);
                 this.setJukeboxItem(jc, s.getStack(), startSongTemp);
                 this.cachedSong = startSongTemp;
             }
-        }
-        if (inv != null && !cachePopulated) {
-            this.refreshOrderedSongsCache(inv);
         }
     }
 
@@ -119,7 +111,6 @@ class JukeboxPlaylistImpl implements IPlayList {
             inv.setItem(nextItem.getIndex(), currentJukeboxItem);
         }
         this.setJukeboxItem(cBox, nextItem.getStack(), nextItem.getSong());
-        this.refreshOrderedSongsCache(inv);
     }
 
     private void rotateNextSong(Inventory inv, IJukebox cBox) {
@@ -137,9 +128,22 @@ class JukeboxPlaylistImpl implements IPlayList {
         ChestIndex last = songs.getLast();
         inv.setItem(last.getIndex(), currentJukeboxItem == null || currentJukeboxItem.isEmpty() ? null : currentJukeboxItem);
         this.setJukeboxItem(cBox, nextItem.getStack(), nextItem.getSong());
-        this.refreshOrderedSongsCache(inv);
     }
 
+    // The container is scanned fresh on every call, and that is the whole reason there is no cache
+    // field left here.
+    //
+    // The list carries both slot indexes and ItemStack snapshots, and the write paths put those
+    // snapshots straight back into chest slots. From a stale list, a disc the player already took
+    // would be written back (duplication) and whatever now sits in that slot would be overwritten
+    // (item loss), so correctness cannot depend on an event keeping a cache fresh. The cost is
+    // acceptable: only low-frequency paths reach here (track change, GUI click, redstone pulse), at
+    // most 54 slots, and findPlayableJukeboxSongByItem short-circuits on items without meta.
+    //
+    // What used to sit on top of this -- a cachedOrderedSongs field refreshed at the end of every
+    // write path -- scanned the container a second time and then handed the result to nobody: the
+    // only reader refreshed before reading. Every track change therefore scanned the container
+    // twice, and the chest-click listener scanned it once per click for the same nothing.
     private List<ChestIndex> getOrderedSongs(Inventory inventory) {
         List<ChestIndex> songs = new ArrayList<>();
         for (int slot = 0; slot < inventory.getSize(); slot++) {
@@ -154,27 +158,6 @@ class JukeboxPlaylistImpl implements IPlayList {
             songs.add(new ChestIndex(slot, item, song));
         }
         return songs;
-    }
-
-    private void refreshOrderedSongsCache(Inventory inventory) {
-        this.cachedOrderedSongs = Collections.unmodifiableList(this.getOrderedSongs(inventory));
-    }
-
-    // Returns the chest's songs ordered by slot, always rescanning the inventory's current
-    // contents.
-    //
-    // Reusing a non-empty cache is deliberately not an option: the list carries both slot
-    // indexes and ItemStack snapshots, and setSong/back write those straight back into chest
-    // slots. From a stale list, a disc the player already took gets written back (duplication)
-    // and whatever now sits in that slot is overwritten (item loss). Correctness here must not
-    // depend on some event firing to keep a cache fresh.
-    //
-    // The cost is acceptable: only low-frequency write paths (track change, GUI click, redstone
-    // pulse) reach here, at most 54 slots, and findPlayableJukeboxSongByItem short-circuits on
-    // items without meta.
-    private List<ChestIndex> getCachedOrRefreshOrderedSongs(Inventory inventory) {
-        this.refreshOrderedSongsCache(inventory);
-        return this.cachedOrderedSongs;
     }
 
     @Override
@@ -197,7 +180,7 @@ class JukeboxPlaylistImpl implements IPlayList {
     }
 
     private ChestIndex getRandomSong(Inventory inventory) {
-        List<ChestIndex> songs = this.getCachedOrRefreshOrderedSongs(inventory);
+        List<ChestIndex> songs = this.getOrderedSongs(inventory);
         if (songs.isEmpty()) {
             return null;
         }
@@ -220,7 +203,7 @@ class JukeboxPlaylistImpl implements IPlayList {
         if (cBox == null) {
             return;
         }
-        List<ChestIndex> songs = this.getCachedOrRefreshOrderedSongs(inventory);
+        List<ChestIndex> songs = this.getOrderedSongs(inventory);
         if (songs.isEmpty()) {
             return;
         }
@@ -239,7 +222,6 @@ class JukeboxPlaylistImpl implements IPlayList {
             invSet(inventory, songs.getFirst().getIndex(), null);
         }
         this.setJukeboxItem(cBox, previousItem.getStack(), previousItem.getSong());
-        this.refreshOrderedSongsCache(inventory);
     }
 
     @Override
@@ -249,7 +231,7 @@ class JukeboxPlaylistImpl implements IPlayList {
             return Collections.emptyList();
         }
         // 一次扫描拿到有序歌曲列表，避免 getByIndex 每次调用都重扫整个容器
-        List<ChestIndex> songs = this.getCachedOrRefreshOrderedSongs(inv);
+        List<ChestIndex> songs = this.getOrderedSongs(inv);
         List<MusicBoxSong> list = new ArrayList<>(Math.min(count, songs.size()));
         int end = Math.min(count, songs.size());
         for (int i = 0; i < end; i++) {
@@ -291,7 +273,7 @@ class JukeboxPlaylistImpl implements IPlayList {
     }
 
     private ChestIndex getByIndex(Inventory inventory, int index) {
-        List<ChestIndex> songs = this.getCachedOrRefreshOrderedSongs(inventory);
+        List<ChestIndex> songs = this.getOrderedSongs(inventory);
         if (index < 0 || index >= songs.size()) {
             return null;
         }
@@ -312,7 +294,7 @@ class JukeboxPlaylistImpl implements IPlayList {
     }
 
     private ChestIndex getLastSong(Inventory inventory) {
-        List<ChestIndex> songs = this.getCachedOrRefreshOrderedSongs(inventory);
+        List<ChestIndex> songs = this.getOrderedSongs(inventory);
         return songs.isEmpty() ? null : songs.getLast();
     }
 
@@ -375,7 +357,7 @@ class JukeboxPlaylistImpl implements IPlayList {
             return;
         }
 
-        List<ChestIndex> orderedSongs = new ArrayList<>(this.getCachedOrRefreshOrderedSongs(inv));
+        List<ChestIndex> orderedSongs = new ArrayList<>(this.getOrderedSongs(inv));
         ItemStack currentItem = jukebox.getJukebox();
         ChestIndex currentEntry = current != null && currentItem != null && !currentItem.isEmpty()
             ? new ChestIndex(-1, currentItem, current)
@@ -413,7 +395,6 @@ class JukeboxPlaylistImpl implements IPlayList {
         }
 
         this.setJukeboxItem(jukebox, target.getStack(), target.getSong());
-        this.refreshOrderedSongsCache(inv);
         this.cachedSong = target.getSong();
     }
 
@@ -427,14 +408,11 @@ class JukeboxPlaylistImpl implements IPlayList {
         this.updateCachedSong();
     }
 
+    // Nothing to re-read ahead of time: every read below scans the container itself, so the only
+    // state that can go stale after a container edit is the current song. Kept as a no-op-with-a-
+    // purpose rather than deleted because it is the playlist API's "the container changed" hook.
     @Override
     public void updatePlaylist() {
-        Inventory inventory = this.getChestInventory();
-        if (inventory != null) {
-            this.refreshOrderedSongsCache(inventory);
-        } else {
-            this.cachedOrderedSongs = Collections.emptyList();
-        }
         this.updateCachedSong();
     }
 

@@ -109,10 +109,11 @@ public final class ReloadPlaybackState {
                         if (!player.isDestroyed()) {
                             if (player instanceof SignPlayer signPlayer) {
                                 blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.SIGN, location,
-                                        getCurrentSongHash(player), player.getTick(), signPlayer.getOwnerUuid()));
+                                        getCurrentSongHash(player), player.getTick(), signPlayer.getOwnerUuid(),
+                                        player.isPaused()));
                             } else {
                                 blockSnapshots.add(new BlockPlaybackSnapshot(BlockPlaybackType.JUKEBOX, location,
-                                        getCurrentSongHash(player), player.getTick(), null));
+                                        getCurrentSongHash(player), player.getTick(), null, player.isPaused()));
                             }
                         }
                     } finally {
@@ -273,9 +274,21 @@ public final class ReloadPlaybackState {
     }
 
     private void restoreBlockPlayerStateLater(Location location, BlockPlaybackSnapshot snapshot) {
+        restoreBlockPlayerStateLater(location, snapshot, 0);
+    }
+
+    // Retried because a cold song is compiled asynchronously: the player is constructed a few ticks
+    // after createNew() returns, and restoring before that used to lose the song, the position and
+    // now the paused state as well. A warm song is done on the first attempt.
+    private static final int RESTORE_ATTEMPTS = 8;
+
+    private void restoreBlockPlayerStateLater(Location location, BlockPlaybackSnapshot snapshot, int attempt) {
         com.huidu.musicboxplus.common.utils.scheduler.Scheduler.regionLater(location, () -> {
             AbstractBlockPlayer restored = AbstractBlockPlayer.findByLocation(location);
             if (restored == null || restored.isDestroyed()) {
+                if (attempt + 1 < RESTORE_ATTEMPTS) {
+                    restoreBlockPlayerStateLater(location, snapshot, attempt + 1);
+                }
                 return;
             }
             if (snapshot.songHash() != -1) {
@@ -283,6 +296,13 @@ public final class ReloadPlaybackState {
             }
             if (snapshot.tick() > -1) {
                 restored.setTick(snapshot.tick());
+            }
+            // The reload destroyed a paused player and rebuilt it playing. Park it again, through
+            // pause() rather than setPlaying(false), so a listener that paused the disc from the
+            // control panel sees the same event path afterwards -- and so nothing downstream (a
+            // display plugin, for one) is left animating a silent jukebox.
+            if (snapshot.paused()) {
+                restored.pause();
             }
         }, 2L);
     }
@@ -301,8 +321,11 @@ public final class ReloadPlaybackState {
     // ownerUuid rides along because SignPlayer.isOwnerOrAdmin treats a null owner as "everyone
     // owns this". Recreating a captured sign through createSign (owner null) therefore handed the
     // destroy button, the protect toggle and song switching to every player on the server.
+    //
+    // paused does too: restoring a paused jukebox as playing made a silent disc start over on
+    // /musicboxplus reload. The restore rebuilds a playing player, so the state has to be re-applied.
     private record BlockPlaybackSnapshot(BlockPlaybackType type, Location location, int songHash, int tick,
-                                         java.util.UUID ownerUuid) {
+                                         java.util.UUID ownerUuid, boolean paused) {
     }
 
     private enum BlockPlaybackType {

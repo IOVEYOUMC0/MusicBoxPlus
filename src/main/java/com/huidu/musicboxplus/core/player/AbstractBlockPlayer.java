@@ -4,7 +4,6 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.event.MusicBoxPlaybackStartEvent;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent.DestroyReason;
-import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
@@ -373,11 +372,36 @@ implements PositionPlayer {
         LocationKey key = new LocationKey(location);
         AbstractBlockPlayer cached = infoSignIndex.get(key);
         if (cached != null && !cached.isDestroyed()) return Optional.of((T) cached);
-        for (AbstractBlockPlayer player : players.values()) {
-            if (player.isDestroyed()) continue;
-            if (player.getInfoSign() != null && player.getInfoSign().equals(location)) {
-                infoSignIndex.put(key, player);
-                return Optional.of((T) player);
+
+        // Only the block players that could own this sign, not the whole registry.
+        //
+        // This used to walk every block player and compare getInfoSign(), and the negative result was
+        // never cached -- so with the signs module on, *every* right-click on *any* sign (an ordinary
+        // sign, a music sign without an info sign, a sign that is not ours) paid a full pass. 500
+        // placed music signs made that 500 Location.equals per click.
+        //
+        // An info sign is found by SignUtils.findSign, which offsets the search vertically and nothing
+        // else, so the player it belongs to is in the same chunk column; the 3x3 neighbourhood covers
+        // that with room to spare and keeps the scan bounded whatever the player count. Chosen over
+        // caching the negative result, which is what the review suggested: a negative cache needs
+        // invalidating on every block player creation, destruction and info-sign reassignment, and
+        // missing one of those makes an info sign silently stop working -- a functional regression in
+        // exchange for a few hundred pointer comparisons.
+        World world = location.getWorld();
+        if (world == null) {
+            return Optional.empty();
+        }
+        int chunkX = location.getBlockX() >> 4;
+        int chunkZ = location.getBlockZ() >> 4;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dz = -1; dz <= 1; dz++) {
+                for (AbstractBlockPlayer player : findByChunk(world, chunkX + dx, chunkZ + dz)) {
+                    if (player.isDestroyed()) continue;
+                    if (player.getInfoSign() != null && player.getInfoSign().equals(location)) {
+                        infoSignIndex.put(key, player);
+                        return Optional.of((T) player);
+                    }
+                }
             }
         }
         return Optional.empty();
@@ -434,18 +458,12 @@ implements PositionPlayer {
             return;
         }
 
-        boolean inRange = this.rangePlayerModel.isPlayerInRange(player);
-        Boolean wasInRange = this.playerList.get(player.getUniqueId());
-        if (inRange) {
-            if (wasInRange == null || !wasInRange) {
-                this.playerList.put(player.getUniqueId(), true);
-                fireRangeStateChange(player, true);
-            }
-        } else if (wasInRange != null && wasInRange) {
-            this.playerList.put(player.getUniqueId(), false);
-            fireRangeStateChange(player, false);
-        }
-        if (!inRange) {
+        // Range membership, and the MusicBoxRangeStateChangeEvent that reports it, belong to the
+        // range scan: RangePlayerModel adds and removes listeners there and fires the event on the
+        // actual transition. playTick only runs for listeners the scan currently holds, so
+        // re-deriving the transition here could never see one -- see
+        // RangePlayerModel.fireRangeStateChange.
+        if (!this.rangePlayerModel.isPlayerInRange(player)) {
                 return;
         }
         CompiledSong compiled = this.compiledSong;
@@ -469,16 +487,6 @@ implements PositionPlayer {
         float stereoWidth = 0F;
         NoteEmitter.emitTick(player, targetLocation, compiled, tick, baseVolume,
             this.soundCategory, this.enable10Octave, stereoWidth);
-    }
-
-    // Range enter/leave is dispatched on the listener's own region thread; a throwing listener
-    // must not abort the tick loop, so the event is isolated like the other playTick callEvents.
-    private void fireRangeStateChange(Player player, boolean inRange) {
-        try {
-            Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(this, player, inRange));
-        } catch (Exception ex) {
-            logger.debug("Exception dispatching MusicBoxRangeStateChangeEvent: {}", ex.getMessage());
-        }
     }
 
     public void setStoredPlaybackSpeedMultiplier(float playbackSpeedMultiplier) {

@@ -75,9 +75,14 @@ public final class PlaybackSetup {
     // transition at the end of the current song does not pay for it. Silent about failures: this
     // is a hint, and the real load happens when that song actually starts.
     public static void prefetchNext(IPlayList list) {
-        if (list == null || !list.hasNext()) {
+        if (list == null) {
             return;
         }
+        // One read of the next entry, not hasNext() followed by getNextSongs(1). They answer the same
+        // question, and for a jukebox each answer is a full scan of the adjacent container -- every
+        // one of its slots, and every item's meta, resolved to a song -- so asking both doubled the
+        // scanning done on the region thread at each track change. An empty result is the "nothing
+        // next" case for every playlist implementation.
         java.util.List<? extends com.huidu.musicboxplus.api.song.MusicBoxSong> next = list.getNextSongs(1);
         if (next.isEmpty()) {
             return;

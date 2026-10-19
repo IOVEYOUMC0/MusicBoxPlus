@@ -149,6 +149,12 @@ public class SongContainerGUI {
         this.renderSongSlots(gui, layoutParser, mapping, page, params, guiType, skipElements, false);
     }
     
+    // Re-renders the visible page, rebuilding one ItemStack per song slot (36 by default).
+    //
+    // Reviewed for caching the stacks and left as it is: a song's lore carries live state (playing,
+    // shop price, ownership), the stack is mutable and handed to inventories, and the rebuild only
+    // happens on a click or a page change rather than per tick. MusicBoxSong already memoizes the
+    // lore strings and builds each stack's meta in one get/set pass, which is where the cost was.
     public void refreshCurrentPage() {
         if (this.currentGUI == null || this.currentParams == null) {
             return;

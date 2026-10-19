@@ -8,11 +8,17 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public final class HikariLogConfigurator {
+    // Only this plugin's own copy of HikariCP.
+    //
+    // The unrelocated `com.zaxxer.hikari.*` names used to be in this list too, and they are not ours:
+    // shadowJar relocates the bundled HikariCP to `com.huidu.musicboxplus.shadow.hikari` and rewrites
+    // the logger names with it -- verified by extracting the shaded HikariDataSource from the built
+    // jar, whose only hikari string is the relocated one. So those four entries could only ever reach
+    // some *other* HikariCP on the same JVM (another plugin, or the server itself), and turn its
+    // logging to FINE when this plugin runs with debug: true, or suppress its INFO output when it
+    // does not. A plugin has no business changing another plugin's log level, and it did so
+    // permanently: the JUL levels and the slf4j-simple system properties are never restored.
     private static final List<String> LOGGER_NAMES = List.of(
-        "com.zaxxer.hikari",
-        "com.zaxxer.hikari.HikariConfig",
-        "com.zaxxer.hikari.HikariDataSource",
-        "com.zaxxer.hikari.pool.HikariPool",
         "com.huidu.musicboxplus.shadow.hikari",
         "com.huidu.musicboxplus.shadow.hikari.HikariConfig",
         "com.huidu.musicboxplus.shadow.hikari.HikariDataSource",

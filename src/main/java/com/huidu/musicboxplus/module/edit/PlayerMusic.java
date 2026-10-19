@@ -111,12 +111,35 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         this.notes = Collections.synchronizedList(new ArrayList<>(notes));
         this.noteIndexMap = Collections.synchronizedMap(new HashMap<>());
         this.tickIndexMap = Collections.synchronizedNavigableMap(new TreeMap<>());
-        for (MusicNote note : this.notes) {
-            String key = createNoteKey(note.getPitch(), note.getTick());
-            this.noteIndexMap.put(key, note);
+        this.description = description != null ? description : "";
+    }
+
+    // Two secondary indexes are kept for the editor and the playback preview: pitch+tick -> note, and
+    // tick -> notes at that tick. Both are built on first use rather than here.
+    //
+    // A player song is 10k-100k notes. Building them eagerly cost a HashMap node plus a concatenated
+    // String key per note and a TreeMap node plus a lock-carrying CopyOnWriteArrayList per distinct
+    // tick -- 80-130 MB of permanent heap for a million notes -- and the paths that only list or
+    // search songs (shop, browser, playlists, the disc adapters) never read either index. Only
+    // editing and playing a song does, and those build it on their first call.
+    //
+    // Every reader and writer of the maps is synchronized, so a plain flag is enough.
+    private boolean indexesBuilt;
+
+    /** Whether the pitch/tick indexes have been materialised yet; they are built on first use. */
+    boolean indexesBuilt() {
+        return indexesBuilt;
+    }
+
+    private void ensureIndexes() {
+        if (indexesBuilt) {
+            return;
+        }
+        for (MusicNote note : notes) {
+            this.noteIndexMap.put(createNoteKey(note.getPitch(), note.getTick()), note);
             this.tickIndexMap.computeIfAbsent(note.getTick(), k -> new CopyOnWriteArrayList<>()).add(note);
         }
-        this.description = description != null ? description : "";
+        indexesBuilt = true;
     }
 
     private String createNoteKey(int pitch, int tick) {
@@ -195,6 +218,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     }
 
     public synchronized boolean addNote(MusicNote note) {
+        ensureIndexes();
         String key = createNoteKey(note.getPitch(), note.getTick());
         if (noteIndexMap.containsKey(key)) {
             return false;
@@ -210,6 +234,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     }
 
     public synchronized boolean removeNote(MusicNote note) {
+        ensureIndexes();
         String key = createNoteKey(note.getPitch(), note.getTick());
         boolean removed = notes.remove(note);
         if (removed) {
@@ -228,10 +253,12 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     }
 
     public synchronized MusicNote getNote(int pitch, int tick) {
+        ensureIndexes();
         return noteIndexMap.get(createNoteKey(pitch, tick));
     }
 
     public synchronized List<MusicNote> getNotesAtTick(int tick) {
+        ensureIndexes();
         List<MusicNote> tickNotes = tickIndexMap.get(tick);
         return tickNotes != null ? new ArrayList<>(tickNotes) : Collections.emptyList();
     }
@@ -248,7 +275,21 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     }
     
     public synchronized NavigableMap<Integer, List<MusicNote>> getTickIndexMap() {
+        ensureIndexes();
         return new TreeMap<>(tickIndexMap);
+    }
+
+    // The two index reads the playback loop needs, answered without copying the whole tree. The loop
+    // calls them once per tick while a song plays; getTickIndexMap() would build an entry per note in
+    // the song on every one of those calls.
+    public synchronized Integer firstNoteTickAtOrAfter(int tick) {
+        ensureIndexes();
+        return tickIndexMap.ceilingKey(tick);
+    }
+
+    public synchronized Integer lastNoteTick() {
+        ensureIndexes();
+        return tickIndexMap.isEmpty() ? null : tickIndexMap.lastKey();
     }
 
     public synchronized void clearNotes() {
@@ -256,6 +297,9 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         noteIndexMap.clear();
         tickIndexMap.clear();
         cachedMaxTick = -1;
+        // The indexes are empty and in sync with the (empty) note list; leaving the flag set means a
+        // later add does not rebuild from notes, which would resurrect the notes just cleared.
+        indexesBuilt = true;
         updateTimestamp();
     }
 
@@ -267,12 +311,22 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         if (cachedMaxTick >= 0) {
             return cachedMaxTick;
         }
-        if (tickIndexMap.isEmpty()) {
-            cachedMaxTick = 0;
-        } else {
-            cachedMaxTick = tickIndexMap.lastKey();
+        if (indexesBuilt) {
+            cachedMaxTick = tickIndexMap.isEmpty() ? 0 : tickIndexMap.lastKey();
+            return cachedMaxTick;
         }
-        return cachedMaxTick;
+        // Not built, and deliberately not built here: this is what the listing paths ask for (the web
+        // API's song snapshots, the duration on a disc's lore), so building the whole index to answer
+        // it would undo the point of building it on demand. One pass over the note list allocates
+        // nothing, and the answer is cached.
+        int max = 0;
+        for (MusicNote note : notes) {
+            if (note.getTick() > max) {
+                max = note.getTick();
+            }
+        }
+        cachedMaxTick = max;
+        return max;
     }
 
     // Metadata copy with no notes, for the caller that is about to replace the note set anyway.
@@ -316,6 +370,8 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
             this.noteIndexMap.put(key, note);
             this.tickIndexMap.computeIfAbsent(note.getTick(), k -> new CopyOnWriteArrayList<>()).add(note);
         }
+        // Rebuilt in full above, so it is in sync whatever the flag said before.
+        this.indexesBuilt = true;
         this.cachedMaxTick = -1;
     }
 

@@ -297,6 +297,8 @@ public class PlayListEditorGUI {
     private int addContainerSync(FullSongContainer container) {
         LinkedHashSet<MusicBoxSong> songsToAdd = new LinkedHashSet<>();
         collectContainerSongs(container, songsToAdd);
+        // hasSong is answered from a set the model builds on first use, so this filter is O(m) rather
+        // than one LinkedList scan per candidate song.
         songsToAdd.removeIf(this::hasSong);
         if (songsToAdd.isEmpty()) {
             return 0;
@@ -312,6 +314,6 @@ public class PlayListEditorGUI {
     }
 
     public boolean hasSong(MusicBoxSong s) {
-        return this.model.getSongs().contains(s);
+        return this.model.hasSong(s);
     }
 }

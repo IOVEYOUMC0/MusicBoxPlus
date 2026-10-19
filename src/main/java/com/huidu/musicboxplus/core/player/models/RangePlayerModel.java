@@ -1,6 +1,7 @@
 package com.huidu.musicboxplus.core.player.models;
 
 import com.huidu.musicboxplus.MusicBox;
+import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.MusicBoxSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
@@ -200,6 +201,50 @@ public class RangePlayerModel {
     private void onPlayerEnterRange(Player player) {
         if (destroyed) return;
         model.addPlayer(player);
+        fireRangeStateChange(player, true);
+    }
+
+    // Fired from the transition itself, not from playTick.
+    //
+    // playTick used to derive it by comparing the range cache with the dispatch map, and could never
+    // observe a disagreement: the scan marks an entering listener in that map before any playTick
+    // runs for them, and on the way out removes the listener in the same scan. On Paper, where the
+    // scan and the dispatch both run on the main thread, the event therefore never fired at all --
+    // a documented public API that downstream plugins could not receive. Here the transition is not
+    // inferred, it is the thing being handled.
+    //
+    // Dispatched to the listener's own region, which is the thread playTick ran on, so a handler that
+    // touches the player keeps working under Folia. Isolated because a throwing handler must not
+    // abort the scan for every other listener. The scan has two shapes -- a Player loop on Paper and
+    // a UUID loop over the position snapshot on Folia -- so both have to report the transition; see
+    // the UUID overload below.
+    private void fireRangeStateChange(Player player, boolean inRange) {
+        if (player == null || model == null) {
+            return;
+        }
+        Runnable fire = () -> {
+            try {
+                Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(model, player, inRange));
+            } catch (Exception ex) {
+                MusicBox.getInstance().getLogger().log(java.util.logging.Level.WARNING,
+                        "Exception dispatching MusicBoxRangeStateChangeEvent", ex);
+            }
+        };
+        Scheduler.entity(player, fire);
+    }
+
+    // Transition by id, for the Folia scan: that path deliberately holds only UUIDs (it reads the
+    // shared position snapshot so it never touches a Player off its region), which meant the event
+    // above fired on Paper only -- the same "public API nobody can receive" failure the Paper side
+    // had, just moved to the other platform. Resolving the id is a plain player-table lookup with no
+    // entity state behind it, and the event itself is then delivered on the player's own region.
+    private void fireRangeStateChange(UUID uuid, boolean inRange) {
+        Player player = uuid == null ? null : Bukkit.getPlayer(uuid);
+        if (player == null) {
+            // Offline: there is no region to deliver on, and nothing can be listening for them.
+            return;
+        }
+        fireRangeStateChange(player, inRange);
     }
 
     private void onPlayerEnterRange(UUID uuid) {
@@ -209,11 +254,13 @@ public class RangePlayerModel {
         } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
             enginePlayer.addPlayer(uuid);
         }
+        fireRangeStateChange(uuid, true);
     }
 
     private void onPlayerLeaveRange(Player player) {
         if (destroyed) return;
         model.removePlayer(player);
+        fireRangeStateChange(player, false);
     }
 
     private void onPlayerLeaveRange(UUID uuid) {
@@ -223,6 +270,7 @@ public class RangePlayerModel {
         } else if (model instanceof com.huidu.musicboxplus.core.player.AbstractEnginePlayer enginePlayer) {
             enginePlayer.removePlayer(uuid);
         }
+        fireRangeStateChange(uuid, false);
     }
 
     private void finishRangeScan(long now) {

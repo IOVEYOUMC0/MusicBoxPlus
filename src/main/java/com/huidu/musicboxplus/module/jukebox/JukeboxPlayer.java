@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.api.event.MusicBoxPlayerDestroyEvent.DestroyReason;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.common.Permissions;
+import com.huidu.musicboxplus.common.utils.NoteParticleColor;
 import com.huidu.musicboxplus.common.utils.SignUtils;
 import com.huidu.musicboxplus.core.player.AbstractBlockPlayer;
 import com.huidu.musicboxplus.core.song.MusicBoxSong;
@@ -26,12 +27,14 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
-import java.util.Random;
 
 public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musicboxplus.api.player.VanillaJukeboxPlayback {
     private Location infoSign;
     private static final long BLOCK_CHECK_INTERVAL_MS = 5000L;
-    private static final Random PARTICLE_RANDOM = new Random();
+    // The decorative note particle: one per second of real time, whatever the server tick rate is.
+    static final long PARTICLE_INTERVAL_MILLIS = 1000L;
+    // Wall-clock pace for the note particle; see tick().
+    private long nextParticleAt = 0L;
     // Wall-clock throttle for the "is the jukebox block still here / still holding a disc" check.
     // A song-tick gate cannot be used: the tick mirror freezes at 0 whenever the jukebox has no
     // listeners in range (playTick, the only thing that advances it, never runs), so tick % 100 == 0
@@ -44,6 +47,10 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
 
     private JukeboxPlayer(IPlayList list, int range, Jukebox box, float speedMultiplier) {
         super(list, box.getLocation(), range, speedMultiplier);
+        // Playback is starting here, so any "this disc already finished" mark for the block is
+        // stale. Also the only place that sees a playback start for every entry point (click,
+        // hopper, redstone, playlist rotation, reload restore).
+        JukeboxPlaybackState.markPlaying(box.getLocation());
         SignUtils.findSign(box.getLocation()).ifPresent(sign -> {
             this.infoSign = sign.getLocation();
             SignPlaylistUtils.setPlayListInfo(this.infoSign, list);
@@ -228,6 +235,12 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
             if (song == null || song.shouldUseVanillaJukeboxPlayback()) {
                 continue;
             }
+            // A disc that had already finished (or was paused/stopped) must stay silent: "the block
+            // holds a disc" is not "should be playing". This is what stopped a reload from starting
+            // every played-to-the-end jukebox over from the beginning; see JukeboxPlaybackState.
+            if (!JukeboxPlaybackState.shouldResume(jukebox.getLocation(), song.getHash())) {
+                continue;
+            }
             JukeboxPlayer.createNew(jukebox);
         }
     }
@@ -238,25 +251,30 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
         if (this.isDestroyed()) {
             return;
         }
+        long now = System.currentTimeMillis();
         Location loc = this.getTargetLocation();
         // Only while actually playing. A paused or stopped jukebox showing note particles reads
         // as still running, and vanilla shows none in that state either.
-        if (loc != null && this.isPlaying()) {
+        //
+        // Gated by the wall clock, not by the tick the timer happens to run on: this is the visual
+        // for a song that advances in real time, so pacing it in ticks made /tick rate raise the
+        // particle rate with it (at 100 tps the "one per second" below became five). One second is
+        // visually enough, as before.
+        if (loc != null && this.isPlaying() && now >= this.nextParticleAt) {
             World world = loc.getWorld();
             if (world != null) {
+                this.nextParticleAt = now + PARTICLE_INTERVAL_MILLIS;
                 // Playback is plugin-driven, so the block never enters vanilla's "playing" state
                 // and emits no note particles of its own; spawn them here instead.
                 double x = loc.getBlockX() + 0.5;
                 double y = loc.getBlockY() + 1.2;
                 double z = loc.getBlockZ() + 0.5;
-                // With a count of 0 the offset arguments carry particle data instead of spread,
-                // which is how the note color (0-24) is chosen. One particle per tick (~1s) is
-                // visually enough.
+                // With a count of 0 the offset argument carries the colour instead of a spread. It
+                // is a fraction of a hue turn, not a note number: see NoteParticleColor.
                 world.spawnParticle(Particle.NOTE, x, y, z, 0,
-                    PARTICLE_RANDOM.nextInt(25), 0, 0);
+                    NoteParticleColor.random(), 0, 0);
             }
         }
-        long now = System.currentTimeMillis();
         if (now < this.nextBlockCheckAt) {
             return;
         }
@@ -316,5 +334,54 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
     @Override
     public Location getInfoSign() {
         return this.infoSign;
+    }
+
+    // ==================== "Is this jukebox supposed to be playing" ====================
+    //
+    // Only "the block holds a MusicBox disc" survives a restart, and the restore paths (startup scan
+    // and ChunkLoadEvent) read that as "should be playing". Without a remembered state, a disc that
+    // had already finished -- or that the player had paused or stopped -- started over on the next
+    // /reload, PlugMan reload or server restart. Vanilla never does that. See JukeboxPlaybackState.
+
+    private int currentSongHash() {
+        if (this.getMusicBoxModel() == null) {
+            return -1;
+        }
+        IPlayList list = this.getMusicBoxModel().getPlayList();
+        MusicBoxSong current = list != null ? (MusicBoxSong) list.getCurrent() : null;
+        return current != null ? current.getHash() : -1;
+    }
+
+    @Override
+    public boolean pause() {
+        if (!super.pause()) {
+            // A listener vetoed the pause, so the jukebox is still playing: nothing to remember.
+            return false;
+        }
+        JukeboxPlaybackState.markNotPlaying(this.getTargetLocation(), currentSongHash());
+        return true;
+    }
+
+    @Override
+    public boolean resume() {
+        if (!super.resume()) {
+            return false;
+        }
+        JukeboxPlaybackState.markPlaying(this.getTargetLocation());
+        return true;
+    }
+
+    // Both reasons mean the jukebox is idle while its disc stays in the block: a stop leaves the
+    // player alive only until the caller destroys it, and a song that reaches its end deliberately
+    // keeps the disc (see songEnd). Everything else -- handover (REPLACED), reload, shutdown, world
+    // unload, a disc taken out -- must NOT be recorded as finished: a handover is a new playback, the
+    // reload path restores the state itself, and the remaining cases have no disc left to restore.
+    @Override
+    public void destroy(DestroyReason reason) {
+        if (!this.isDestroyed()
+                && (reason == DestroyReason.SONG_END || reason == DestroyReason.MANUAL_STOP)) {
+            JukeboxPlaybackState.markNotPlaying(this.getTargetLocation(), currentSongHash());
+        }
+        super.destroy(reason);
     }
 }

@@ -1,11 +1,11 @@
 package com.huidu.musicboxplus.module.speaker;
 
 import com.huidu.musicboxplus.MusicBox;
-import com.huidu.musicboxplus.api.event.MusicBoxRangeStateChangeEvent;
 import com.huidu.musicboxplus.api.player.IPlayList;
 import com.huidu.musicboxplus.api.player.PlayerSongPlayer;
 import com.huidu.musicboxplus.api.player.PositionPlayer;
 import com.huidu.musicboxplus.core.playback.SongUtils;
+import com.huidu.musicboxplus.common.utils.NoteParticleColor;
 import com.huidu.musicboxplus.core.engine.CompiledSong;
 import com.huidu.musicboxplus.core.playback.PlayerWrapper;
 import com.huidu.musicboxplus.core.player.NoteEmitter;
@@ -203,17 +203,10 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
             return;
         }
 
+        // Range membership, and the MusicBoxRangeStateChangeEvent that reports it, belong to the range
+        // scan; see RangePlayerModel.fireRangeStateChange. playTick only runs for listeners the scan
+        // currently holds, so deriving the transition here could never see one.
         boolean inRange = this.rangeModel.isPlayerInRange(player);
-        Boolean wasInRange = this.playerList.get(player.getUniqueId());
-        if (inRange) {
-            if (wasInRange == null || !wasInRange) {
-                this.playerList.put(player.getUniqueId(), true);
-                fireRangeStateChange(player, true);
-            }
-        } else if (wasInRange != null && wasInRange) {
-            this.playerList.put(player.getUniqueId(), false);
-            fireRangeStateChange(player, false);
-        }
         CompiledSong compiled = this.compiledSong;
         boolean hasNotes = compiled != null && compiled.noteStart(tick) < compiled.noteEnd(tick);
         if (inRange && hasNotes) {
@@ -246,21 +239,28 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
         }
         if (this.ownerUuid != null && player.getUniqueId().equals(this.ownerUuid)) {
             this.model.nextTick(compiled != null ? compiled.lengthTicks() : 0, tick);
-            if (!this.ownerVanishedSnapshot && hasNotes) {
+            if (!this.ownerVanishedSnapshot && hasNotes && this.noteParticleDue()) {
                 this.spawnNote(player);
             }
         }
     }
 
-    // Range enter/leave is dispatched on the listener's own region thread; a throwing listener
-    // must not abort the tick loop, so the event is isolated like the other playTick callEvents.
-    private void fireRangeStateChange(Player player, boolean inRange) {
-        try {
-            Bukkit.getPluginManager().callEvent(new MusicBoxRangeStateChangeEvent(this, player, inRange));
-        } catch (Exception ex) {
-            java.util.logging.Logger.getLogger(SpeakerPlayer.class.getName())
-                    .log(java.util.logging.Level.FINEST, "Exception dispatching range state change", ex);
+    // One note particle per 50 ms of real time.
+    //
+    // That is exactly what "one per tick" did at the default tickInterval of 1 and 20 tps, but it no
+    // longer multiplies when the server's tick rate is raised: the song advances on the wall clock,
+    // so a tick-paced sparkle drifts away from it (100 tps would have meant 100 particles a second
+    // above the owner's head).
+    private static final long NOTE_PARTICLE_INTERVAL_MILLIS = 50L;
+    private long lastNoteParticleAt = 0L;
+
+    private boolean noteParticleDue() {
+        long now = System.currentTimeMillis();
+        if (now - this.lastNoteParticleAt < NOTE_PARTICLE_INTERVAL_MILLIS) {
+            return false;
         }
+        this.lastNoteParticleAt = now;
+        return true;
     }
 
     // Vanishing is signalled by several popular plugins under a handful of metadata keys. All
@@ -286,8 +286,12 @@ public class SpeakerPlayer extends com.huidu.musicboxplus.core.player.AbstractEn
     private void spawnNote(Player player) {
         // Coordinates straight from the entity: getLocation() would allocate a Location per tick
         // for a particle that only ever reads x/y/z.
+        //
+        // Count 0 with the colour in the x-offset, like vanilla's own jukebox: with a count of 1 the
+        // offset is read as a spread instead, so the colour was never set and every one of these
+        // came out the same fixed hue. Still exactly one particle.
         player.getWorld().spawnParticle(Particle.NOTE, player.getX(), player.getY() + 2.3,
-                player.getZ(), 1);
+                player.getZ(), 0, NoteParticleColor.random(), 0, 0);
     }
 
 

@@ -163,10 +163,13 @@ public final class NoteEmitter {
             float pitch;
             boolean naturalBucket;
             if (tenOctave) {
-                int bucket = NotePitch.bucketIndex(key, finePitch);
+                // One fold for both values: the emit path needs the bucket for the sound name and the
+                // pitch for the event, and bucketIndex/bucketPitch would have folded the note twice.
+                int bucketOffset = NotePitch.bucketOffset(key, finePitch);
+                int bucket = NotePitch.bucketOfOffset(bucketOffset);
                 naturalBucket = bucket == NotePitch.NATURAL_BUCKET;
                 sound = instruments.soundName(instrument, bucket);
-                pitch = NotePitch.bucketPitch(key, finePitch);
+                pitch = NotePitch.pitchOfOffset(bucketOffset);
             } else {
                 naturalBucket = true;
                 sound = instruments.baseSoundName(instrument);
@@ -179,6 +182,11 @@ public final class NoteEmitter {
             // Tested on the instrument, not on the resolved name: the ten-octave path appends a
             // bucket suffix unconditionally, so a silent instrument came out as the non-empty
             // "_1" and slipped past this check into a bogus sound event.
+            //
+            // isSilent() resolves the name for the natural bucket again, and isPlainVanilla() is a
+            // second array read. Both were reviewed and left: each is an array read plus a bounds
+            // check, and this order of the checks is what keeps the silent-instrument case above
+            // correct. The fold was the expensive part and that is done once now.
             if (instruments.isSilent(instrument) || sound.isEmpty()) {
                 continue;
             }

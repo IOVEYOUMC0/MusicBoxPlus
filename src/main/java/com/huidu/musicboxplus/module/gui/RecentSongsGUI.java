@@ -55,7 +55,8 @@ public class RecentSongsGUI {
         }
         int lastPage = this.getLastPage(recentSongs, indexLimit);
         int clampedPage = Math.max(0, Math.min(page, lastPage - 1));
-        String title = (this.buyMode ? Lang.RECENT_SONGS_BUY_TITLE : Lang.RECENT_SONGS_TITLE).toString().replace("{page}", String.valueOf(clampedPage + 1)).replace("{last_page}", String.valueOf(lastPage));
+        String title = (this.buyMode ? Lang.RECENT_SONGS_BUY_TITLE : Lang.RECENT_SONGS_TITLE)
+                .toString("{page}", String.valueOf(clampedPage + 1), "{last_page}", String.valueOf(lastPage));
         GUI gui = new GUI(title, this.configManager.getGUIRows("recent-songs"));
         LayoutParser layoutParser = new LayoutParser(gui, "recent-songs");
         GUIConfigManager.GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");

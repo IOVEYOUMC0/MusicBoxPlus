@@ -33,12 +33,24 @@ public final class PlayerPositionSnapshot {
     // own cadence and roughly double how long it takes to notice someone walking into range.
     // Sampling twice as often keeps a sample at most half a scan old, and still costs one task per
     // player for the whole server rather than one per player per block player.
-    private static long sampleIntervalTicks() {
+    private static long sampleIntervalMillis() {
         long refreshMillis = Math.max(50L,
                 Math.max(1000L, com.huidu.musicboxplus.MusicBox.getInstance()
                         .getConfigObject().getPlayer().getRangeCacheClearInterval()) / 5);
-        return Math.max(1L, refreshMillis / (2 * Scheduler.TICK_MILLIS));
+        return Math.max(50L, refreshMillis / 2);
     }
+
+    // The task polls on the tick counter, but acceptance is wall-clock (see sample()): raising the
+    // server's tick rate must not multiply the sampling, because every sample costs one region hop
+    // per online player. The range scan is gated the same way.
+    private static long sampleIntervalTicks() {
+        return Math.max(1L, sampleIntervalMillis() / Scheduler.TICK_MILLIS);
+    }
+
+    // Half a tick of slack for the same reason the range scan has it: ticks run back to back after
+    // a lag spike, and a poll landing a hair early must not cost a whole extra interval.
+    private static final long SAMPLE_SLACK_MILLIS = 25L;
+    private static volatile long lastSampleAt;
 
     private PlayerPositionSnapshot() {
     }
@@ -90,6 +102,11 @@ public final class PlayerPositionSnapshot {
     }
 
     private static void sample() {
+        long now = System.currentTimeMillis();
+        if (now - lastSampleAt < sampleIntervalMillis() - SAMPLE_SLACK_MILLIS) {
+            return;
+        }
+        lastSampleAt = now;
         // One snapshot, reused for both the write loop and the cleanup check. getOnlinePlayers()
         // builds a fresh collection each call, and the old cleanup called it a second time just to
         // compare sizes.

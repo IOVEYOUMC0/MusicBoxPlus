@@ -345,6 +345,7 @@ public enum Lang {
     EDIT_INPUT_EMPTY("edit_input_empty"),
     EDIT_INPUT_CANCEL_HINT("edit_input_cancel_hint"),
     EDIT_INPUT_EMPTY_RETRY("edit_input_empty_retry"),
+    EDIT_INPUT_INVALID_RETRY("edit_input_invalid_retry"),
     EDIT_INPUT_SEARCH_PROMPT("edit_input_search_prompt"),
     EDIT_INPUT_GENERIC_PROMPT("edit_input_generic_prompt"),
     EDIT_INPUT_DESCRIPTION_PROMPT_ALT("edit_input_description_prompt_alt"),

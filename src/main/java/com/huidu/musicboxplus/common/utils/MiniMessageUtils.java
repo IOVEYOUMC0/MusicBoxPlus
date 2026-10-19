@@ -29,6 +29,22 @@ public final class MiniMessageUtils {
                 }
             });
 
+    // A second, separate (and much smaller) LRU for strings that are almost never repeated: the
+    // control-panel progress bar rebuilds one name and a few lore lines per slot from the current
+    // tick, so it produces tens of fresh strings every second per viewer. Those went into the cache
+    // above, one miss each, and evicted the whole 1024-entry set of static GUI strings within a
+    // minute -- precisely the memoization that cap exists to keep. Separate maps mean dynamic churn
+    // can only evict dynamic churn; the dynamic side still dedupes the one case that does repeat,
+    // two viewers looking at the same song at the same tick.
+    private static final int DYNAMIC_CACHE_MAX = 128;
+    private static final Map<String, Component> DYNAMIC_COMPONENT_CACHE = Collections.synchronizedMap(
+            new LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, Component> eldest) {
+                    return size() > DYNAMIC_CACHE_MAX;
+                }
+            });
+
     private MiniMessageUtils() {}
 
     public static Component parseMiniMessage(String input) {
@@ -58,6 +74,30 @@ public final class MiniMessageUtils {
 
     public static boolean containsMiniMessageTags(String input) {
         return input != null && input.contains("<") && input.contains(">");
+    }
+
+    // Makes a string safe to place inside a MiniMessage template: `<` becomes `\<`, so the text can
+    // only ever render as itself.
+    //
+    // This is for values that come from somewhere the plugin does not control -- a song title read
+    // out of a .nbs header, a file name, a playlist name, chat input. Substituting one of those into
+    // a language template and then parsing the result let the data be markup: a song called
+    // `<click:run_command:/op me>` was a component, not a title.
+    //
+    // Deliberately narrow, and the narrowness matters. It escapes MiniMessage's own delimiters and
+    // nothing else, so legacy `&` and section codes in a value still work -- which is load-bearing,
+    // because the intentional-markup call sites all pass Lang.X.toString(), and that serialises to
+    // legacy codes rather than to MiniMessage. Widening this to strip `&` as well would turn every
+    // one of those into literal text.
+    //
+    // What it does not do is stop a value from *restyling* the message via `&`/`§` codes: those can
+    // only change colour and formatting, never introduce a component, so it is a cosmetic residual
+    // rather than an injection one.
+    public static String escapeTags(String input) {
+        if (input == null || input.isEmpty() || input.indexOf('<') < 0) {
+            return input;
+        }
+        return MINI_MESSAGE.escapeTags(input);
     }
 
     public static String processText(String input) {
@@ -91,6 +131,26 @@ public final class MiniMessageUtils {
         }
         Component result = computeComponent(input);
         COMPONENT_CACHE.put(input, result);
+        return result;
+    }
+
+    /**
+     * Same as {@link #processComponent}, but memoized in the small dynamic cache.
+     *
+     * For callers whose strings carry a value that changes on every render (a tick number, a
+     * countdown, a percentage): they never hit the shared cache, so putting them there only evicts
+     * the static strings it is sized for. See {@link #DYNAMIC_COMPONENT_CACHE}.
+     */
+    public static Component processDynamicComponent(String input) {
+        if (input == null || input.isEmpty()) {
+            return Component.empty();
+        }
+        Component cached = DYNAMIC_COMPONENT_CACHE.get(input);
+        if (cached != null) {
+            return cached;
+        }
+        Component result = computeComponent(input);
+        DYNAMIC_COMPONENT_CACHE.put(input, result);
         return result;
     }
 
@@ -133,6 +193,18 @@ public final class MiniMessageUtils {
         List<Component> result = new ArrayList<>(inputs.size());
         for (String input : inputs) {
             result.add(processComponent(input));
+        }
+        return result;
+    }
+
+    /** {@link #processDynamicComponent} for a lore block. */
+    public static List<Component> processDynamicComponents(List<String> inputs) {
+        if (inputs == null || inputs.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Component> result = new ArrayList<>(inputs.size());
+        for (String input : inputs) {
+            result.add(processDynamicComponent(input));
         }
         return result;
     }
