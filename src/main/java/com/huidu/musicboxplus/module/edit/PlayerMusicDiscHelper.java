@@ -14,6 +14,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 import java.util.logging.Level;
+import com.huidu.musicboxplus.common.config.SongItemConfig;
 
 public final class PlayerMusicDiscHelper {
     public static final String PLAYER_MUSIC_ID_KEY = "player_music_id";
@@ -26,7 +27,7 @@ public final class PlayerMusicDiscHelper {
     }
 
     public static ItemStack createDisc(PlayerMusic music, PublishedMusic source) {
-        GUIConfigManager.SongItemConfig songItemConfig = GUIConfigManager.getInstance().getSongItemConfig();
+        SongItemConfig songItemConfig = GUIConfigManager.getInstance().getSongItemConfig();
         ItemStack stack = new ItemStack(resolveMaterial(songItemConfig));
         stack.setAmount(1);
 
@@ -107,7 +108,7 @@ public final class PlayerMusicDiscHelper {
         return k;
     }
 
-    private static Material resolveMaterial(GUIConfigManager.SongItemConfig songItemConfig) {
+    private static Material resolveMaterial(SongItemConfig songItemConfig) {
         if (songItemConfig.isCustomEnabled() || !songItemConfig.isUseRandomDisc()) {
             Material customMaterial = songItemConfig.getCustomMaterial();
             return isUsableItem(customMaterial) ? customMaterial : Material.MUSIC_DISC_CAT;
@@ -131,7 +132,7 @@ public final class PlayerMusicDiscHelper {
         return material != null && material != Material.AIR && material.isItem();
     }
 
-    private static List<String> createLore(GUIConfigManager.SongItemConfig songItemConfig, PlayerMusic music, PublishedMusic source) {
+    private static List<String> createLore(SongItemConfig songItemConfig, PlayerMusic music, PublishedMusic source) {
         List<String> loreFormat = songItemConfig.getLoreFormat();
         if (loreFormat == null || loreFormat.isEmpty()) {
             loreFormat = new ArrayList<>();

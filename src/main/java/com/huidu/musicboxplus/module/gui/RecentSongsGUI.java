@@ -12,6 +12,8 @@ import com.huidu.musicboxplus.module.gui.minecraft.actions.ClickAction;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
+import com.huidu.musicboxplus.common.config.GUIConfig;
 
 public class RecentSongsGUI {
     private final PlayerWrapper wrapper;
@@ -43,7 +45,7 @@ public class RecentSongsGUI {
         layout = this.configManager.getGUILayout("recent-songs");
         if (layout != null && !layout.isEmpty()) {
             int count = 0;
-            GUIConfigManager.GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");
+            GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");
             char songChar = guiConfig.getButtonMapping().getSongs();
             for (char c : layout.toCharArray()) {
                 if (c != songChar) continue;
@@ -59,8 +61,8 @@ public class RecentSongsGUI {
                 .toString("{page}", String.valueOf(clampedPage + 1), "{last_page}", String.valueOf(lastPage));
         GUI gui = new GUI(title, this.configManager.getGUIRows("recent-songs"));
         LayoutParser layoutParser = new LayoutParser(gui, "recent-songs");
-        GUIConfigManager.GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getButtonMapping();
+        GUIConfig guiConfig = this.configManager.getGUIConfig("recent-songs");
+        ButtonMappingConfig mapping = guiConfig.getButtonMapping();
         if (this.backAction != null) {
             layoutParser.registerSimpleButton(mapping.getBack(), "back", this.backAction);
         } else {

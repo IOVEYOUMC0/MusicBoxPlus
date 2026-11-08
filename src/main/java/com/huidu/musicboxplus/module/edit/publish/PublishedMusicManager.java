@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.MusicBoxConfig;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.EconomyUtils;
+import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
 import com.huidu.musicboxplus.module.edit.PlayerMusic;
 import org.bukkit.Bukkit;
@@ -70,7 +71,9 @@ public class PublishedMusicManager {
 
     private void ensurePublishedFolder() {
         if (!publishedFolder.exists() && !publishedFolder.mkdirs()) {
-            MusicBox.getInstance().getLogger().warning("无法创建发布音乐目录: " + publishedFolder.getAbsolutePath());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Could not create the published music folder: " + publishedFolder.getAbsolutePath(),
+                    "无法创建发布音乐目录: " + publishedFolder.getAbsolutePath()));
         }
     }
 
@@ -88,11 +91,15 @@ public class PublishedMusicManager {
                         pendingRevenue.put(uuid, amount);
                     }
                 } catch (IllegalArgumentException e) {
-                    MusicBox.getInstance().getLogger().warning("跳过无效的收入UUID: " + key);
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "Skipping invalid revenue UUID: " + key,
+                            "跳过无效的收入UUID: " + key));
                 }
             }
         } catch (Exception e) {
-            MusicBox.getInstance().getLogger().log(Level.WARNING, "加载待领取收入数据失败", e);
+            MusicBox.getInstance().getLogger().log(Level.WARNING, LogLocale.text(MusicBox.getInstance(),
+                    "Failed to load pending revenue data",
+                    "加载待领取收入数据失败"), e);
         }
     }
 
@@ -120,7 +127,9 @@ public class PublishedMusicManager {
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
-            MusicBox.getInstance().getLogger().log(Level.WARNING, "保存待领取收入数据失败", e);
+            MusicBox.getInstance().getLogger().log(Level.WARNING, LogLocale.text(MusicBox.getInstance(),
+                    "Failed to save pending revenue data",
+                    "保存待领取收入数据失败"), e);
             tmp.delete();
         }
     }
@@ -142,7 +151,9 @@ public class PublishedMusicManager {
                 UUID authorUUID = UUID.fromString(authorFolder.getName());
                 loadAuthorPublishedMusic(authorUUID);
             } catch (IllegalArgumentException e) {
-                MusicBox.getInstance().getLogger().warning("跳过无效的作者文件夹: " + authorFolder.getName());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Skipping invalid author folder: " + authorFolder.getName(),
+                        "跳过无效的作者文件夹: " + authorFolder.getName()));
             }
         }
     }
@@ -167,7 +178,9 @@ public class PublishedMusicManager {
                     }
                 } catch (Exception e) {
                     MusicBox.getInstance().getLogger().log(Level.WARNING,
-                            "加载发布音乐失败: " + musicFile.getName(), e);
+                            LogLocale.text(MusicBox.getInstance(),
+                                    "Failed to load published music: " + musicFile.getName(),
+                                    "加载发布音乐失败: " + musicFile.getName()), e);
                 }
             }
         }
@@ -428,7 +441,9 @@ public class PublishedMusicManager {
             savePublishedMusic(published);
             return true;
         } catch (Exception e) {
-            MusicBox.getInstance().getLogger().warning("记录发布音乐购买失败: " + e.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to record the published music purchase: " + e.getMessage(),
+                    "记录发布音乐购买失败: " + e.getMessage()));
             rollbackRecordedPurchase(publishedId, paidPrice);
             return false;
         }
@@ -465,7 +480,9 @@ public class PublishedMusicManager {
             }
         } catch (IOException e) {
             MusicBox.getInstance().getLogger().log(Level.SEVERE,
-                    "保存发布音乐失败: " + published.getName(), e);
+                    LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save published music: " + published.getName(),
+                            "保存发布音乐失败: " + published.getName()), e);
         }
     }
 
@@ -480,20 +497,31 @@ public class PublishedMusicManager {
         RevenueClaim.Result result = revenueClaim.claim(playerUUID,
                 amount -> EconomyUtils.depositPlayer(player, amount), this::savePendingRevenue);
         if (result.status() == RevenueClaim.Status.INVALID) {
-            MusicBox.getInstance().getLogger().severe("拒绝领取无效收入，记录已保留: UUID="
-                    + playerUUID + ", amount=" + result.amount());
+            MusicBox.getInstance().getLogger().severe(LogLocale.text(MusicBox.getInstance(),
+                    "Refusing to claim invalid revenue, record kept: UUID="
+                            + playerUUID + ", amount=" + result.amount(),
+                    "拒绝领取无效收入，记录已保留: UUID="
+                            + playerUUID + ", amount=" + result.amount()));
         } else if (result.status() == RevenueClaim.Status.UNCERTAIN) {
             // The current file format cannot persist the quarantine separately from the balance.
             // An operator must reconcile this account before restarting the server.
             MusicBox.getInstance().getLogger().log(Level.SEVERE,
-                    "收入支付结果不确定，余额已保留并冻结此UUID的领取；禁止自动重试，请在重启前人工核账"
-                            + "（冻结状态仅在本次运行有效）: UUID=" + playerUUID + ", amount=" + result.amount(),
+                    LogLocale.text(MusicBox.getInstance(),
+                            "Revenue payout outcome is uncertain; the balance is kept and claims for this UUID are frozen; "
+                                    + "automatic retry is disabled, reconcile manually before restarting "
+                                    + "(the frozen state lasts only for this run): UUID=" + playerUUID + ", amount=" + result.amount(),
+                            "收入支付结果不确定，余额已保留并冻结此UUID的领取；禁止自动重试，请在重启前人工核账"
+                                    + "（冻结状态仅在本次运行有效）: UUID=" + playerUUID + ", amount=" + result.amount()),
                     result.paymentFailure());
         }
         if (result.persistenceFailure() != null) {
             MusicBox.getInstance().getLogger().log(Level.SEVERE,
-                    "收入领取状态保存失败，支付状态=" + result.status() + "；已支付金额不会重新加入待领取余额: UUID="
-                            + playerUUID + ", amount=" + result.amount(), result.persistenceFailure());
+                    LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save the revenue claim state; payout status=" + result.status()
+                                    + "; the paid amount will not be re-added to the pending balance: UUID="
+                                    + playerUUID + ", amount=" + result.amount(),
+                            "收入领取状态保存失败，支付状态=" + result.status() + "；已支付金额不会重新加入待领取余额: UUID="
+                                    + playerUUID + ", amount=" + result.amount()), result.persistenceFailure());
         }
         return result.paidAmount();
     }
@@ -611,7 +639,9 @@ public class PublishedMusicManager {
                 }
             } catch (IOException e) {
                 MusicBox.getInstance().getLogger().log(Level.SEVERE,
-                        "保存发布音乐失败: " + published.getName(), e);
+                        LogLocale.text(MusicBox.getInstance(),
+                                "Failed to save published music: " + published.getName(),
+                                "保存发布音乐失败: " + published.getName()), e);
             }
         });
     }

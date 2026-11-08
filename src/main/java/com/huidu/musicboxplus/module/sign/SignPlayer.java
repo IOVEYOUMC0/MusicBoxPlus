@@ -150,7 +150,9 @@ extends AbstractBlockPlayer {
                 DatabaseLoader.getBase().savePreventedSigns(signLocations);
             }
             catch (Exception e) {
-                MusicBox.getInstance().getLogger().warning("保存受保护告示牌失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the protected signs: " + e.getMessage(),
+                        "保存受保护告示牌失败: " + e.getMessage()));
             }
         });
     }
@@ -378,7 +380,9 @@ extends AbstractBlockPlayer {
                 DatabaseLoader.getBase().saveSignSong(location, songHash);
             }
             catch (Exception e) {
-                MusicBox.getInstance().getLogger().warning("\u4fdd\u5b58\u544a\u793a\u724c\u6b4c\u66f2\u5931\u8d25: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the sign's song: " + e.getMessage(),
+                        "保存告示牌歌曲失败: " + e.getMessage()));
             }
         });
     }
@@ -393,7 +397,9 @@ extends AbstractBlockPlayer {
                 DatabaseLoader.getBase().deleteSignSong(location);
             }
             catch (Exception e) {
-                MusicBox.getInstance().getLogger().warning("\u5220\u9664\u544a\u793a\u724c\u6b4c\u66f2\u8bb0\u5f55\u5931\u8d25: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to delete the sign's saved song: " + e.getMessage(),
+                        "删除告示牌歌曲记录失败: " + e.getMessage()));
             }
         });
     }

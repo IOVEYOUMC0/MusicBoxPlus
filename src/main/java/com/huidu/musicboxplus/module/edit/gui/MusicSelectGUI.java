@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
@@ -15,7 +18,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
@@ -23,14 +25,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.MusicSelectConfig;
 
-public class MusicSelectGUI implements InventoryHolder {
+public class MusicSelectGUI implements Menu {
 
     private static final Map<UUID, MusicSelectGUI> openGUIs = new ConcurrentHashMap<>();
     private final Player player;
     private final Inventory inventory;
     private final List<PlayerMusic> musicList;
-    private final GUIConfigManager.MusicSelectConfig config;
+    private final MusicSelectConfig config;
     private final SelectMode mode;
     private int page = 0;
 
@@ -81,7 +85,7 @@ public class MusicSelectGUI implements InventoryHolder {
             int slot = musicSlots.get(slotIndex);
             PlayerMusic music = musicList.get(i);
 
-            GUIConfigManager.HotbarButtonConfig musicConfig = config.getButton("music-item");
+            HotbarButtonConfig musicConfig = config.getButton("music-item");
             List<String> lore = new ArrayList<>();
             for (String line : musicConfig.getLore()) {
                 lore.add(line.replace("{name}", music.getName())
@@ -102,7 +106,7 @@ public class MusicSelectGUI implements InventoryHolder {
 
         int prevSlot = config.getSlotForButton("prev-page");
         if (prevSlot >= 0 && page > 0) {
-            GUIConfigManager.HotbarButtonConfig prevConfig = config.getButton("prev-page");
+            HotbarButtonConfig prevConfig = config.getButton("prev-page");
             List<String> lore = new ArrayList<>();
             for (String line : prevConfig.getLore()) {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
@@ -114,7 +118,7 @@ public class MusicSelectGUI implements InventoryHolder {
 
         int nextSlot = config.getSlotForButton("next-page");
         if (nextSlot >= 0 && (page + 1) * itemsPerPage < musicList.size()) {
-            GUIConfigManager.HotbarButtonConfig nextConfig = config.getButton("next-page");
+            HotbarButtonConfig nextConfig = config.getButton("next-page");
             List<String> lore = new ArrayList<>();
             for (String line : nextConfig.getLore()) {
                 lore.add(line.replace("{page}", String.valueOf(page + 1))
@@ -126,14 +130,14 @@ public class MusicSelectGUI implements InventoryHolder {
 
         int closeSlot = config.getSlotForButton("close");
         if (closeSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig closeConfig = config.getButton("close");
+            HotbarButtonConfig closeConfig = config.getButton("close");
             ItemStack closeButton = closeConfig.createItem();
             inventory.setItem(closeSlot, closeButton);
         }
 
         int createSlot = config.getSlotForButton("create");
         if (createSlot >= 0 && mode == SelectMode.EDIT) {
-            GUIConfigManager.HotbarButtonConfig createConfig = config.getButton("create");
+            HotbarButtonConfig createConfig = config.getButton("create");
             ItemStack createButton = createConfig.createItem();
             inventory.setItem(createSlot, createButton);
         }
@@ -145,7 +149,8 @@ public class MusicSelectGUI implements InventoryHolder {
         return Math.max(1, (int) Math.ceil((double) musicList.size() / itemsPerPage));
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
         int itemsPerPage = musicSlots.isEmpty() ? 45 : musicSlots.size();
         int prevSlot = config.getSlotForButton("prev-page");

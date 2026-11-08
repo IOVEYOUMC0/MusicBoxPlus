@@ -29,9 +29,13 @@ public final class EconomyUtils {
                     }
                 }
             } catch (NoClassDefFoundError e) {
-                MusicBox.getInstance().getLogger().warning("Vault 未安装或版本不兼容，经济功能将不可用");
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Vault is not installed or is incompatible; economy features will be unavailable",
+                        "Vault 未安装或版本不兼容，经济功能将不可用"));
             } catch (Exception e) {
-                MusicBox.getInstance().getLogger().warning("初始化经济系统失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to initialize the economy system: " + e.getMessage(),
+                        "初始化经济系统失败: " + e.getMessage()));
             }
             initialized = true;
         }
@@ -114,7 +118,9 @@ public final class EconomyUtils {
         }
         EconomyResponse response = eco.withdrawPlayer(player, price);
         if (!response.transactionSuccess()) {
-            MusicBox.getInstance().getLogger().warning("从玩家 " + player.getName() + " 扣款 " + price + " 失败: " + response.errorMessage);
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to withdraw " + price + " from player " + player.getName() + ": " + response.errorMessage,
+                    "从玩家 " + player.getName() + " 扣款 " + price + " 失败: " + response.errorMessage));
             return false;
         }
         return true;
@@ -155,7 +161,9 @@ public final class EconomyUtils {
         }
         EconomyResponse response = eco.depositPlayer(player, amount);
         if (!response.transactionSuccess()) {
-            MusicBox.getInstance().getLogger().warning("向玩家 " + player.getName() + " 存款 " + amount + " 失败: " + response.errorMessage);
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to deposit " + amount + " to player " + player.getName() + ": " + response.errorMessage,
+                    "向玩家 " + player.getName() + " 存款 " + amount + " 失败: " + response.errorMessage));
             return false;
         }
         return true;

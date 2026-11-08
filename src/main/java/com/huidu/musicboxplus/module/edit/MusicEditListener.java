@@ -6,8 +6,8 @@ import com.huidu.musicboxplus.common.utils.MessageUtils;
 import com.huidu.musicboxplus.common.utils.scheduler.MbTask;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.module.edit.gui.*;
-import com.huidu.musicboxplus.module.gui.DeleteConfirmGUI;
 import com.huidu.musicboxplus.module.gui.GUIInputManager;
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.bukkit.Bukkit;
@@ -34,88 +34,6 @@ public class MusicEditListener implements Listener {
     private static final Set<UUID> warnedPlayers = ConcurrentHashMap.newKeySet();
     private static MusicEditListener listener;
     private static MbTask cleanupTask;
-
-    private interface GUIHandler {
-        void handleClick(InventoryHolder holder, int rawSlot, boolean isRightClick, boolean isShiftClick);
-    }
-
-    // Populated once, from the static initialiser below. Deliberately never cleared: the initialiser
-    // does not run again when the plugin is re-enabled on the same classloader (PlugMan-style), so
-    // emptying it here would leave every GUI click unhandled for the rest of the JVM's life -- the
-    // same failure mode the GUIInputManager registration bug had.
-    private static final Map<Class<? extends InventoryHolder>, GUIHandler> GUI_HANDLERS = new ConcurrentHashMap<>();
-
-    static {
-        GUI_HANDLERS.put(MusicSelectGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            MusicSelectGUI gui = (MusicSelectGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-
-        GUI_HANDLERS.put(PlayerMusicShopGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PlayerMusicShopGUI gui = (PlayerMusicShopGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot, isShiftClick);
-            }
-        });
-
-        GUI_HANDLERS.put(PublishGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PublishGUI gui = (PublishGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-
-        GUI_HANDLERS.put(PublishConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PublishConfirmGUI gui = (PublishConfirmGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot, isRightClick, isShiftClick);
-            }
-        });
-
-        GUI_HANDLERS.put(ManagePublishedGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            ManagePublishedGUI gui = (ManagePublishedGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot, isShiftClick);
-            }
-        });
-
-        GUI_HANDLERS.put(PublishReviewGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PublishReviewGUI gui = (PublishReviewGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot, isRightClick);
-            }
-        });
-
-        GUI_HANDLERS.put(PurchaseConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PurchaseConfirmGUI gui = (PurchaseConfirmGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-
-        GUI_HANDLERS.put(DeleteConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            DeleteConfirmGUI gui = (DeleteConfirmGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-
-        GUI_HANDLERS.put(ExitConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            ExitConfirmGUI gui = (ExitConfirmGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-
-        GUI_HANDLERS.put(PastePreviewGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
-            PastePreviewGUI gui = (PastePreviewGUI) holder;
-            if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
-                gui.handleClick(rawSlot);
-            }
-        });
-    }
 
     public static boolean enterEditMode(Player player, PlayerMusic music) {
         UUID musicId = music.getUniqueId();
@@ -216,20 +134,10 @@ public class MusicEditListener implements Listener {
         UUID playerUUID = player.getUniqueId();
         InventoryHolder holder = event.getInventory().getHolder();
 
-        GUIHandler handler = holder != null ? GUI_HANDLERS.get(holder.getClass()) : null;
-        if (handler != null) {
-            // Cancel FIRST, then decide whether to dispatch. A plugin-owned GUI holder must never
-            // leave a click uncancelled: if the owning module was disabled mid-session (the open
-            // inventory isn't force-closed), the old "return before setCancelled" let vanilla
-            // inventory mechanics move the GUI's display items into the player's inventory = dupe.
-            event.setCancelled(true);
-            if (!canHandleModuleGui(holder)) {
-                return;
-            }
-            int rawSlot = event.getRawSlot();
-            boolean isRightClick = event.isRightClick();
-            boolean isShiftClick = event.isShiftClick();
-            handler.handleClick(holder, rawSlot, isRightClick, isShiftClick);
+        // Menu clicks are cancelled and dispatched by EditGUIListener at NORMAL priority, which runs
+        // before this handler. This listener keeps only the inventory-swap guard below; handling the
+        // menu here too would call handleClick a second time.
+        if (holder instanceof Menu) {
             return;
         }
 
@@ -281,11 +189,11 @@ public class MusicEditListener implements Listener {
         Player player = (Player) event.getWhoClicked();
         UUID playerUUID = player.getUniqueId();
 
-        // Cancel drags over any registered module GUI (shop/publish/manage/...) regardless of edit
-        // mode or module-enabled state, mirroring the click handler -- defense-in-depth against
-        // dragging items into/out of a plugin-owned inventory.
+        // Cancel drags over any plugin-owned menu (shop/publish/manage/...) regardless of edit mode
+        // or module-enabled state, mirroring the click handler -- defense-in-depth against dragging
+        // items into/out of a plugin-owned inventory.
         InventoryHolder holder = event.getInventory().getHolder();
-        if (holder != null && GUI_HANDLERS.containsKey(holder.getClass())) {
+        if (holder instanceof Menu) {
             event.setCancelled(true);
             return;
         }
@@ -536,21 +444,6 @@ public class MusicEditListener implements Listener {
             if (expected != null && !isCurrentSession(playerUUID, expected)) return;
             processTextInput(player, data, rawMessage);
         });
-    }
-
-    private boolean canHandleModuleGui(InventoryHolder holder) {
-        MusicBox plugin = MusicBox.getInstance();
-        if (holder instanceof DeleteConfirmGUI) {
-            return true;
-        }
-        if (holder instanceof PlayerMusicShopGUI || holder instanceof PurchaseConfirmGUI) {
-            return plugin.isPlayerMusicShopModuleEnabled();
-        }
-        if (holder instanceof PublishGUI || holder instanceof PublishConfirmGUI || holder instanceof ManagePublishedGUI
-                || holder instanceof PublishReviewGUI) {
-            return plugin.isPublishModuleEnabled();
-        }
-        return plugin.isEditorModuleEnabled();
     }
 
     private boolean canHandleTextInput(MusicEditTextInputManager.TextInputData data) {

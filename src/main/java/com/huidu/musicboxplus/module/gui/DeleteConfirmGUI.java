@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
@@ -8,21 +11,22 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.DeleteConfirmConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
 
-public class DeleteConfirmGUI implements InventoryHolder {
+public class DeleteConfirmGUI implements Menu {
 
     private final Player player;
     private final String itemName;
     private final Runnable onConfirm;
     private final Runnable onCancel;
     private final Inventory inventory;
-    private final GUIConfigManager.DeleteConfirmConfig config;
+    private final DeleteConfirmConfig config;
     private boolean handled = false;
 
     public DeleteConfirmGUI(Player player, String itemName, Runnable onConfirm, Runnable onCancel) {
@@ -58,7 +62,7 @@ public class DeleteConfirmGUI implements InventoryHolder {
     }
 
     private ItemStack createConfiguredItem(String key) {
-        GUIConfigManager.HotbarButtonConfig buttonConfig = config.getButton(key);
+        HotbarButtonConfig buttonConfig = config.getButton(key);
         if (buttonConfig == null) {
             return null;
         }
@@ -85,7 +89,8 @@ public class DeleteConfirmGUI implements InventoryHolder {
         return replaced;
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         if (handled) {
             return;
         }

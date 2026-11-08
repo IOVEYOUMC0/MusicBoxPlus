@@ -1,6 +1,5 @@
 package com.huidu.musicboxplus.module.edit;
 
-import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
 import org.bukkit.entity.Player;
@@ -9,6 +8,8 @@ import org.bukkit.inventory.ItemStack;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.InstrumentSelectConfig;
 
 final class MusicEditInstrumentMenuRenderer {
     private MusicEditInstrumentMenuRenderer() {
@@ -16,7 +17,7 @@ final class MusicEditInstrumentMenuRenderer {
 
     static void renderInstrumentSelect(
         Player player,
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig,
+        InstrumentSelectConfig instrumentConfig,
         MusicNote selectedNote,
         int instrumentPageOffset,
         int instrumentsPerPage
@@ -34,7 +35,7 @@ final class MusicEditInstrumentMenuRenderer {
 
         int noteInfoSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "note-info");
         if (noteInfoSlot >= 0 && selectedNote != null) {
-            GUIConfigManager.HotbarButtonConfig noteInfoConfig = instrumentConfig.getButton("note-info");
+            HotbarButtonConfig noteInfoConfig = instrumentConfig.getButton("note-info");
             if (noteInfoConfig != null) {
                 List<String> noteInfoLore = new ArrayList<>();
                 for (String line : noteInfoConfig.getLore()) {
@@ -53,7 +54,7 @@ final class MusicEditInstrumentMenuRenderer {
 
         int playSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "play-preview");
         if (playSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig playConfig = instrumentConfig.getButton("play-preview");
+            HotbarButtonConfig playConfig = instrumentConfig.getButton("play-preview");
             if (playConfig != null) {
                 ItemStack playButton = playConfig.createItem();
                 player.getInventory().setItem(playSlot, playButton);
@@ -66,7 +67,7 @@ final class MusicEditInstrumentMenuRenderer {
 
         int backSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = instrumentConfig.getButton("back");
+            HotbarButtonConfig backConfig = instrumentConfig.getButton("back");
             if (backConfig != null) {
                 ItemStack backButton = backConfig.createItem();
                 player.getInventory().setItem(backSlot, backButton);
@@ -101,7 +102,7 @@ final class MusicEditInstrumentMenuRenderer {
 
     static void renderCurrentInstrumentSelect(
         Player player,
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig,
+        InstrumentSelectConfig instrumentConfig,
         MusicNote.NoteInstrument currentInstrument,
         int instrumentPageOffset,
         int instrumentsPerPage
@@ -120,7 +121,7 @@ final class MusicEditInstrumentMenuRenderer {
         if (backSlot < 0) {
             backSlot = 0;
         }
-        GUIConfigManager.HotbarButtonConfig backConfig = instrumentConfig.getButton("back");
+        HotbarButtonConfig backConfig = instrumentConfig.getButton("back");
         if (backConfig != null) {
             ItemStack backButton = backConfig.createItem();
             player.getInventory().setItem(backSlot, backButton);
@@ -162,7 +163,7 @@ final class MusicEditInstrumentMenuRenderer {
         return (int) Math.ceil((double) MusicNote.NoteInstrument.getAvailableCount() / Math.max(1, instrumentsPerPage));
     }
 
-    static List<Integer> getPlayerInventorySlotsForInstrumentChar(GUIConfigManager.InstrumentSelectConfig instrumentConfig, char c) {
+    static List<Integer> getPlayerInventorySlotsForInstrumentChar(InstrumentSelectConfig instrumentConfig, char c) {
         List<Integer> mappedSlots = new ArrayList<>();
         for (int layoutSlot : instrumentConfig.getSlotsForChar(c)) {
             int playerSlot = mapInstrumentLayoutSlotToPlayerSlot(layoutSlot);
@@ -173,16 +174,16 @@ final class MusicEditInstrumentMenuRenderer {
         return mappedSlots;
     }
 
-    static int getPlayerInventorySlotForInstrumentButton(GUIConfigManager.InstrumentSelectConfig instrumentConfig, String buttonType) {
+    static int getPlayerInventorySlotForInstrumentButton(InstrumentSelectConfig instrumentConfig, String buttonType) {
         return mapInstrumentLayoutSlotToPlayerSlot(instrumentConfig.getSlotForButton(buttonType));
     }
 
-    private static void renderPageButton(Player player, GUIConfigManager.InstrumentSelectConfig instrumentConfig, String key, int pageOffset, int totalPages) {
+    private static void renderPageButton(Player player, InstrumentSelectConfig instrumentConfig, String key, int pageOffset, int totalPages) {
         int slot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, key);
         if (slot < 0) {
             return;
         }
-        GUIConfigManager.HotbarButtonConfig config = instrumentConfig.getButton(key);
+        HotbarButtonConfig config = instrumentConfig.getButton(key);
         if (config == null) {
             return;
         }

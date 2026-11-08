@@ -810,6 +810,15 @@ public class PlayerMusicManager {
         return musicList != null ? musicList.size() : 0;
     }
 
+    /**
+     * Number of player-created songs held in memory, for diagnostics. This is the loaded set, not a
+     * database count: a fresh start that failed to load shows 0 even when rows exist, which is
+     * exactly the distinction {@code /musicboxplus doctor} needs to expose.
+     */
+    public int getLoadedMusicCount() {
+        return musicByIdCache.size();
+    }
+
     private static final String LIMIT_PERM_PREFIX = Permissions.EDIT_LIMIT_PREFIX;
 
     public int getMusicLimit(Player player) {

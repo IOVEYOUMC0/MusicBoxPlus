@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
+import com.huidu.musicboxplus.common.config.GUIConfig;
+import com.huidu.musicboxplus.common.config.ProgressBarConfig;
 
 final class ControlPanelProgressRenderer {
     private ControlPanelProgressRenderer() {
@@ -36,9 +39,9 @@ final class ControlPanelProgressRenderer {
         Supplier<ItemStack> unavailableFallback,
         Runnable afterSeek
     ) {
-        GUIConfigManager.ProgressBarConfig progressBarConfig = configManager.getProgressBarConfig("control-panel");
-        GUIConfigManager.GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getButtonMapping();
+        ProgressBarConfig progressBarConfig = configManager.getProgressBarConfig("control-panel");
+        GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
+        ButtonMappingConfig mapping = guiConfig.getButtonMapping();
         List<Integer> progressSlots = layoutParser.getSlotsForChar(mapping.getProgress());
         if (progressSlots.isEmpty()) {
             int startCol = Math.max(0, progressBarConfig.getStartCol());

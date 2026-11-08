@@ -91,7 +91,9 @@ implements ExpiringCacheCleaner {
             try {
                 return Files.readAllBytes(cached.file.toPath());
             } catch (IOException e) {
-                this.plugin.getLogger().warning("缓存文件读取失败，重新加载配置: " + e.getMessage());
+                this.plugin.getLogger().warning(LogLocale.text(this.plugin,
+                        "Failed to read cached config file, reloading the config: " + e.getMessage(),
+                        "缓存文件读取失败，重新加载配置: " + e.getMessage()));
                 this.cache.remove(cacheKey);
             }
         }

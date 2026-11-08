@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 // GUI button definitions: global buttons plus per-GUI slot overrides, with fallback lookup.
 final class GUIButtonRegistry {
-    private final Map<String, GUIConfigManager.ButtonConfig> buttonConfigs = new ConcurrentHashMap<>();
+    private final Map<String, ButtonConfig> buttonConfigs = new ConcurrentHashMap<>();
 
-    Map<String, GUIConfigManager.ButtonConfig> getButtonConfigs() {
+    Map<String, ButtonConfig> getButtonConfigs() {
         return this.buttonConfigs;
     }
 
@@ -26,14 +26,14 @@ final class GUIButtonRegistry {
         this.loadGuiButtonSlots(config);
     }
 
-    GUIConfigManager.ButtonConfig getButtonConfig(String guiName, String buttonName) {
-        GUIConfigManager.ButtonConfig parentButton;
-        GUIConfigManager.ButtonConfig guiButton = this.buttonConfigs.get(guiName + "." + buttonName);
+    ButtonConfig getButtonConfig(String guiName, String buttonName) {
+        ButtonConfig parentButton;
+        ButtonConfig guiButton = this.buttonConfigs.get(guiName + "." + buttonName);
         if (guiButton != null && guiButton.getMaterial() != Material.STONE) {
             return guiButton;
         }
 
-        GUIConfigManager.ButtonConfig globalButton = this.buttonConfigs.get("global." + buttonName);
+        ButtonConfig globalButton = this.buttonConfigs.get("global." + buttonName);
         if (globalButton != null) {
             return globalButton;
         }
@@ -52,7 +52,7 @@ final class GUIButtonRegistry {
         // compare the button NAME part of the key, not the whole "global.xxx" key -- the old comparison
         // could never match, so this fallback was dead code.
         if (!buttonName.contains("-")) {
-            for (Map.Entry<String, GUIConfigManager.ButtonConfig> entry : this.buttonConfigs.entrySet()) {
+            for (Map.Entry<String, ButtonConfig> entry : this.buttonConfigs.entrySet()) {
                 String key = entry.getKey();
                 if (!key.startsWith("global.")) {
                     continue;
@@ -64,11 +64,11 @@ final class GUIButtonRegistry {
             }
         }
 
-        return new GUIConfigManager.ButtonConfig();
+        return new ButtonConfig();
     }
 
     ItemStack createButtonItem(String guiName, String buttonName) {
-        GUIConfigManager.ButtonConfig buttonConfig = this.getButtonConfig(guiName, buttonName);
+        ButtonConfig buttonConfig = this.getButtonConfig(guiName, buttonName);
         if (!buttonConfig.isEnabled()) {
             return null;
         }
@@ -83,7 +83,7 @@ final class GUIButtonRegistry {
     }
 
     ItemStack createButtonItem(String guiName, String buttonName, String... replacements) {
-        GUIConfigManager.ButtonConfig buttonConfig = this.getButtonConfig(guiName, buttonName);
+        ButtonConfig buttonConfig = this.getButtonConfig(guiName, buttonName);
         if (!buttonConfig.isEnabled()) {
             return null;
         }
@@ -126,7 +126,7 @@ final class GUIButtonRegistry {
             if (buttonSection == null) {
                 continue;
             }
-            GUIConfigManager.ButtonConfig buttonConfig = new GUIConfigManager.ButtonConfig();
+            ButtonConfig buttonConfig = new ButtonConfig();
             buttonConfig.enabled = true;
             buttonConfig.slot = -1;
             buttonConfig.material = Material.matchMaterial(buttonSection.getString("material", "STONE"));
@@ -157,9 +157,9 @@ final class GUIButtonRegistry {
 
             for (String buttonName : buttonSlotsSection.getKeys(false)) {
                 int slot = buttonSlotsSection.getInt(buttonName, -1);
-                GUIConfigManager.ButtonConfig globalConfig = this.buttonConfigs.get("global." + buttonName);
+                ButtonConfig globalConfig = this.buttonConfigs.get("global." + buttonName);
                 if (globalConfig != null) {
-                    GUIConfigManager.ButtonConfig guiButtonConfig = new GUIConfigManager.ButtonConfig();
+                    ButtonConfig guiButtonConfig = new ButtonConfig();
                     guiButtonConfig.enabled = globalConfig.enabled;
                     guiButtonConfig.slot = slot;
                     guiButtonConfig.material = globalConfig.material;
@@ -172,7 +172,7 @@ final class GUIButtonRegistry {
                     continue;
                 }
 
-                GUIConfigManager.ButtonConfig buttonConfig = new GUIConfigManager.ButtonConfig();
+                ButtonConfig buttonConfig = new ButtonConfig();
                 buttonConfig.enabled = true;
                 buttonConfig.slot = slot;
                 this.buttonConfigs.put(guiName + "." + buttonName, buttonConfig);

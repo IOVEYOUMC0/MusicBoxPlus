@@ -37,6 +37,9 @@ import org.bukkit.block.Sign;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.TextPlayerEditConfig;
 
 public class SongPlayerControlGUI implements PlayerControlGUI {
     private final MusicBoxSongPlayerModel spModel;
@@ -107,7 +110,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
     }
 
     private void initializeLayout() {
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("control-panel").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("control-panel").getButtonMapping();
         this.layoutParser.registerButton(mapping.getPlayPause(), () -> ControlPanelButtonFactory.createPlayPauseButton(this.configManager, this.getPlaybackContext()), () -> new ClickAction(() -> {
             MusicBoxSongPlayer songPlayer = this.getCurrentMusicPlayer();
             if (songPlayer != null) {
@@ -580,7 +583,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
 
     private void updateControlButtons() {
         MusicBoxSongPlayer currentPlayer = this.getCurrentMusicPlayer();
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("control-panel").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("control-panel").getButtonMapping();
         int volumeSlot;
         int loopSlot;
         int speedSlot;
@@ -671,8 +674,8 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
     }
 
     private ItemStack createTextDisplayEditButton() {
-        GUIConfigManager.TextPlayerEditConfig config = this.configManager.getTextPlayerEditConfig();
-        GUIConfigManager.HotbarButtonConfig button = config.getButton("edit-display");
+        TextPlayerEditConfig config = this.configManager.getTextPlayerEditConfig();
+        HotbarButtonConfig button = config.getButton("edit-display");
         return button != null ? button.createItem() : ItemUtils.createStack(
             Material.PAPER,
             Lang.EDIT_DISPLAY_BUTTON.toString(),

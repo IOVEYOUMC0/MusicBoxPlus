@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.MusicBoxConfig;
 import com.huidu.musicboxplus.core.db.AbstractBase;
 import com.huidu.musicboxplus.common.utils.HikariLogConfigurator;
+import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -47,17 +48,23 @@ public class MySQL extends AbstractBase {
             this.dataSource = created;
             this.afterInit();
         } catch (Exception e) {
-            MusicBox.getInstance().getLogger().severe("MySQL 连接失败: " + e.getMessage());
+            MusicBox.getInstance().getLogger().severe(LogLocale.text(MusicBox.getInstance(),
+                    "MySQL connection failed: " + e.getMessage(),
+                    "MySQL 连接失败: " + e.getMessage()));
             // A pool allocated above but failing afterInit() would otherwise stay open, holding
             // live connections on an instance this constructor is about to abandon.
             if (created != null && !created.isClosed()) {
                 try {
                     created.close();
                 } catch (Exception closeError) {
-                    MusicBox.getInstance().getLogger().log(Level.WARNING, "关闭 MySQL 连接池失败", closeError);
+                    MusicBox.getInstance().getLogger().log(Level.WARNING, LogLocale.text(MusicBox.getInstance(),
+                            "Failed to close the MySQL connection pool",
+                            "关闭 MySQL 连接池失败"), closeError);
                 }
             }
-            throw new RuntimeException("无法连接到 MySQL 数据库", e);
+            throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                    "Could not connect to the MySQL database",
+                    "无法连接到 MySQL 数据库"), e);
         }
     }
 
@@ -75,7 +82,9 @@ public class MySQL extends AbstractBase {
     public void shutdown() {
         if (this.dataSource != null && !this.dataSource.isClosed()) {
             this.dataSource.close();
-            MusicBox.getInstance().getLogger().info("MySQL 连接池已关闭");
+            MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                    "MySQL connection pool closed",
+                    "MySQL 连接池已关闭"));
         }
     }
 }

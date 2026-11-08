@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
@@ -14,19 +17,20 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.PublishConfirmConfig;
 
-public class PublishConfirmGUI implements InventoryHolder {
+public class PublishConfirmGUI implements Menu {
 
     private final Player player;
     private final PlayerMusic music;
     private final PublishGUI parentGUI;
     private final Inventory inventory;
-    private final GUIConfigManager.PublishConfirmConfig config;
+    private final PublishConfirmConfig config;
     private double currentPrice = 100;
     private String description = "";
 
@@ -49,7 +53,7 @@ public class PublishConfirmGUI implements InventoryHolder {
 
         int infoSlot = config.getSlotForButton("info");
         if (infoSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig infoConfig = config.getButton("info");
+            HotbarButtonConfig infoConfig = config.getButton("info");
             List<String> lore = new ArrayList<>();
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{name}", music.getName())
@@ -64,7 +68,7 @@ public class PublishConfirmGUI implements InventoryHolder {
 
         int priceSlot = config.getSlotForButton("price");
         if (priceSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig priceConfig = config.getButton("price");
+            HotbarButtonConfig priceConfig = config.getButton("price");
             List<String> lore = new ArrayList<>();
             double minPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMinPrice();
             double maxPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMaxPrice();
@@ -80,7 +84,7 @@ public class PublishConfirmGUI implements InventoryHolder {
 
         int descSlot = config.getSlotForButton("description");
         if (descSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig descConfig = config.getButton("description");
+            HotbarButtonConfig descConfig = config.getButton("description");
             String descriptionText = description.isEmpty() ? Lang.PUBLISH_DESCRIPTION_EMPTY.toString() : description;
             List<String> lore = new ArrayList<>();
             for (String line : descConfig.getLore()) {
@@ -93,7 +97,7 @@ public class PublishConfirmGUI implements InventoryHolder {
 
         int taxSlot = config.getSlotForButton("tax-info");
         if (taxSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig taxConfig = config.getButton("tax-info");
+            HotbarButtonConfig taxConfig = config.getButton("tax-info");
             double taxRate = MusicBox.getInstance().getConfigObject().getPublishConfig().getTaxRate();
             double authorRevenue = currentPrice * (1 - taxRate);
             List<String> lore = new ArrayList<>();
@@ -108,20 +112,24 @@ public class PublishConfirmGUI implements InventoryHolder {
 
         int confirmSlot = config.getSlotForButton("confirm");
         if (confirmSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig confirmConfig = config.getButton("confirm");
+            HotbarButtonConfig confirmConfig = config.getButton("confirm");
             ItemStack confirmItem = confirmConfig.createItem();
             inventory.setItem(confirmSlot, confirmItem);
         }
 
         int cancelSlot = config.getSlotForButton("cancel");
         if (cancelSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig cancelConfig = config.getButton("cancel");
+            HotbarButtonConfig cancelConfig = config.getButton("cancel");
             ItemStack cancelItem = cancelConfig.createItem();
             inventory.setItem(cancelSlot, cancelItem);
         }
     }
 
-    public void handleClick(int slot, boolean isRightClick, boolean isShiftClick) {
+    @Override
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
+        boolean isRightClick = click.rightClick();
+        boolean isShiftClick = click.shiftClick();
         int priceSlot = config.getSlotForButton("price");
         int descSlot = config.getSlotForButton("description");
         int confirmSlot = config.getSlotForButton("confirm");

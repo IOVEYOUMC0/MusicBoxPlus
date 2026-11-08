@@ -21,6 +21,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.ShopContainerPurchaseConfirmConfig;
+import com.huidu.musicboxplus.common.config.ShopLoreConfig;
 
 final class GUIShopActions {
     private GUIShopActions() {
@@ -70,7 +73,7 @@ final class GUIShopActions {
         }
     }
 
-    static List<String> playerBuySongLore(Logger logger, Map<String, List<String>> loreCache, GUIConfigManager.ShopLoreConfig shopLoreConfig, MusicBoxSong musicBoxSong) {
+    static List<String> playerBuySongLore(Logger logger, Map<String, List<String>> loreCache, ShopLoreConfig shopLoreConfig, MusicBoxSong musicBoxSong) {
         double price = EconomyUtils.getDiscPrice();
         if (musicBoxSong == null) {
             logger.warning("Invalid music box song data provided");
@@ -89,7 +92,7 @@ final class GUIShopActions {
             int songCount = container.getAllSongCount();
             double totalPrice = EconomyUtils.getDiscPrice() * songCount;
             String cacheKey = "buy_container_lore_" + container.getNameId() + "_" + songCount + "_" + totalPrice;
-            GUIConfigManager.ShopLoreConfig shopLoreConfig = GUIConfigManager.getInstance().getShopLoreConfig();
+            ShopLoreConfig shopLoreConfig = GUIConfigManager.getInstance().getShopLoreConfig();
             return loreCache.computeIfAbsent(cacheKey, k -> replaceContainerPurchase(
                     shopLoreConfig.getContainerBuyAllLore(),
                     container,
@@ -119,7 +122,7 @@ final class GUIShopActions {
             return;
         }
 
-        GUIConfigManager.ShopContainerPurchaseConfirmConfig confirmConfig = GUIConfigManager.getInstance().getShopContainerPurchaseConfirmConfig();
+        ShopContainerPurchaseConfirmConfig confirmConfig = GUIConfigManager.getInstance().getShopContainerPurchaseConfirmConfig();
         double totalPrice = EconomyUtils.getDiscPrice() * songCount;
         double balance = EconomyUtils.getBalance(player);
         boolean canAfford = balance >= totalPrice;
@@ -133,7 +136,7 @@ final class GUIShopActions {
         String actionButton = canAfford ? "confirm" : "no-money";
         int actionSlot = confirmConfig.getSlotForButton(actionButton);
         if (actionSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig buttonConfig = confirmConfig.getButton(actionButton);
+            HotbarButtonConfig buttonConfig = confirmConfig.getButton(actionButton);
             if (buttonConfig != null) {
                 ItemStack item = createConfirmItem(buttonConfig, container, songCount, totalPrice, balance, canAfford);
                 gui.addItem(actionSlot, item, new ClickAction(() -> {
@@ -148,7 +151,7 @@ final class GUIShopActions {
 
         int backSlot = confirmConfig.getSlotForButton("back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = confirmConfig.getButton("back");
+            HotbarButtonConfig backConfig = confirmConfig.getButton("back");
             if (backConfig != null) {
                 gui.addItem(backSlot, createConfirmItem(backConfig, container, songCount, totalPrice, balance, canAfford), new ClickAction(() -> {
                     if (containerData.getGui() != null) {
@@ -235,20 +238,20 @@ final class GUIShopActions {
         return result;
     }
 
-    private static void addConfirmButton(GUI gui, GUIConfigManager.ShopContainerPurchaseConfirmConfig confirmConfig, String buttonName,
+    private static void addConfirmButton(GUI gui, ShopContainerPurchaseConfirmConfig confirmConfig, String buttonName,
             FullSongContainer container, int songCount, double totalPrice, double balance, boolean canAfford) {
         int slot = confirmConfig.getSlotForButton(buttonName);
         if (slot < 0) {
             return;
         }
-        GUIConfigManager.HotbarButtonConfig buttonConfig = confirmConfig.getButton(buttonName);
+        HotbarButtonConfig buttonConfig = confirmConfig.getButton(buttonName);
         if (buttonConfig == null) {
             return;
         }
         gui.addItem(slot, createConfirmItem(buttonConfig, container, songCount, totalPrice, balance, canAfford), new ClickAction(() -> {}));
     }
 
-    private static ItemStack createConfirmItem(GUIConfigManager.HotbarButtonConfig config, FullSongContainer container,
+    private static ItemStack createConfirmItem(HotbarButtonConfig config, FullSongContainer container,
             int songCount, double totalPrice, double balance, boolean canAfford) {
         double need = Math.max(0D, totalPrice - balance);
         List<String> lore = replaceContainerPurchase(config.getLore(), container, songCount, totalPrice, balance, need);

@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
@@ -16,20 +19,21 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.PublishGUIConfig;
 
-public class PublishGUI implements InventoryHolder {
+public class PublishGUI implements Menu {
 
     private final Player player;
     private final Inventory inventory;
     private final List<PlayerMusic> musicList;
-    private final GUIConfigManager.PublishGUIConfig config;
+    private final PublishGUIConfig config;
     private int page = 0;
     private final Map<Integer, PlayerMusic> slotMusicMap = new HashMap<>();
 
@@ -70,10 +74,10 @@ public class PublishGUI implements InventoryHolder {
             boolean hasPublishedListing = publishedMusic != null;
             boolean isPublished = publishedMusic != null && publishedMusic.isAvailable();
 
-            GUIConfigManager.HotbarButtonConfig musicConfig = config.getButton("music-item");
+            HotbarButtonConfig musicConfig = config.getButton("music-item");
             Material material = musicConfig.getMaterial();
             if (hasPublishedListing) {
-                GUIConfigManager.HotbarButtonConfig publishedConfig = config.getButton("music-item-published");
+                HotbarButtonConfig publishedConfig = config.getButton("music-item-published");
                 if (publishedConfig != null && publishedConfig.getMaterial() != null) {
                     material = publishedConfig.getMaterial();
                 }
@@ -101,7 +105,7 @@ public class PublishGUI implements InventoryHolder {
             ItemStack item = ItemUtils.createStack(material, name, lore, musicConfig.getCustomModelData());
 
             if (isPublished) {
-                GUIConfigManager.HotbarButtonConfig publishedConfig = config.getButton("music-item-published");
+                HotbarButtonConfig publishedConfig = config.getButton("music-item-published");
                 if (publishedConfig != null && publishedConfig.isGlow()) {
                     item = ItemUtils.glow(item);
                 }
@@ -113,7 +117,7 @@ public class PublishGUI implements InventoryHolder {
 
         int prevSlot = config.getSlotForButton("prev-page");
         if (prevSlot >= 0 && page > 0) {
-            GUIConfigManager.HotbarButtonConfig prevConfig = config.getButton("prev-page");
+            HotbarButtonConfig prevConfig = config.getButton("prev-page");
             List<String> lore = new ArrayList<>();
             int totalPages = Math.max(1, (int) Math.ceil((double) musicList.size() / itemsPerPage));
             for (String line : prevConfig.getLore()) {
@@ -126,7 +130,7 @@ public class PublishGUI implements InventoryHolder {
 
         int nextSlot = config.getSlotForButton("next-page");
         if (nextSlot >= 0 && (page + 1) * itemsPerPage < musicList.size()) {
-            GUIConfigManager.HotbarButtonConfig nextConfig = config.getButton("next-page");
+            HotbarButtonConfig nextConfig = config.getButton("next-page");
             List<String> lore = new ArrayList<>();
             int totalPages = Math.max(1, (int) Math.ceil((double) musicList.size() / itemsPerPage));
             for (String line : nextConfig.getLore()) {
@@ -139,7 +143,7 @@ public class PublishGUI implements InventoryHolder {
 
         int closeSlot = config.getSlotForButton("close");
         if (closeSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig closeConfig = config.getButton("close");
+            HotbarButtonConfig closeConfig = config.getButton("close");
             ItemStack closeButton = closeConfig.createItem();
             inventory.setItem(closeSlot, closeButton);
         }
@@ -147,7 +151,7 @@ public class PublishGUI implements InventoryHolder {
         double pendingRevenue = PublishedMusicManager.getInstance().getPendingRevenue(player.getUniqueId());
         int revenueSlot = config.getSlotForButton("revenue");
         if (revenueSlot >= 0 && pendingRevenue > 0) {
-            GUIConfigManager.HotbarButtonConfig revenueConfig = config.getButton("revenue");
+            HotbarButtonConfig revenueConfig = config.getButton("revenue");
             List<String> lore = new ArrayList<>();
             for (String line : revenueConfig.getLore()) {
                 lore.add(line.replace("{amount}", String.format("%.2f", pendingRevenue)));
@@ -166,7 +170,8 @@ public class PublishGUI implements InventoryHolder {
                 .orElse(null);
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         List<Integer> musicSlots = config.getSlotsForChar(config.getButtonMapping().getOrDefault("music-item", 'M'));
         int itemsPerPage = Math.max(1, musicSlots.size());
         int prevSlot = config.getSlotForButton("prev-page");

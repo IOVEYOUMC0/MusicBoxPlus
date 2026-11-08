@@ -2,8 +2,8 @@ package com.huidu.musicboxplus.module.command.subcommands;
 
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.Permissions;
+import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
-import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.module.command.SubCommand;
@@ -36,14 +36,11 @@ public class ExportExecutor implements SubCommand {
     public void execute(CommandSender sender, String[] args) {
         MusicBox plugin = MusicBox.getInstance();
         if (args.length == 0) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "Usage: /musicboxplus export <player|uuid>",
-                    "用法: /musicboxplus export <玩家名|UUID>"));
+            MessageUtils.send(sender, Lang.CLI_EXPORT_USAGE);
             return;
         }
         if (!running.compareAndSet(false, true)) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "An export is already running.", "已有导出正在进行中。"));
+            MessageUtils.send(sender, Lang.CLI_EXPORT_RUNNING);
             return;
         }
         String target = args[0];
@@ -53,56 +50,41 @@ public class ExportExecutor implements SubCommand {
             try {
                 UUID owner = resolveOwner(target);
                 if (owner == null) {
-                    finish(sender, LogLocale.text(plugin,
-                            "Unknown player: " + target, "未知玩家: " + target));
+                    finish(sender, Lang.CLI_EXPORT_UNKNOWN_PLAYER, "{player}", target);
                     return;
                 }
                 List<PlayerMusic> songs = PlayerMusicManager.getInstance().getMusicByPlayer(owner);
                 if (songs.isEmpty()) {
-                    finish(sender, LogLocale.text(plugin,
-                            "That player has no songs.", "该玩家没有作品。"));
+                    finish(sender, Lang.CLI_EXPORT_NO_SONGS);
                     return;
                 }
                 File targetDir = new File(plugin.getDataFolder(),
                         "exports/" + safeFolderName(target) + "-" + System.currentTimeMillis());
                 MusicExportService.ExportResult result = MusicExportService.export(songs, targetDir);
-                finish(sender, buildReport(result));
+                finish(sender, Lang.CLI_EXPORT_DONE,
+                        "{count}", String.valueOf(result.files().size()),
+                        "{path}", result.directory().getPath());
+                if (!result.failures().isEmpty()) {
+                    finish(sender, Lang.CLI_EXPORT_FAILURES, "{list}", String.join(", ", result.failures()));
+                }
+                if (!result.warnings().isEmpty()) {
+                    finish(sender, Lang.CLI_EXPORT_WARNINGS, "{list}", String.join(", ", result.warnings()));
+                }
             } catch (Exception failure) {
                 plugin.getLogger().log(java.util.logging.Level.SEVERE, "Music export failed", failure);
-                finish(sender, LogLocale.text(plugin,
-                        "Export failed: " + failure.getMessage(),
-                        "导出失败: " + failure.getMessage()));
+                finish(sender, Lang.CLI_EXPORT_FAILED, "{error}", String.valueOf(failure.getMessage()));
             } finally {
                 running.set(false);
             }
         }, () -> {
             running.set(false);
-            Scheduler.global(() -> MessageUtils.send(sender, LogLocale.text(plugin,
-                    "Export was rejected because the async queue is full.", "异步队列已满，导出未执行。")));
+            Scheduler.global(() -> MessageUtils.send(sender, Lang.CLI_EXPORT_QUEUE_FULL));
         });
     }
 
-    private String buildReport(MusicExportService.ExportResult result) {
-        MusicBox plugin = MusicBox.getInstance();
-        StringBuilder message = new StringBuilder(LogLocale.text(plugin,
-                "Exported " + result.files().size() + " song(s) to " + result.directory().getPath(),
-                "已导出 " + result.files().size() + " 首作品到 " + result.directory().getPath()));
-        if (!result.failures().isEmpty()) {
-            message.append('\n').append(LogLocale.text(plugin,
-                    "Failed: " + String.join(", ", result.failures()),
-                    "失败: " + String.join(", ", result.failures())));
-        }
-        if (!result.warnings().isEmpty()) {
-            message.append('\n').append(LogLocale.text(plugin,
-                    "Warnings: " + String.join(", ", result.warnings()),
-                    "警告: " + String.join(", ", result.warnings())));
-        }
-        return message.toString();
-    }
-
     /** Never call after the async hop; logs the outcome from the global thread. */
-    private void finish(CommandSender sender, String message) {
-        Scheduler.global(() -> MessageUtils.send(sender, message));
+    private void finish(CommandSender sender, Lang message, String... replacements) {
+        Scheduler.global(() -> MessageUtils.send(sender, message, replacements));
     }
 
     private static UUID resolveOwner(String target) {

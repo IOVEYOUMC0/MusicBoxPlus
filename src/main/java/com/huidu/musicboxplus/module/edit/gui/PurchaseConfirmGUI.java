@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.EconomyUtils;
@@ -15,7 +18,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.text.SimpleDateFormat;
@@ -23,14 +25,16 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.function.Consumer;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.PurchaseConfirmConfig;
 
-public class PurchaseConfirmGUI implements InventoryHolder {
+public class PurchaseConfirmGUI implements Menu {
 
     private final Player player;
     private final PublishedMusic published;
     private final PlayerMusicShopGUI parentGUI;
     private final Inventory inventory;
-    private final GUIConfigManager.PurchaseConfirmConfig config;
+    private final PurchaseConfirmConfig config;
     // Guards against double-clicking "confirm": money is withdrawn synchronously but
     // the disc/save completes asynchronously, leaving a window in which a second click
     // would withdraw again. True while a purchase is in flight.
@@ -54,7 +58,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
 
         int infoSlot = config.getSlotForButton("info");
         if (infoSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig infoConfig = config.getButton("info");
+            HotbarButtonConfig infoConfig = config.getButton("info");
             List<String> lore = new ArrayList<>();
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{name}", published.getName())
@@ -80,7 +84,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
 
         int priceSlot = config.getSlotForButton("price");
         if (priceSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig priceConfig = config.getButton("price");
+            HotbarButtonConfig priceConfig = config.getButton("price");
             String priceColor = canAfford ? "<gold>" : "<red>";
             String balanceColor = canAfford ? "<green>" : "<red>";
             String canAffordText = authorClaim
@@ -106,11 +110,11 @@ public class PurchaseConfirmGUI implements InventoryHolder {
         int confirmSlot = config.getSlotForButton("confirm");
         if (confirmSlot >= 0) {
             if (canAfford) {
-                GUIConfigManager.HotbarButtonConfig confirmConfig = config.getButton("confirm");
+                HotbarButtonConfig confirmConfig = config.getButton("confirm");
                 ItemStack confirmItem = confirmConfig.createItem();
                 inventory.setItem(confirmSlot, confirmItem);
             } else {
-                GUIConfigManager.HotbarButtonConfig noMoneyConfig = config.getButton("no-money");
+                HotbarButtonConfig noMoneyConfig = config.getButton("no-money");
                 if (noMoneyConfig != null) {
                     double need = Math.max(0D, price - balance);
                     List<String> lore = new ArrayList<>();
@@ -125,7 +129,7 @@ public class PurchaseConfirmGUI implements InventoryHolder {
 
         int backSlot = config.getSlotForButton("back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = config.getButton("back");
+            HotbarButtonConfig backConfig = config.getButton("back");
             ItemStack backButton = backConfig.createItem();
             inventory.setItem(backSlot, backButton);
         }
@@ -136,7 +140,8 @@ public class PurchaseConfirmGUI implements InventoryHolder {
         return sdf.format(new Date(timestamp));
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int confirmSlot = config.getSlotForButton("confirm");
         int backSlot = config.getSlotForButton("back");
 

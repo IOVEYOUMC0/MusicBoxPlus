@@ -13,6 +13,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
+import com.huidu.musicboxplus.common.config.GUIConfig;
 
 final class ControlPanelSongListRenderer {
     private ControlPanelSongListRenderer() {
@@ -27,8 +29,8 @@ final class ControlPanelSongListRenderer {
         Consumer<MusicBoxSong> onSelect
     ) {
         if (list == null || list.getCurrent() == null) {
-            GUIConfigManager.GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
-            GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getButtonMapping();
+            GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
+            ButtonMappingConfig mapping = guiConfig.getButtonMapping();
             List<Integer> songSlots = layoutParser.getSlotsForChar(mapping.getSongList());
             if (songSlots.isEmpty()) {
                 songSlots = IntStream.range(9, 18).boxed().toList();
@@ -43,8 +45,8 @@ final class ControlPanelSongListRenderer {
         Collections.reverse(prev);
         List<? extends MusicBoxSong> next = list.getNextSongs(4);
         MusicBoxSong currentSong = list.getCurrent();
-        GUIConfigManager.GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getButtonMapping();
+        GUIConfig guiConfig = configManager.getGUIConfig("control-panel");
+        ButtonMappingConfig mapping = guiConfig.getButtonMapping();
         List<Integer> songSlots = layoutParser.getSlotsForChar(mapping.getSongList());
         if (songSlots.isEmpty()) {
             songSlots = IntStream.range(9, 18).boxed().toList();

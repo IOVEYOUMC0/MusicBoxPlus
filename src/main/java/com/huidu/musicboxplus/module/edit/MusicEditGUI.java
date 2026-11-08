@@ -21,8 +21,12 @@ import org.bukkit.inventory.meta.ItemMeta;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import com.huidu.musicboxplus.common.config.ClearConfirmConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.InstrumentSelectConfig;
+import com.huidu.musicboxplus.common.config.MusicEditorConfig;
 
-public class MusicEditGUI implements InventoryHolder {
+public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
 
     public static void cleanupSession(UUID playerUUID) {
         MusicEditTextInputManager.cleanupSession(playerUUID);
@@ -63,7 +67,7 @@ public class MusicEditGUI implements InventoryHolder {
     private final PlayerMusic music;
     private final Player player;
     private final Inventory inventory;
-    private final GUIConfigManager.MusicEditorConfig config;
+    private final MusicEditorConfig config;
     private final int maxPitch;
     private int pitchOffset = 0;
     private int tickOffset = 0;
@@ -74,22 +78,19 @@ public class MusicEditGUI implements InventoryHolder {
     private boolean openingSubGUI = false;
     private final List<MbTask> scheduledTaskIds = Collections.synchronizedList(new ArrayList<>());
     private MusicNote.NoteInstrument currentInstrument = MusicNote.NoteInstrument.HARP;
-    private final List<Integer> editAreaSlots = new ArrayList<>();
     // The slots currently carrying the preview flash, so clearing it repaints only those. See
     // flashPreviewHighlight.
     private final Set<Integer> previewHighlightSlots = new HashSet<>();
-    private final Map<Integer, Integer> editAreaSlotIndexes = new HashMap<>();
     // Scratch set for the playback timer, which runs every server tick: reused instead of allocating
     // a fresh HashSet 20 times a second. Only read by updateInventory(Set) within the same tick.
     private final Set<Integer> playbackChangedSlots = new HashSet<>();
-    private String[] layoutLines = new String[0];
+    private final MusicEditLayout layout = new MusicEditLayout();
+    private final MusicEditPlayback playback = new MusicEditPlayback(this);
     private final EditHistory editHistory = new EditHistory();
     private int currentPlayTick = -1;
     private Mode currentMode = Mode.EDIT;
     private MusicNote selectedNote = null;
     private int instrumentPageOffset = 0;
-    private int cachedEditColumns = -1;
-    private int cachedEditRows = -1;
     private int clearNoteCount = 0;
     private MbTask autoSaveTask = null;
     private MbTask queuedEditorRenderTask = null;
@@ -183,31 +184,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void parseLayout() {
-        editAreaSlots.clear();
-        editAreaSlotIndexes.clear();
-        layoutLines = new String[0];
-        cachedEditColumns = -1;
-        cachedEditRows = -1;
-
-        String layout = config.getLayout();
-        if (layout == null || layout.isEmpty()) {
-            return;
-        }
-
-        String[] lines = layout.split("\n");
-        layoutLines = lines;
-        for (int row = 0; row < lines.length && row < 6; row++) {
-            String line = lines[row];
-            for (int col = 0; col < line.length() && col < 9; col++) {
-                char c = line.charAt(col);
-                int slot = row * 9 + col;
-
-                if (c == config.getEditAreaChar()) {
-                    editAreaSlotIndexes.put(slot, editAreaSlots.size());
-                    editAreaSlots.add(slot);
-                }
-            }
-        }
+        layout.parse(config);
     }
 
     public void open() {
@@ -283,17 +260,17 @@ public class MusicEditGUI implements InventoryHolder {
             return;
         }
 
-        GUIConfigManager.HotbarButtonConfig playConfig = isPlaying ? config.getButton("play-stop") : config.getButton("play");
-        GUIConfigManager.HotbarButtonConfig emptyConfig = config.getButton("empty");
+        HotbarButtonConfig playConfig = isPlaying ? config.getButton("play-stop") : config.getButton("play");
+        HotbarButtonConfig emptyConfig = config.getButton("empty");
 
-        if (layoutLines.length == 0) {
+        if (layout.lineCount() == 0) {
             return;
         }
 
         clearPlayerInventoryEditorArea();
 
-        for (int row = 6; row < layoutLines.length && row < 10; row++) {
-            String line = layoutLines[row];
+        for (int row = 6; row < layout.lineCount() && row < 10; row++) {
+            String line = layout.line(row);
             for (int col = 0; col < line.length() && col < 9; col++) {
                 char c = line.charAt(col);
                 int layoutSlot = row * 9 + col;
@@ -301,7 +278,7 @@ public class MusicEditGUI implements InventoryHolder {
 
                 if (playerSlot < 0 || playerSlot >= 36) continue;
 
-                GUIConfigManager.HotbarButtonConfig btnConfig = null;
+                HotbarButtonConfig btnConfig = null;
                 String[] replacements = null;
 
                 if (c == config.getButtonMapping().getOrDefault("pitch-up", 'U')) {
@@ -406,24 +383,24 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void giveInstrumentSelectItems() {
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
+        InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
         MusicEditInstrumentMenuRenderer.renderInstrumentSelect(player, instrumentConfig, selectedNote, instrumentPageOffset, getInstrumentsPerPage());
     }
 
     private void giveCurrentInstrumentSelectItems() {
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
+        InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
         MusicEditInstrumentMenuRenderer.renderCurrentInstrumentSelect(player, instrumentConfig, currentInstrument, instrumentPageOffset, getInstrumentsPerPage());
     }
 
     private void giveClearConfirmItems() {
         player.getInventory().clear();
 
-        GUIConfigManager.ClearConfirmConfig clearConfig = GUIConfigManager.getInstance().getClearConfirmConfig();
+        ClearConfirmConfig clearConfig = GUIConfigManager.getInstance().getClearConfirmConfig();
 
         int infoSlot = clearConfig.getSlotForButton("info");
         if (infoSlot < 0) infoSlot = 4;
 
-        GUIConfigManager.HotbarButtonConfig infoConfig = clearConfig.getButton("info");
+        HotbarButtonConfig infoConfig = clearConfig.getButton("info");
         if (infoConfig != null) {
             List<String> lore = new ArrayList<>();
             for (String line : infoConfig.getLore()) {
@@ -436,7 +413,7 @@ public class MusicEditGUI implements InventoryHolder {
         int confirmSlot = clearConfig.getSlotForButton("confirm");
         if (confirmSlot < 0) confirmSlot = 0;
 
-        GUIConfigManager.HotbarButtonConfig confirmConfig = clearConfig.getButton("confirm");
+        HotbarButtonConfig confirmConfig = clearConfig.getButton("confirm");
         if (confirmConfig != null) {
             ItemStack confirmItem = confirmConfig.createItem();
             player.getInventory().setItem(confirmSlot, confirmItem);
@@ -445,7 +422,7 @@ public class MusicEditGUI implements InventoryHolder {
         int cancelSlot = clearConfig.getSlotForButton("cancel");
         if (cancelSlot < 0) cancelSlot = 8;
 
-        GUIConfigManager.HotbarButtonConfig cancelConfig = clearConfig.getButton("cancel");
+        HotbarButtonConfig cancelConfig = clearConfig.getButton("cancel");
         if (cancelConfig != null) {
             ItemStack cancelItem = cancelConfig.createItem();
             player.getInventory().setItem(cancelSlot, cancelItem);
@@ -453,27 +430,14 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private int layoutSlotToPlayerSlot(int layoutSlot) {
-        int row = layoutSlot / 9;
-        int col = layoutSlot % 9;
-
-        if (row == 9) {
-            return col;
-        } else if (row >= 6 && row < 9) {
-            return (row - 6) * 9 + col + 9;
-        }
-        return -1;
+        return MusicEditLayout.layoutSlotToPlayerSlot(layoutSlot);
     }
 
     private int playerSlotToLayoutSlot(int playerSlot) {
-        if (playerSlot >= 0 && playerSlot < 9) {
-            return 9 * 9 + playerSlot;
-        } else if (playerSlot >= 9 && playerSlot < 36) {
-            return 6 * 9 + (playerSlot - 9);
-        }
-        return -1;
+        return MusicEditLayout.playerSlotToLayoutSlot(playerSlot);
     }
 
-    private void setPlayerInventoryItem(int playerSlot, GUIConfigManager.HotbarButtonConfig btnConfig, String... replacements) {
+    private void setPlayerInventoryItem(int playerSlot, HotbarButtonConfig btnConfig, String... replacements) {
         if (playerSlot < 0 || playerSlot >= 36 || btnConfig == null) {
             return;
         }
@@ -532,8 +496,8 @@ public class MusicEditGUI implements InventoryHolder {
         boolean needsFullUpdate = (changedSlots == null || changedSlots.isEmpty());
 
         if (needsFullUpdate) {
-            for (int i = 0; i < editAreaSlots.size(); i++) {
-                int slot = editAreaSlots.get(i);
+            for (int i = 0; i < layout.editAreaSlots().size(); i++) {
+                int slot = layout.editAreaSlots().get(i);
                 int localRow = i / editCols;
                 int localCol = i % editCols;
 
@@ -563,7 +527,7 @@ public class MusicEditGUI implements InventoryHolder {
             // tens of microseconds each), the same order that the review's own progress-bar finding
             // was judged not worth the risk for.
             for (int slot : changedSlots) {
-                Integer index = editAreaSlotIndexes.get(slot);
+                Integer index = layout.indexOf(slot);
                 if (index == null) continue;
 
                 int localRow = index / editCols;
@@ -609,41 +573,11 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private int calculateEditColumns() {
-        if (cachedEditColumns >= 0) {
-            return cachedEditColumns;
-        }
-        if (editAreaSlots.isEmpty()) {
-            cachedEditColumns = 7;
-            return cachedEditColumns;
-        }
-
-        int minCol = 9, maxCol = 0;
-        for (int slot : editAreaSlots) {
-            int col = slot % 9;
-            minCol = Math.min(minCol, col);
-            maxCol = Math.max(maxCol, col);
-        }
-        cachedEditColumns = maxCol - minCol + 1;
-        return cachedEditColumns;
+        return layout.columns();
     }
 
     private int calculateEditRows() {
-        if (cachedEditRows >= 0) {
-            return cachedEditRows;
-        }
-        if (editAreaSlots.isEmpty()) {
-            cachedEditRows = 6;
-            return cachedEditRows;
-        }
-
-        int minRow = 6, maxRow = 0;
-        for (int slot : editAreaSlots) {
-            int row = slot / 9;
-            minRow = Math.min(minRow, row);
-            maxRow = Math.max(maxRow, row);
-        }
-        cachedEditRows = maxRow - minRow + 1;
-        return cachedEditRows;
+        return layout.rows();
     }
 
     private void scheduleEditorViewRender() {
@@ -672,7 +606,7 @@ public class MusicEditGUI implements InventoryHolder {
         if (currentMode == Mode.INSTRUMENT_SELECT) {
             return;
         }
-        if (editAreaSlotIndexes.containsKey(slot)) {
+        if (layout.isEditAreaSlot(slot)) {
             handleEditAreaClick(slot, isRightClick, isShiftClick);
         }
     }
@@ -777,7 +711,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void handleEditAreaClick(int slot, boolean isRightClick, boolean isShiftClick) {
-        Integer index = editAreaSlotIndexes.get(slot);
+        Integer index = layout.indexOf(slot);
         if (index == null) {
             return;
         }
@@ -853,7 +787,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void handleInstrumentSelectClick(int slot) {
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
+        InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
         MusicNote.NoteInstrument[] instruments = MusicNote.NoteInstrument.getAvailableValues();
         int totalInstruments = instruments.length;
         List<Integer> instrumentSlots = getPlayerInventorySlotsForInstrumentChar(
@@ -930,16 +864,16 @@ public class MusicEditGUI implements InventoryHolder {
         return MusicEditInstrumentMenuRenderer.getTotalInstrumentPages(instrumentsPerPage);
     }
 
-    private List<Integer> getPlayerInventorySlotsForInstrumentChar(GUIConfigManager.InstrumentSelectConfig instrumentConfig, char c) {
+    private List<Integer> getPlayerInventorySlotsForInstrumentChar(InstrumentSelectConfig instrumentConfig, char c) {
         return MusicEditInstrumentMenuRenderer.getPlayerInventorySlotsForInstrumentChar(instrumentConfig, c);
     }
 
-    private int getPlayerInventorySlotForInstrumentButton(GUIConfigManager.InstrumentSelectConfig instrumentConfig, String buttonType) {
+    private int getPlayerInventorySlotForInstrumentButton(InstrumentSelectConfig instrumentConfig, String buttonType) {
         return MusicEditInstrumentMenuRenderer.getPlayerInventorySlotForInstrumentButton(instrumentConfig, buttonType);
     }
 
     private void handleCurrentInstrumentSelectClick(int slot) {
-        GUIConfigManager.InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
+        InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
         MusicNote.NoteInstrument[] instruments = MusicNote.NoteInstrument.getAvailableValues();
         List<Integer> instrumentSlots = getPlayerInventorySlotsForInstrumentChar(
                 instrumentConfig,
@@ -990,7 +924,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void handleClearConfirmClick(int slot) {
-        GUIConfigManager.ClearConfirmConfig clearConfig = GUIConfigManager.getInstance().getClearConfirmConfig();
+        ClearConfirmConfig clearConfig = GUIConfigManager.getInstance().getClearConfirmConfig();
 
         int confirmSlot = clearConfig.getSlotForButton("confirm");
         if (confirmSlot < 0) confirmSlot = 0;
@@ -1036,19 +970,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private char getCharAtInventorySlot(int playerSlot) {
-        int layoutSlot = playerSlotToLayoutSlot(playerSlot);
-        if (layoutSlot < 0) {
-            return ' ';
-        }
-
-        int row = layoutSlot / 9;
-        int col = layoutSlot % 9;
-
-        if (row < 0 || row >= layoutLines.length) {
-            return ' ';
-        }
-        String line = layoutLines[row];
-        return col < line.length() ? line.charAt(col) : ' ';
+        return layout.charAtPlayerSlot(playerSlot);
     }
 
     public void handleHotbarClick(int slot, boolean isRightClick, boolean isShiftClick) {
@@ -1109,7 +1031,7 @@ public class MusicEditGUI implements InventoryHolder {
         Set<Integer> slots = new HashSet<>();
         int editCols = calculateEditColumns();
         int editRows = calculateEditRows();
-        for (int i = 0; i < editAreaSlots.size(); i++) {
+        for (int i = 0; i < layout.editAreaSlots().size(); i++) {
             int localRow = i / editCols;
             if (localRow >= editRows) {
                 continue;
@@ -1121,7 +1043,7 @@ public class MusicEditGUI implements InventoryHolder {
             if (localRow + pitchOffset > maxPitch) {
                 continue;
             }
-            slots.add(editAreaSlots.get(i));
+            slots.add(layout.editAreaSlots().get(i));
         }
         return slots;
     }
@@ -1247,194 +1169,113 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     private void playMusic() {
-        playMusicFromTick(0);
+        playback.play();
     }
 
     private void playMusicFromTick(int startTick) {
-        isPlaying = true;
-        scheduledTaskIds.clear();
-        currentPlayTick = -1;
-
-        if (music.getNoteCount() == 0) {
-            isPlaying = false;
-            currentPlayTick = -1;
-            updateInventory();
-            MessageUtils.send(player, Lang.EDIT_NO_NOTES_TO_PLAY);
-            return;
-        }
-
-        int bpm = music.getBpm();
-        double tickDurationMillis = 60000.0 / (bpm * music.getBeatSubdivision());
-        int editCols = calculateEditColumns();
-
-        // Playback reads the song through PlayerMusic's per-tick accessors instead of taking a copy
-        // of the whole tick index first. getTickIndexMap() returns `new TreeMap<>(tickIndexMap)`, so
-        // pressing play built a full copy of every note in the song on the main thread (100k notes =
-        // 100k tree entries) and the loop then walked an Integer[] of every remaining tick, boxed.
-        // Both are gone: the loop asks for the notes at one tick, which is a small list copy.
-        int from = Math.max(0, startTick);
-        if (music.firstNoteTickAtOrAfter(from) == null) {
-            isPlaying = false;
-            currentPlayTick = -1;
-            updateInventory();
-            MessageUtils.send(player, Lang.EDIT_NO_NOTES_TO_PLAY);
-            return;
-        }
-
-        startTimedPlayback(music.lastNoteTick(), from, tickDurationMillis, editCols);
-
-        MessageUtils.send(player, Lang.EDIT_PLAYBACK_STARTED);
-    }
-
-    private void startTimedPlayback(int endTick,
-                                    int startTick,
-                                    double tickDurationMillis,
-                                    int editCols) {
-        final int[] timelineTick = {startTick};
-        final double[] accumulator = {tickDurationMillis};
-        final long[] lastNano = {System.nanoTime()};
-        final int maxBurstPerServerTick = 32;
-
-        MbTask task = Scheduler.entityTimer(player, () -> {
-            if (!isPlaying) {
-                return;
-            }
-
-            long now = System.nanoTime();
-            accumulator[0] += (now - lastNano[0]) / 1_000_000.0;
-            lastNano[0] = now;
-
-            int processed = 0;
-            boolean needsInventoryRefresh = false;
-            boolean needsHotbarRefresh = false;
-            boolean needsFullInventoryRefresh = false;
-            // Reused across ticks: this runs every server tick while a song plays.
-            Set<Integer> changedSlots = playbackChangedSlots;
-            changedSlots.clear();
-            while (accumulator[0] >= tickDurationMillis && timelineTick[0] <= endTick && processed < maxBurstPerServerTick) {
-                accumulator[0] -= tickDurationMillis;
-                int previousPlayTick = currentPlayTick;
-                int previousTickOffset = tickOffset;
-                List<MusicNote> tickNotes = music.getNotesAtTick(timelineTick[0]);
-                if (!tickNotes.isEmpty()) {
-                    needsHotbarRefresh |= playPlaybackTick(tickNotes, timelineTick[0], editCols);
-                } else {
-                    needsHotbarRefresh |= updatePlaybackPosition(timelineTick[0], editCols);
-                }
-                if (tickOffset != previousTickOffset) {
-                    needsFullInventoryRefresh = true;
-                } else {
-                    addPlaybackChangedSlots(changedSlots, previousPlayTick, editCols);
-                    addPlaybackChangedSlots(changedSlots, currentPlayTick, editCols);
-                }
-                needsInventoryRefresh = true;
-                timelineTick[0]++;
-                processed++;
-            }
-
-            if (timelineTick[0] > endTick) {
-                finishPlayback();
-                return;
-            }
-
-            if (needsInventoryRefresh) {
-                if (needsHotbarRefresh) {
-                    givePlayerInventoryItems();
-                }
-                if (needsFullInventoryRefresh) {
-                    updateInventory();
-                } else if (!changedSlots.isEmpty()) {
-                    updateInventory(changedSlots);
-                }
-            }
-        }, 0L, 1L);
-
-        scheduledTaskIds.add(task);
-    }
-
-    private boolean playPlaybackTick(List<MusicNote> tickNotes, int tick, int editCols) {
-        boolean needsHotbarRefresh = updatePlaybackPosition(tick, editCols);
-
-        for (MusicNote n : tickNotes) {
-            for (MusicNote.NoteInstrument instrument : n.getInstruments()) {
-                playNoteSound(n.getPitch(), instrument);
-            }
-        }
-        return needsHotbarRefresh;
-    }
-
-    private boolean updatePlaybackPosition(int tick, int editCols) {
-        currentPlayTick = tick;
-
-        if (currentPageHasRemainingNotes(tick, editCols)) {
-            return false;
-        }
-
-        Integer nextNoteTick = music.firstNoteTickAtOrAfter(tick);
-        if (nextNoteTick == null) {
-            return false;
-        }
-
-        int nextOffset = nextNoteTick / editCols;
-        if (nextOffset == tickOffset) {
-            return false;
-        }
-        tickOffset = nextOffset;
-        return true;
-    }
-
-    private boolean currentPageHasRemainingNotes(int tick, int editCols) {
-        int pageStart = tickOffset * editCols;
-        int pageEnd = pageStart + editCols - 1;
-        Integer nextVisibleNoteTick = music.firstNoteTickAtOrAfter(Math.max(tick, pageStart));
-        return nextVisibleNoteTick != null && nextVisibleNoteTick <= pageEnd;
-    }
-
-    private void addPlaybackChangedSlots(Set<Integer> changedSlots, int tick, int editCols) {
-        if (tick < 0) {
-            return;
-        }
-        int localCol = tick - tickOffset * editCols;
-        if (localCol < 0 || localCol >= editCols) {
-            return;
-        }
-        int editRows = calculateEditRows();
-        for (int localRow = 0; localRow < editRows; localRow++) {
-            int index = localRow * editCols + localCol;
-            if (index < editAreaSlots.size()) {
-                changedSlots.add(editAreaSlots.get(index));
-            }
-        }
-    }
-
-    private void finishPlayback() {
-        if (!isPlaying) {
-            return;
-        }
-        cancelQueuedEditorRender();
-        isPlaying = false;
-        currentPlayTick = -1;
-        for (MbTask task : scheduledTaskIds) {
-            task.cancel();
-        }
-        scheduledTaskIds.clear();
-        updateInventory();
-        givePlayerInventoryItems();
+        playback.playFromTick(startTick);
     }
 
     public void stopMusic() {
-        cancelQueuedEditorRender();
-        isPlaying = false;
-        currentPlayTick = -1;
-        previewHighlighter.clear();
-        for (MbTask task : scheduledTaskIds) {
-            task.cancel();
-        }
-        scheduledTaskIds.clear();
-        updateInventory();
-        MessageUtils.send(player, Lang.EDIT_PLAYBACK_STOPPED);
+        playback.stop();
     }
 
+    // --- MusicEditPlayback.Host: the window as the playback clock sees it ---------------------
+
+    @Override
+    public Player player() {
+        return player;
+    }
+
+    @Override
+    public PlayerMusic music() {
+        return music;
+    }
+
+    @Override
+    public MusicEditLayout layout() {
+        return layout;
+    }
+
+    @Override
+    public int columns() {
+        return calculateEditColumns();
+    }
+
+    @Override
+    public int rows() {
+        return calculateEditRows();
+    }
+
+    @Override
+    public int tickOffset() {
+        return tickOffset;
+    }
+
+    @Override
+    public void tickOffset(int tickOffset) {
+        this.tickOffset = tickOffset;
+    }
+
+    @Override
+    public boolean playing() {
+        return isPlaying;
+    }
+
+    @Override
+    public void playing(boolean playing) {
+        this.isPlaying = playing;
+    }
+
+    @Override
+    public int playTick() {
+        return currentPlayTick;
+    }
+
+    @Override
+    public void playTick(int playTick) {
+        this.currentPlayTick = playTick;
+    }
+
+    @Override
+    public Set<Integer> changedSlots() {
+        return playbackChangedSlots;
+    }
+
+    @Override
+    public List<MbTask> scheduledTasks() {
+        return scheduledTaskIds;
+    }
+
+    @Override
+    public void refreshAll() {
+        updateInventory();
+    }
+
+    @Override
+    public void refreshSlots(Set<Integer> slots) {
+        updateInventory(slots);
+    }
+
+    @Override
+    public void refreshHotbar() {
+        givePlayerInventoryItems();
+    }
+
+    @Override
+    public void cancelQueuedRender() {
+        cancelQueuedEditorRender();
+    }
+
+    @Override
+    public void clearPreviewHighlight() {
+        previewHighlighter.clear();
+    }
+
+    @Override
+    public void playNote(int pitch, MusicNote.NoteInstrument instrument) {
+        playNoteSound(pitch, instrument);
+    }
     public void close() {
         closeCoordinator.close(
                 isPlaying,
@@ -1750,7 +1591,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     public List<MusicNote> getSelectedNotes() {
-        return selectionManager.getSelectedNotes(music, editAreaSlots, calculateEditColumns(), pitchOffset, tickOffset, maxPitch);
+        return selectionManager.getSelectedNotes(music, layout.editAreaSlots(), calculateEditColumns(), pitchOffset, tickOffset, maxPitch);
     }
 
     public void startSelection(int slot) {
@@ -1780,7 +1621,7 @@ public class MusicEditGUI implements InventoryHolder {
     }
 
     public boolean isSlotInSelection(int slot) {
-        return selectionManager.isSlotInSelection(slot, editAreaSlots, calculateEditColumns());
+        return selectionManager.isSlotInSelection(slot, layout.editAreaSlots(), calculateEditColumns());
     }
 
     public EditHistory getEditHistory() {

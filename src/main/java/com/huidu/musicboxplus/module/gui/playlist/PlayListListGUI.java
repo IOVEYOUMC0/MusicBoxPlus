@@ -26,6 +26,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
+import com.huidu.musicboxplus.common.config.PlaylistItemConfig;
 
 public class PlayListListGUI {
     private List<PlayerPlayListModel> list;
@@ -71,7 +73,7 @@ public class PlayListListGUI {
     }
 
     public void openPage(int page, Function<SongContainer, InventoryAction> onSelect, Function<PlayerPlayListModel, List<String>> extraLore, Runnable backAction) {
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-list").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-list").getButtonMapping();
         int slotsPerPage = this.configManager.getLayoutCharCount("playlist-list", mapping.getPlaylist());
         if (slotsPerPage <= 0) {
             slotsPerPage = 36;
@@ -114,7 +116,7 @@ public class PlayListListGUI {
         }
 
         List<Integer> playlistSlots = layoutParser.getSlotsForChar(mapping.getPlaylist());
-        GUIConfigManager.PlaylistItemConfig playlistConfig = this.configManager.getPlaylistItemConfig();
+        PlaylistItemConfig playlistConfig = this.configManager.getPlaylistItemConfig();
         int itemIndex = 0;
         for (int slot : playlistSlots) {
             int listIndex = offset + itemIndex;
@@ -153,7 +155,7 @@ public class PlayListListGUI {
     }
 
     private int getLastPage() {
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-list").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-list").getButtonMapping();
         int slotsPerPage = this.configManager.getLayoutCharCount("playlist-list", mapping.getPlaylist());
         if (slotsPerPage <= 0) {
             slotsPerPage = 36;

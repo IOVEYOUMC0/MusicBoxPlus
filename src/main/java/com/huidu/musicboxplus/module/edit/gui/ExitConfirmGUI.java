@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
@@ -7,17 +10,18 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.ExitConfirmConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
 
-public class ExitConfirmGUI implements InventoryHolder {
+public class ExitConfirmGUI implements Menu {
 
     private final Player player;
     private final Inventory inventory;
-    private final GUIConfigManager.ExitConfirmConfig config;
+    private final ExitConfirmConfig config;
     private final String musicName;
     private final Runnable onSave;
     private final Runnable onDiscard;
@@ -43,7 +47,7 @@ public class ExitConfirmGUI implements InventoryHolder {
 
         int infoSlot = config.getSlotForButton("info");
         if (infoSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig infoConfig = config.getButton("info");
+            HotbarButtonConfig infoConfig = config.getButton("info");
             List<String> lore = new ArrayList<>();
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{name}", musicName));
@@ -54,27 +58,28 @@ public class ExitConfirmGUI implements InventoryHolder {
 
         int saveSlot = config.getSlotForButton("save");
         if (saveSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig saveConfig = config.getButton("save");
+            HotbarButtonConfig saveConfig = config.getButton("save");
             ItemStack saveItem = saveConfig.createItem();
             inventory.setItem(saveSlot, saveItem);
         }
 
         int discardSlot = config.getSlotForButton("discard");
         if (discardSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig discardConfig = config.getButton("discard");
+            HotbarButtonConfig discardConfig = config.getButton("discard");
             ItemStack discardItem = discardConfig.createItem();
             inventory.setItem(discardSlot, discardItem);
         }
 
         int cancelSlot = config.getSlotForButton("cancel");
         if (cancelSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig cancelConfig = config.getButton("cancel");
+            HotbarButtonConfig cancelConfig = config.getButton("cancel");
             ItemStack cancelItem = cancelConfig.createItem();
             inventory.setItem(cancelSlot, cancelItem);
         }
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int saveSlot = config.getSlotForButton("save");
         int discardSlot = config.getSlotForButton("discard");
         int cancelSlot = config.getSlotForButton("cancel");

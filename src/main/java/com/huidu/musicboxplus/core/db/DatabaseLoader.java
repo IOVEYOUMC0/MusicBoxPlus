@@ -25,7 +25,9 @@ public class DatabaseLoader {
     public static AbstractBase getBase() {
         DatabaseLoader localInstance = instance;
         if (localInstance == null) {
-            throw new IllegalStateException("DatabaseLoader 未初始化，请先调用 reload()");
+            throw new IllegalStateException(LogLocale.text(MusicBox.getInstance(),
+                    "DatabaseLoader is not initialized; call reload() first",
+                    "DatabaseLoader 未初始化，请先调用 reload()"));
         }
         return localInstance.base;
     }
@@ -52,11 +54,15 @@ public class DatabaseLoader {
             if ("mysql".equalsIgnoreCase(type)) {
                 MusicBoxConfig.MySQLSetting mysqlConfig = dbConfig.getMysql();
                 if (mysqlConfig == null) {
-                    MusicBox.getInstance().getLogger().warning("MySQL 配置缺失，使用 SQLite 作为默认数据库");
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "MySQL settings are missing, falling back to SQLite as the default database",
+                            "MySQL 配置缺失，使用 SQLite 作为默认数据库"));
                     this.base = createDefaultSQLite();
                 } else {
                     this.base = new MySQL(mysqlConfig);
-                    MusicBox.getInstance().getLogger().info("已连接到 MySQL 数据库: " + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDatabase());
+                    MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                            "Connected to MySQL database: " + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDatabase(),
+                            "已连接到 MySQL 数据库: " + mysqlConfig.getHost() + ":" + mysqlConfig.getPort() + "/" + mysqlConfig.getDatabase()));
                 }
             } else {
                 this.base = createDefaultSQLite();

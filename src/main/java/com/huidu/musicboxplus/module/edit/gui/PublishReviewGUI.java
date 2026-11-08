@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
@@ -11,22 +14,23 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.PublishReviewConfig;
 
 // Admin review queue for the publish approval flow: lists every pending listing, left-click
 // approves it, right-click rejects it. The queue is re-fetched on every render, so decisions
 // made elsewhere (or by other admins) show up on the next refresh/page turn.
-public class PublishReviewGUI implements InventoryHolder {
+public class PublishReviewGUI implements Menu {
 
     private final Player player;
     private final Inventory inventory;
-    private final GUIConfigManager.PublishReviewConfig config;
+    private final PublishReviewConfig config;
     // The layout char for listing slots comes from the button-mapping, matching how the
     // other config-driven GUIs resolve their item chars (default 'R').
     private final char reviewChar;
@@ -59,7 +63,7 @@ public class PublishReviewGUI implements InventoryHolder {
         int startIndex = page * itemsPerPage;
         int endIndex = Math.min(startIndex + itemsPerPage, pendingList.size());
 
-        GUIConfigManager.HotbarButtonConfig reviewConfig = config.getButton("review-item");
+        HotbarButtonConfig reviewConfig = config.getButton("review-item");
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= reviewSlots.size()) {
@@ -93,19 +97,19 @@ public class PublishReviewGUI implements InventoryHolder {
 
         int closeSlot = config.getSlotForButton("close");
         if (closeSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig closeConfig = config.getButton("close");
+            HotbarButtonConfig closeConfig = config.getButton("close");
             inventory.setItem(closeSlot, closeConfig.createItem());
         }
 
         int refreshSlot = config.getSlotForButton("refresh");
         if (refreshSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig refreshConfig = config.getButton("refresh");
+            HotbarButtonConfig refreshConfig = config.getButton("refresh");
             inventory.setItem(refreshSlot, refreshConfig.createItem());
         }
     }
 
     private ItemStack pageButton(String key) {
-        GUIConfigManager.HotbarButtonConfig buttonConfig = config.getButton(key);
+        HotbarButtonConfig buttonConfig = config.getButton(key);
         int itemsPerPage = Math.max(1, config.getSlotsForChar(reviewChar).size());
         int totalPages = Math.max(1, (int) Math.ceil((double) pendingList.size() / itemsPerPage));
         List<String> lore = new ArrayList<>();
@@ -116,7 +120,14 @@ public class PublishReviewGUI implements InventoryHolder {
         return ItemUtils.createStack(buttonConfig.getMaterial(), buttonConfig.getName(), lore, buttonConfig.getCustomModelData(), buttonConfig.getItemModel(), buttonConfig.getCraftEngineItem());
     }
 
-    public void handleClick(int slot, boolean isRightClick) {
+    @Override
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
+        boolean isRightClick = click.rightClick();
+        handleClick(slot, isRightClick);
+    }
+
+    private void handleClick(int slot, boolean isRightClick) {
         int prevSlot = config.getSlotForButton("prev-page");
         int nextSlot = config.getSlotForButton("next-page");
         int closeSlot = config.getSlotForButton("close");

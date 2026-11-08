@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.module.command.subcommands;
 
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.Permissions;
+import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
 import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
@@ -35,12 +36,10 @@ public class BackupExecutor implements SubCommand {
     public void execute(CommandSender sender, String[] args) {
         MusicBox plugin = MusicBox.getInstance();
         if (!running.compareAndSet(false, true)) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "A backup is already running.", "已有备份正在进行中。"));
+            MessageUtils.send(sender, Lang.BACKUP_RUNNING);
             return;
         }
-        MessageUtils.send(sender, LogLocale.text(plugin,
-                "Creating backup, this may take a moment...", "正在创建备份，请稍候..."));
+        MessageUtils.send(sender, Lang.BACKUP_STARTED);
 
         AsyncTaskManager.runAsync(() -> {
             try {
@@ -62,44 +61,34 @@ public class BackupExecutor implements SubCommand {
                 Scheduler.global(() -> report(sender, result));
             } catch (Exception failure) {
                 plugin.getLogger().log(java.util.logging.Level.SEVERE, "Backup failed", failure);
-                Scheduler.global(() -> MessageUtils.send(sender, LogLocale.text(plugin,
-                        "Backup failed: " + failure.getMessage(),
-                        "备份失败: " + failure.getMessage())));
+                Scheduler.global(() -> MessageUtils.send(sender, Lang.BACKUP_FAILED,
+                        "{error}", String.valueOf(failure.getMessage())));
             } finally {
                 running.set(false);
             }
         }, () -> {
             running.set(false);
-            Scheduler.global(() -> MessageUtils.send(sender, LogLocale.text(plugin,
-                    "Backup was rejected because the async queue is full.", "异步队列已满，备份未执行。")));
+            Scheduler.global(() -> MessageUtils.send(sender, Lang.BACKUP_QUEUE_FULL));
         });
     }
 
     private void report(CommandSender sender,
                         com.huidu.musicboxplus.core.backup.BackupService.BackupResult result) {
-        MusicBox plugin = MusicBox.getInstance();
         double megabytes = result.bytes() / (1024.0 * 1024.0);
-        MessageUtils.send(sender, LogLocale.text(plugin,
-                "Backup created: " + result.archive() + " ("
-                        + String.format(java.util.Locale.ROOT, "%.1f", megabytes) + " MB, "
-                        + result.entries() + " files)",
-                "备份已创建: " + result.archive() + "（"
-                        + String.format(java.util.Locale.ROOT, "%.1f", megabytes) + " MB，"
-                        + result.entries() + " 个文件）"));
+        MessageUtils.send(sender, Lang.BACKUP_CREATED,
+                "{path}", String.valueOf(result.archive()),
+                "{size}", String.format(java.util.Locale.ROOT, "%.1f", megabytes),
+                "{files}", String.valueOf(result.entries()));
         if (!result.databaseFileIncluded()) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "The database is MySQL, so its contents are not in the zip; dump it with mysqldump.",
-                    "数据库为 MySQL，其内容不在压缩包内；请使用 mysqldump 备份。"));
+            MessageUtils.send(sender, Lang.BACKUP_MYSQL_NOTE);
         }
         if (!result.skipped().isEmpty()) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "Skipped " + result.skipped().size() + " oversized file(s).",
-                    "已跳过 " + result.skipped().size() + " 个超大文件。"));
+            MessageUtils.send(sender, Lang.BACKUP_SKIPPED,
+                    "{count}", String.valueOf(result.skipped().size()));
         }
         if (result.pruned() > 0) {
-            MessageUtils.send(sender, LogLocale.text(plugin,
-                    "Removed " + result.pruned() + " old backup(s).",
-                    "已清理 " + result.pruned() + " 个旧备份。"));
+            MessageUtils.send(sender, Lang.BACKUP_PRUNED,
+                    "{count}", String.valueOf(result.pruned()));
         }
     }
 

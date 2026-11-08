@@ -14,6 +14,7 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 import java.util.stream.IntStream;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
 
 public class SearchResultGUI {
     public static void open(PlayerWrapper wrapper, List<MusicBoxSong> results, String query) {
@@ -26,7 +27,7 @@ public class SearchResultGUI {
         }
         int pageCount;
         GUIConfigManager configManager = GUIConfigManager.getInstance();
-        GUIConfigManager.ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
+        ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
         int slotsPerPage = configManager.getLayoutCharCount("search-results", mapping.getResults());
         if (slotsPerPage <= 0) {
             slotsPerPage = configManager.getGUIRows("search-results") * 9;
@@ -46,7 +47,7 @@ public class SearchResultGUI {
         title = title.replace("{query}", query).replace("{page}", String.valueOf(page + 1)).replace("{last_page}", String.valueOf(pageCount));
         GUI gui = new GUI(title, configManager.getGUIRows("search-results"));
         LayoutParser layoutParser = new LayoutParser(gui, "search-results");
-        GUIConfigManager.ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
+        ButtonMappingConfig mapping = configManager.getGUIConfig("search-results").getButtonMapping();
         layoutParser.registerSimpleButton(mapping.getBack(), "back", backAction != null ? backAction : () -> com.huidu.musicboxplus.module.gui.GUIActions.openDefaultInventory(wrapper));
         if (page > 0) {
             int prevPage = page - 1;

@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.Permissions;
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
@@ -16,19 +19,20 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.SettingsMenuConfig;
 
-public class SettingsMenuGUI implements InventoryHolder {
+public class SettingsMenuGUI implements Menu {
 
     private final PlayerMusic music;
     private final Player player;
     private final MusicEditGUI parentGUI;
     private final Inventory inventory;
-    private final GUIConfigManager.SettingsMenuConfig config;
+    private final SettingsMenuConfig config;
     private boolean handledClose = false;
 
     public SettingsMenuGUI(PlayerMusic music, Player player, MusicEditGUI parentGUI) {
@@ -48,7 +52,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int bpmSlot = config.getSlotForButton("bpm");
         if (bpmSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig bpmConfig = config.getButton("bpm");
+            HotbarButtonConfig bpmConfig = config.getButton("bpm");
             if (bpmConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : bpmConfig.getLore()) {
@@ -61,7 +65,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int subdivisionSlot = config.getSlotForButton("subdivision");
         if (subdivisionSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig subConfig = config.getButton("subdivision");
+            HotbarButtonConfig subConfig = config.getButton("subdivision");
             if (subConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : subConfig.getLore()) {
@@ -74,7 +78,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int timeSignatureSlot = config.getSlotForButton("time-signature");
         if (timeSignatureSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig tsConfig = config.getButton("time-signature");
+            HotbarButtonConfig tsConfig = config.getButton("time-signature");
             if (tsConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : tsConfig.getLore()) {
@@ -87,7 +91,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int nameSlot = config.getSlotForButton("name");
         if (nameSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig nameConfig = config.getButton("name");
+            HotbarButtonConfig nameConfig = config.getButton("name");
             if (nameConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : nameConfig.getLore()) {
@@ -100,7 +104,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int clearSlot = config.getSlotForButton("clear");
         if (clearSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig clearConfig = config.getButton("clear");
+            HotbarButtonConfig clearConfig = config.getButton("clear");
             if (clearConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : clearConfig.getLore()) {
@@ -113,7 +117,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int saveCloseSlot = config.getSlotForButton("save-close");
         if (saveCloseSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig saveConfig = config.getButton("save-close");
+            HotbarButtonConfig saveConfig = config.getButton("save-close");
             if (saveConfig != null) {
                 ItemStack saveCloseButton = saveConfig.createItem();
                 inventory.setItem(saveCloseSlot, saveCloseButton);
@@ -122,7 +126,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int publishSlot = config.getSlotForButton("publish");
         if (publishSlot >= 0 && MusicBox.getInstance().isPublishModuleEnabled() && player.hasPermission(Permissions.SHOPMUSIC)) {
-            GUIConfigManager.HotbarButtonConfig publishConfig = config.getButton("publish");
+            HotbarButtonConfig publishConfig = config.getButton("publish");
             if (publishConfig != null) {
                 PublishedMusic published = findPublishedMusic();
                 String status = published == null
@@ -147,7 +151,7 @@ public class SettingsMenuGUI implements InventoryHolder {
 
         int backSlot = config.getSlotForButton("back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = config.getButton("back");
+            HotbarButtonConfig backConfig = config.getButton("back");
             if (backConfig != null) {
                 ItemStack backButton = backConfig.createItem();
                 inventory.setItem(backSlot, backButton);
@@ -155,7 +159,8 @@ public class SettingsMenuGUI implements InventoryHolder {
         }
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int bpmSlot = config.getSlotForButton("bpm");
         int subdivisionSlot = config.getSlotForButton("subdivision");
         int timeSignatureSlot = config.getSlotForButton("time-signature");

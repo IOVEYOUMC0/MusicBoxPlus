@@ -26,11 +26,14 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.TextPlayerEditConfig;
+import com.huidu.musicboxplus.common.config.ToggleStatusConfig;
 
 public class TextDisplayPlayerEditGUI {
     private final String name;
     private GUI gui;
-    private GUIConfigManager.TextPlayerEditConfig config;
+    private TextPlayerEditConfig config;
     private MbTask watcherTask;
 
     public TextDisplayPlayerEditGUI(String name) {
@@ -181,7 +184,7 @@ public class TextDisplayPlayerEditGUI {
     }
 
     private ItemStack createToggleItem(String key, boolean enabled) {
-        GUIConfigManager.ToggleStatusConfig toggle = GUIConfigManager.getInstance().getToggleStatusConfig();
+        ToggleStatusConfig toggle = GUIConfigManager.getInstance().getToggleStatusConfig();
         String status = enabled ? toggle.getEnabled() : toggle.getDisabled();
         return createConfiguredItem(key, "{status}", status);
     }
@@ -255,7 +258,7 @@ public class TextDisplayPlayerEditGUI {
     }
 
     private ItemStack createConfiguredItem(String key, String... replacements) {
-        GUIConfigManager.HotbarButtonConfig buttonConfig = config.getButton(key);
+        HotbarButtonConfig buttonConfig = config.getButton(key);
         if (buttonConfig == null) {
             return null;
         }

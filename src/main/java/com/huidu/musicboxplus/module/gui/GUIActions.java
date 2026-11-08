@@ -32,6 +32,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Logger;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
 
 public final class GUIActions {
     private static final Logger logger = Logger.getLogger("MusicBox");
@@ -89,7 +90,7 @@ public final class GUIActions {
     private static void buildButtons() {
         if (loreCache != null) loreCache.clear();
         if (itemCache != null) itemCache.clear();
-        GUIConfigManager.ButtonMappingConfig songListMapping = GUIConfigManager.getInstance().getGUIConfig("song-list").getButtonMapping();
+        ButtonMappingConfig songListMapping = GUIConfigManager.getInstance().getGUIConfig("song-list").getButtonMapping();
         HashMap<Character, SongContainerGUI.BarButton> buttonMap = new HashMap<Character, SongContainerGUI.BarButton>();
         buttonMap.put(Character.valueOf(songListMapping.getVolume()), ButtonFactory.createVolumeButton());
         buttonMap.put(Character.valueOf(songListMapping.getSpeed()), ButtonFactory.createSpeedButton());

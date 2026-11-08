@@ -1,6 +1,5 @@
 package com.huidu.musicboxplus.module.edit;
 
-import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -10,16 +9,18 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.EditorItemConfig;
+import com.huidu.musicboxplus.common.config.MusicEditorConfig;
 
 // Builds the ItemStacks shown in the editor's note grid (filled notes, multi-instrument cells,
 // empty slots) from a note plus the current view flags. Pure rendering: it reads the editor
 // config and pitch bounds but mutates no editor state.
 final class MusicEditNoteRenderer {
-    private final GUIConfigManager.MusicEditorConfig config;
+    private final MusicEditorConfig config;
     private final int maxPitch;
     private final int defaultMaxPitch;
 
-    MusicEditNoteRenderer(GUIConfigManager.MusicEditorConfig config, int maxPitch, int defaultMaxPitch) {
+    MusicEditNoteRenderer(MusicEditorConfig config, int maxPitch, int defaultMaxPitch) {
         this.config = config;
         this.maxPitch = maxPitch;
         this.defaultMaxPitch = defaultMaxPitch;
@@ -43,7 +44,7 @@ final class MusicEditNoteRenderer {
 
     private ItemStack createSingleInstrumentNoteItem(MusicNote note, String noteName, int tick, boolean isExtendedOctave, boolean canEdit, boolean isCurrentPlayingNote, boolean isSelected) {
         MusicNote.NoteInstrument instrument = note.getInstruments().get(0);
-        GUIConfigManager.EditorItemConfig baseConfig = isSelected ? config.getFilledNoteSelected() : config.getFilledNote();
+        EditorItemConfig baseConfig = isSelected ? config.getFilledNoteSelected() : config.getFilledNote();
         Material material = resolveNoteItemMaterial(baseConfig, instrument);
         String name = buildNoteName(baseConfig.getName(), noteName, isExtendedOctave, isCurrentPlayingNote);
         List<String> lore = buildNoteLore(baseConfig.getLore(), noteName, tick, instrument.getDisplayName(), isExtendedOctave, canEdit, isCurrentPlayingNote);
@@ -60,7 +61,7 @@ final class MusicEditNoteRenderer {
     }
 
     private ItemStack createMultiInstrumentNoteItem(MusicNote note, String noteName, int tick, boolean isExtendedOctave, boolean canEdit, boolean isCurrentPlayingNote, boolean isSelected) {
-        GUIConfigManager.EditorItemConfig baseConfig = isSelected ? config.getMultiInstrumentSelected() : config.getMultiInstrument();
+        EditorItemConfig baseConfig = isSelected ? config.getMultiInstrumentSelected() : config.getMultiInstrument();
         String name = baseConfig.getName().replace("{count}", String.valueOf(note.getInstrumentCount()));
         if (isExtendedOctave) {
             name = config.getWarningPrefix() + name;
@@ -97,7 +98,7 @@ final class MusicEditNoteRenderer {
         return item;
     }
 
-    private Material resolveNoteItemMaterial(GUIConfigManager.EditorItemConfig itemConfig, MusicNote.NoteInstrument instrument) {
+    private Material resolveNoteItemMaterial(EditorItemConfig itemConfig, MusicNote.NoteInstrument instrument) {
         if (itemConfig.isUseInstrumentMaterial() && instrument != null) {
             return instrument.getMaterial();
         }
@@ -105,7 +106,7 @@ final class MusicEditNoteRenderer {
     }
 
     private ItemStack createEmptySlotItem(String noteName, int tick, boolean isExtendedOctave, boolean canEdit, boolean isCurrentPlayingTick, boolean isSelected) {
-        GUIConfigManager.EditorItemConfig baseConfig = isSelected ? config.getEmptySlotSelected() : config.getEmptySlot();
+        EditorItemConfig baseConfig = isSelected ? config.getEmptySlotSelected() : config.getEmptySlot();
         String name = baseConfig.getName().replace("{note}", noteName);
         Material material;
 

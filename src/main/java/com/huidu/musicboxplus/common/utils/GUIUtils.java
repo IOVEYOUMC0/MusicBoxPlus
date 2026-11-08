@@ -2,13 +2,14 @@ package com.huidu.musicboxplus.common.utils;
 
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import org.bukkit.Material;
+import com.huidu.musicboxplus.common.config.VolumeControlConfig;
 
 public final class GUIUtils {
     private GUIUtils() {
     }
 
     public static Material getVolumeMaterial(int volume) {
-        GUIConfigManager.VolumeControlConfig config = GUIConfigManager.getInstance().getVolumeControlConfig();
+        VolumeControlConfig config = GUIConfigManager.getInstance().getVolumeControlConfig();
         if (volume == 0) {
             return config.getMaterialMute() != null ? config.getMaterialMute() : Material.BARRIER;
         }

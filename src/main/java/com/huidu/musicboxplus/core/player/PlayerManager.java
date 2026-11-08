@@ -47,7 +47,9 @@ public final class PlayerManager {
                 try {
                     player.destroy();
                 } catch (Throwable e) {
-                    MusicBox.getInstance().getLogger().log(Level.WARNING, "销毁播放器时出错", e);
+                    MusicBox.getInstance().getLogger().log(Level.WARNING,
+                            com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(),
+                                    "Error while destroying a player", "销毁播放器时出错"), e);
                 }
             }
         }

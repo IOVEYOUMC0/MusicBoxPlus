@@ -91,13 +91,17 @@ public abstract class AbstractBase {
 
     private void validateTableName(String table) {
         if (!ALLOWED_TABLES.contains(table)) {
-            throw new IllegalArgumentException("无效的表名: " + table);
+            throw new IllegalArgumentException(LogLocale.text(MusicBox.getInstance(),
+                    "Invalid table name: " + table,
+                    "无效的表名: " + table));
         }
     }
 
     private void validateColumnName(String column) {
         if (!ALLOWED_COLUMNS.contains(column)) {
-            throw new IllegalArgumentException("无效的列名: " + column);
+            throw new IllegalArgumentException(LogLocale.text(MusicBox.getInstance(),
+                    "Invalid column name: " + column,
+                    "无效的列名: " + column));
         }
     }
 
@@ -323,7 +327,7 @@ public abstract class AbstractBase {
             MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(), "Database tables initialized", "数据库表初始化完成"));
         } catch (SQLException e) {
             MusicBox.getInstance().getLogger().severe(LogLocale.text(MusicBox.getInstance(), "Database initialization failed: " + e.getMessage(), "数据库初始化失败: " + e.getMessage()));
-            throw new RuntimeException("数据库初始化失败", e);
+            throw new RuntimeException(LogLocale.text(MusicBox.getInstance(), "Database initialization failed", "数据库初始化失败"), e);
         }
     }
 
@@ -347,7 +351,9 @@ public abstract class AbstractBase {
                 }
             }
         } catch (SQLException e) {
-            MusicBox.getInstance().getLogger().warning("确保表存在时出错: " + e.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Error while ensuring tables exist: " + e.getMessage(),
+                    "确保表存在时出错: " + e.getMessage()));
         }
     }
 
@@ -390,6 +396,41 @@ public abstract class AbstractBase {
             MusicBox.getInstance().getLogger().warning(
                     "SQLite WAL checkpoint before backup failed: " + e.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Round-trips a trivial query so an operator can tell "database is slow" from "database is
+     * down". Returns -1 when the query fails instead of throwing: this is a diagnostic, and a
+     * failure is one of the answers it needs to report.
+     */
+    public long pingMillis() {
+        long started = System.nanoTime();
+        try (Connection connection = this.acquireConnection();
+             Statement statement = connection.createStatement();
+             ResultSet ignored = statement.executeQuery("SELECT 1")) {
+            return (System.nanoTime() - started) / 1_000_000L;
+        } catch (SQLException e) {
+            return -1L;
+        }
+    }
+
+    /**
+     * Version recorded by {@link com.huidu.musicboxplus.core.db.schema.SchemaMigrator}, or 0 when
+     * the table is missing or unreadable. Read-only; migrations themselves run during startup.
+     */
+    public int getSchemaVersion() {
+        String table = resolveTableNames(com.huidu.musicboxplus.core.db.schema.SchemaMigrator.VERSION_TABLE);
+        try (Connection connection = this.acquireConnection();
+             Statement statement = connection.createStatement();
+             ResultSet rows = statement.executeQuery("SELECT version FROM " + table)) {
+            int version = 0;
+            while (rows.next()) {
+                version = Math.max(version, rows.getInt(1));
+            }
+            return version;
+        } catch (SQLException e) {
+            return 0;
         }
     }
 
@@ -479,7 +520,9 @@ public abstract class AbstractBase {
         // owns, which is worse than stalling one main thread -- but the wording below says "main
         // thread" because that is what it is on Paper.
         if (Bukkit.isPrimaryThread()) {
-            String message = "[数据库警告] 操作 '" + operation + "' 在主线程执行，这可能导致服务器卡顿！请使用异步方法。";
+            String message = LogLocale.text(plugin,
+                    "[Database Warning] Operation '" + operation + "' is running on the main thread, which may cause server lag! Use async methods.",
+                    "[数据库警告] 操作 '" + operation + "' 在主线程执行，这可能导致服务器卡顿！请使用异步方法。");
             MusicBox.getInstance().getLogger().warning(message);
 
             MusicBoxConfig config = MusicBox.getInstance().getConfigObject();
@@ -490,10 +533,15 @@ public abstract class AbstractBase {
                         .limit(6)
                         .map(StackTraceElement::toString)
                         .collect(java.util.stream.Collectors.joining("\n  "));
-                    MusicBox.getInstance().getLogger().warning("调用堆栈:\n  " + trace);
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(plugin,
+                            "Call stack:\n  " + trace,
+                            "调用堆栈:\n  " + trace));
                 }
                 if (config.isBlockMainThreadDb()) {
-                    throw new IllegalStateException("[数据库错误] 禁止在主线程执行数据库操作: " + operation + "。请在配置中设置 blockMainThreadDb: false 以允许此操作（不推荐）");
+                    throw new IllegalStateException(LogLocale.text(MusicBox.getInstance(),
+                            "[Database Error] Database operations on the main thread are blocked: " + operation
+                                    + ". Set blockMainThreadDb: false in the config to allow them (not recommended)",
+                            "[数据库错误] 禁止在主线程执行数据库操作: " + operation + "。请在配置中设置 blockMainThreadDb: false 以允许此操作（不推荐）"));
                 }
             }
         }
@@ -525,10 +573,14 @@ public abstract class AbstractBase {
         if (Bukkit.isPrimaryThread()) {
             MusicBoxConfig config = MusicBox.getInstance().getConfigObject();
             if (config != null && config.isBlockMainThreadDb()) {
-                throw new IllegalStateException("数据库操作不允许在主线程执行！请使用异步任务。");
+                throw new IllegalStateException(LogLocale.text(MusicBox.getInstance(),
+                        "Database operations are not allowed on the main thread! Use an async task.",
+                        "数据库操作不允许在主线程执行！请使用异步任务。"));
             }
             MusicBox.getInstance().getLogger().warning(
-                "[数据库警告] 大量数据库操作在主线程执行，这可能导致服务器卡顿！");
+                LogLocale.text(MusicBox.getInstance(),
+                    "[Database Warning] A large number of database operations are running on the main thread, which may cause server lag!",
+                    "[数据库警告] 大量数据库操作在主线程执行，这可能导致服务器卡顿！"));
         }
     }
 
@@ -575,7 +627,9 @@ public abstract class AbstractBase {
                 try {
                     connection.rollback();
                 } catch (SQLException rollbackEx) {
-                    MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to roll back transaction: " + rollbackEx.getMessage(),
+                            "回滚事务失败: " + rollbackEx.getMessage()));
                 }
                 throw new RuntimeException(e);
             } finally {
@@ -681,7 +735,9 @@ public abstract class AbstractBase {
                 try {
                     connection.rollback();
                 } catch (SQLException rollbackEx) {
-                    MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to roll back transaction: " + rollbackEx.getMessage(),
+                            "回滚事务失败: " + rollbackEx.getMessage()));
                 }
                 throw new RuntimeException(e);
             }
@@ -725,7 +781,9 @@ public abstract class AbstractBase {
             if (isMissingTableError(e)) {
                 return Collections.emptyList();
             }
-            MusicBox.getInstance().getLogger().warning("获取告示牌列表失败: " + e.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to get the prevented sign list: " + e.getMessage(),
+                    "获取告示牌列表失败: " + e.getMessage()));
             return Collections.emptyList();
         }
     }
@@ -736,7 +794,9 @@ public abstract class AbstractBase {
         try {
             connection.rollback();
         } catch (SQLException rollbackEx) {
-            MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to roll back transaction: " + rollbackEx.getMessage(),
+                    "回滚事务失败: " + rollbackEx.getMessage()));
         }
     }
 
@@ -761,12 +821,16 @@ public abstract class AbstractBase {
                 connection.commit();
             } catch (SQLException e) {
                 rollbackQuietly(connection);
-                throw new RuntimeException("保存告示牌列表失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the prevented sign list: " + e.getMessage(),
+                        "保存告示牌列表失败: " + e.getMessage()), e);
             } finally {
                 restoreAutoCommit(connection, previousAutoCommit);
             }
         } catch (SQLException e) {
-            throw new RuntimeException("保存告示牌列表失败: " + e.getMessage(), e);
+            throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to save the prevented sign list: " + e.getMessage(),
+                    "保存告示牌列表失败: " + e.getMessage()), e);
         }
     }
 
@@ -783,10 +847,14 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("sign_songs", new String[]{"location", "song_hash"}, new String[]{"location"});
                     this.update(connection, sql, locStr, songHash);
                 } catch (SQLException ex) {
-                    throw new RuntimeException("保存告示牌歌曲失败: " + ex.getMessage(), ex);
+                    throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save the sign's song: " + ex.getMessage(),
+                            "保存告示牌歌曲失败: " + ex.getMessage()), ex);
                 }
             } else {
-                throw new RuntimeException("保存告示牌歌曲失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the sign's song: " + e.getMessage(),
+                        "保存告示牌歌曲失败: " + e.getMessage()), e);
             }
         }
     }
@@ -811,7 +879,9 @@ public abstract class AbstractBase {
             this.update(connection, "DELETE FROM sign_songs WHERE location = ?", locStr);
         } catch (SQLException e) {
             if (!isMissingTableError(e)) {
-                MusicBox.getInstance().getLogger().warning("删除告示牌歌曲记录失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to delete the sign's saved song: " + e.getMessage(),
+                        "删除告示牌歌曲记录失败: " + e.getMessage()));
             }
         }
     }
@@ -836,7 +906,9 @@ public abstract class AbstractBase {
             this.update(connection, "DELETE FROM recent_songs WHERE player_uuid = ?", playerUuid.toString());
         } catch (SQLException e) {
             if (!isMissingTableError(e)) {
-                MusicBox.getInstance().getLogger().warning("清空最近播放歌曲失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to clear recent songs: " + e.getMessage(),
+                        "清空最近播放歌曲失败: " + e.getMessage()));
             }
         }
     }
@@ -851,10 +923,14 @@ public abstract class AbstractBase {
                 try {
                     saveRecentSongsTransactional(playerUuid, songHashes);
                 } catch (SQLException ex) {
-                    throw new RuntimeException("批量保存最近播放歌曲失败: " + ex.getMessage(), ex);
+                    throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to batch-save recent songs: " + ex.getMessage(),
+                            "批量保存最近播放歌曲失败: " + ex.getMessage()), ex);
                 }
             } else {
-                throw new RuntimeException("批量保存最近播放歌曲失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to batch-save recent songs: " + e.getMessage(),
+                        "批量保存最近播放歌曲失败: " + e.getMessage()), e);
             }
         }
     }
@@ -893,10 +969,14 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("player_volumes", new String[]{"player_uuid", "volume"}, new String[]{"player_uuid"});
                     this.update(connection, sql, playerUuid.toString(), volume);
                 } catch (SQLException ex) {
-                    throw new RuntimeException("保存玩家音量失败: " + ex.getMessage(), ex);
+                    throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save the player volume: " + ex.getMessage(),
+                            "保存玩家音量失败: " + ex.getMessage()), ex);
                 }
             } else {
-                throw new RuntimeException("保存玩家音量失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the player volume: " + e.getMessage(),
+                        "保存玩家音量失败: " + e.getMessage()), e);
             }
         }
     }
@@ -919,10 +999,14 @@ public abstract class AbstractBase {
                 try {
                     savePlayerVolumesBatchInternal(volumes);
                 } catch (SQLException ex) {
-                    throw new RuntimeException("批量保存玩家音量失败: " + ex.getMessage(), ex);
+                    throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to batch-save player volumes: " + ex.getMessage(),
+                            "批量保存玩家音量失败: " + ex.getMessage()), ex);
                 }
             } else {
-                throw new RuntimeException("批量保存玩家音量失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to batch-save player volumes: " + e.getMessage(),
+                        "批量保存玩家音量失败: " + e.getMessage()), e);
             }
         }
     }
@@ -959,7 +1043,9 @@ public abstract class AbstractBase {
             this.update(connection, "DELETE FROM player_volumes WHERE player_uuid = ?", playerUuid.toString());
         } catch (SQLException e) {
             if (!isMissingTableError(e)) {
-                MusicBox.getInstance().getLogger().warning("删除玩家音量记录失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to delete the player volume record: " + e.getMessage(),
+                        "删除玩家音量记录失败: " + e.getMessage()));
             }
         }
     }
@@ -975,10 +1061,14 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("block_player_volumes", new String[]{"location", "volume"}, new String[]{"location"});
                     this.update(connection, sql, BukkitUtils.locationToString(location), volume);
                 } catch (SQLException ex) {
-                    throw new RuntimeException("保存方块播放器音量失败: " + ex.getMessage(), ex);
+                    throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save the block player volume: " + ex.getMessage(),
+                            "保存方块播放器音量失败: " + ex.getMessage()), ex);
                 }
             } else {
-                throw new RuntimeException("保存方块播放器音量失败: " + e.getMessage(), e);
+                throw new RuntimeException(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to save the block player volume: " + e.getMessage(),
+                        "保存方块播放器音量失败: " + e.getMessage()), e);
             }
         }
     }
@@ -1003,7 +1093,9 @@ public abstract class AbstractBase {
                 BukkitUtils.locationToString(location));
         } catch (SQLException e) {
             if (!isMissingTableError(e)) {
-                MusicBox.getInstance().getLogger().warning("删除方块播放器音量失败: " + e.getMessage());
+                MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                        "Failed to delete the block player's volume: " + e.getMessage(),
+                        "删除方块播放器音量失败: " + e.getMessage()));
             }
         }
     }

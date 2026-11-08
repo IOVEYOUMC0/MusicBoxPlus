@@ -4,6 +4,7 @@ import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.MusicBoxConfig;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.AsyncTaskManager;
+import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.huidu.musicboxplus.common.utils.MessageUtils;
 import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import org.bukkit.Bukkit;
@@ -133,7 +134,9 @@ public class PlayerInventoryState {
         try {
             payload = serializeToPayload();
         } catch (IOException e) {
-            MusicBox.getInstance().getLogger().warning("保存玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to save the player inventory state: " + playerUUID + " - " + e.getMessage(),
+                    "保存玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage()));
             return;
         }
 
@@ -145,8 +148,9 @@ public class PlayerInventoryState {
                 try {
                     writeBackupFile(saveFolder, playerUUID, payload);
                 } catch (IOException e) {
-                    MusicBox.getInstance().getLogger().warning(
-                            "保存玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage());
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to save the player inventory state: " + playerUUID + " - " + e.getMessage(),
+                            "保存玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage()));
                 }
             }
         };
@@ -271,7 +275,9 @@ public class PlayerInventoryState {
             return new PlayerInventoryState(UUID.fromString(uuidStr), contents, armor,
                     offHand.length > 0 ? offHand[0] : null, heldSlot, savedTime);
         } catch (Exception e) {
-            MusicBox.getInstance().getLogger().warning("加载玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to load the player inventory state: " + playerUUID + " - " + e.getMessage(),
+                    "加载玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage()));
             return null;
         }
     }
@@ -295,7 +301,9 @@ public class PlayerInventoryState {
         }
 
         if (!savedStates.isEmpty()) {
-            MusicBox.getInstance().getLogger().info("已加载 " + savedStates.size() + " 个保存的物品栏状态");
+            MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                    "Loaded " + savedStates.size() + " saved inventory states",
+                    "已加载 " + savedStates.size() + " 个保存的物品栏状态"));
         }
     }
 
@@ -338,7 +346,9 @@ public class PlayerInventoryState {
             // retry from -- and the .dat on disk could then overwrite a real inventory on restart.
             // Put it back (without clobbering a newer state) and keep the disk copy for the retry.
             savedStates.putIfAbsent(player.getUniqueId(), state);
-            MusicBox.getInstance().getLogger().warning("恢复玩家物品栏失败: " + failure.getMessage());
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "Failed to restore the player inventory: " + failure.getMessage(),
+                    "恢复玩家物品栏失败: " + failure.getMessage()));
         }
     }
 
@@ -351,7 +361,9 @@ public class PlayerInventoryState {
         for (Map.Entry<UUID, PlayerInventoryState> entry : savedStates.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player == null) {
-                MusicBox.getInstance().getLogger().info("玩家 " + entry.getKey() + " 不在线，保留物品栏状态等待下次登录");
+                MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                        "Player " + entry.getKey() + " is offline; keeping the inventory state until their next login",
+                        "玩家 " + entry.getKey() + " 不在线，保留物品栏状态等待下次登录"));
                 continue;
             }
             PlayerInventoryState state = entry.getValue();
@@ -370,7 +382,9 @@ public class PlayerInventoryState {
                     state.deleteFromDisk();
                 } catch (RuntimeException failure) {
                     savedStates.putIfAbsent(playerId, state);
-                    MusicBox.getInstance().getLogger().warning("恢复玩家物品栏失败: " + failure.getMessage());
+                    MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                            "Failed to restore the player inventory: " + failure.getMessage(),
+                            "恢复玩家物品栏失败: " + failure.getMessage()));
                 }
             };
             Runnable retired = () -> savedStates.putIfAbsent(playerId, state);

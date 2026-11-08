@@ -23,6 +23,7 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
 
 public class PlayListEditorGUI {
     private static final long DIRTY_EXIT_CONFIRM_WINDOW_MS = 3000L;
@@ -59,7 +60,7 @@ public class PlayListEditorGUI {
         this.currentPage = clampedPage;
 
         LayoutParser layoutParser = new LayoutParser(gui, "playlist-editor");
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
         if (clampedPage > 0) {
             int prevPage = clampedPage - 1;
             layoutParser.registerSimpleButton(mapping.getBack(), "back", () -> this.openPage(prevPage));
@@ -161,7 +162,7 @@ public class PlayListEditorGUI {
             return;
         }
 
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
         int slotsPerPage = this.configManager.getLayoutCharCount("playlist-editor", mapping.getSongs());
         if (slotsPerPage <= 0) {
             slotsPerPage = 36;
@@ -210,7 +211,7 @@ public class PlayListEditorGUI {
     }
 
     private int getLastPage() {
-        GUIConfigManager.ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
+        ButtonMappingConfig mapping = this.configManager.getGUIConfig("playlist-editor").getButtonMapping();
         int slotsPerPage = this.configManager.getLayoutCharCount("playlist-editor", mapping.getSongs());
         if (slotsPerPage <= 0) {
             slotsPerPage = 36;

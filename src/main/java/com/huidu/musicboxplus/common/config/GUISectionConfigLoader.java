@@ -27,13 +27,13 @@ final class GUISectionConfigLoader {
         }
     }
 
-    static void loadButtonsConfig(ConfigurationSection section, Map<String, GUIConfigManager.HotbarButtonConfig> buttons) {
+    static void loadButtonsConfig(ConfigurationSection section, Map<String, HotbarButtonConfig> buttons) {
         ConfigurationSection buttonsSection = section.getConfigurationSection("buttons");
         if (buttonsSection == null) {
             return;
         }
         for (String key : buttonsSection.getKeys(false)) {
-            GUIConfigManager.HotbarButtonConfig btnConfig = buttons.get(key);
+            HotbarButtonConfig btnConfig = buttons.get(key);
             if (btnConfig != null) {
                 loadHotbarButtonConfig(buttonsSection, key, btnConfig);
                 continue;
@@ -48,14 +48,14 @@ final class GUISectionConfigLoader {
             List<String> lore = StringUtils.t(btnSection.getStringList("lore"));
             int customModelData = btnSection.getInt("custom-model-data", 0);
             boolean glow = btnSection.getBoolean("glow", false);
-            GUIConfigManager.HotbarButtonConfig newConfig = new GUIConfigManager.HotbarButtonConfig(material, name, lore, customModelData, glow);
+            HotbarButtonConfig newConfig = new HotbarButtonConfig(material, name, lore, customModelData, glow);
             newConfig.itemModel = btnSection.getString("item-model", "");
             newConfig.craftEngineItem = btnSection.getString("craft-engine-item", "");
             buttons.put(key, newConfig);
         }
     }
 
-    static void loadHotbarButtonConfig(ConfigurationSection section, String key, GUIConfigManager.HotbarButtonConfig config) {
+    static void loadHotbarButtonConfig(ConfigurationSection section, String key, HotbarButtonConfig config) {
         ConfigurationSection btnSection = section.getConfigurationSection(key);
         if (btnSection == null) {
             return;
@@ -69,7 +69,7 @@ final class GUISectionConfigLoader {
         config.craftEngineItem = btnSection.getString("craft-engine-item", config.craftEngineItem);
     }
 
-    static void loadEditorItemConfig(ConfigurationSection section, String key, GUIConfigManager.EditorItemConfig config) {
+    static void loadEditorItemConfig(ConfigurationSection section, String key, EditorItemConfig config) {
         ConfigurationSection itemSection = section.getConfigurationSection(key);
         if (itemSection == null) {
             return;

@@ -43,7 +43,9 @@ public class SQLite extends AbstractBase {
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
-            throw new IllegalArgumentException("SQLite JDBC 驱动不可用!");
+            throw new IllegalArgumentException(LogLocale.text(MusicBox.getInstance(),
+                    "The SQLite JDBC driver is not available!",
+                    "SQLite JDBC 驱动不可用!"));
         }
 
         this.dataSource = createDataSource(file);
@@ -105,7 +107,9 @@ public class SQLite extends AbstractBase {
     @Override
     protected Connection acquireConnection() throws SQLException {
         if (shutdown) {
-            throw new SQLException("连接池已关闭");
+            throw new SQLException(LogLocale.text(MusicBox.getInstance(),
+                    "The connection pool is closed",
+                    "连接池已关闭"));
         }
         return dataSource.getConnection();
     }

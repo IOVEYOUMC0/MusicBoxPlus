@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
 
 final class GUISignActions {
     private GUISignActions() {
@@ -100,7 +101,7 @@ final class GUISignActions {
 
         final Supplier<String> signParams = () -> Stream.of(infoSignButton, randButton, preventDestroy).map(BooleanButton::getValue).filter(Objects::nonNull).collect(Collectors.joining("|"));
         HashMap<Character, SongContainerGUI.BarButton> buttonMap = new HashMap<>();
-        GUIConfigManager.ButtonMappingConfig mapping = GUIConfigManager.getInstance().getGUIConfig("sign-setup").getButtonMapping();
+        ButtonMappingConfig mapping = GUIConfigManager.getInstance().getGUIConfig("sign-setup").getButtonMapping();
         Player player = wrapper.getPlayer();
         boolean canUseProtect = player != null && (player.hasPermission(Permissions.ADMIN) || player.hasPermission(Permissions.SIGN_PROTECT));
         if (canUseProtect) {

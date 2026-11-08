@@ -1,0 +1,305 @@
+# English overlay for gui-config.yml.
+#
+# Loaded automatically when the plugin language is English; see GuiConfigOverlay. Only the keys
+# listed here are replaced, so this file can grow a screen at a time. A server owner can put their
+# own copy in the plugin data folder to override this one.
+#
+# Covered so far: every GUI title and the shared button set (names and lore). Screen-specific
+# sections (song items, playlist items, per-screen lore) still fall back to the Chinese defaults.
+
+# --- Titles ---
+edit-menu:
+  title: "<gold>Music Edit Menu</gold>"
+paste-preview:
+  title: "<gold>Paste Preview: {count} notes</gold>"
+shop-container-purchase-confirm:
+  title: "<gold>Buy Folder: {folder}</gold>"
+volume-control:
+  title: "<gold>Volume</gold>"
+music-editor:
+  title: "<gold>Music Editor</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+music-select:
+  title: "<gold>Select Music to Edit</gold>"
+settings-menu:
+  title: "<gold>Music Settings</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+bpm-settings:
+  title: "<gold>BPM Settings</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+publish-gui:
+  title: "<gold>Publish Music</gold>"
+publish-confirm:
+  title: "<gold>Publish: {name}</gold>"
+delete-confirm:
+  title: "<red>Confirm Delete: {name}</red>"
+purchase-confirm:
+  title: "<gold>Purchase: {name}</gold>"
+manage-published:
+  title: "<gold>Manage: {name}</gold>"
+publish-review:
+  title: "<gold>Publish Review</gold>"
+text-player-edit:
+  title: "<gold>Text Player</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+player-shop:
+  title: "<gold>Player Music Shop</gold>"
+search:
+  title: "<gold>Search</gold>"
+exit-confirm:
+  title: "<red>Unsaved Changes</red>"
+
+# --- Shared buttons ---
+buttons:
+  previous:
+    name: "<gold>Previous Page</gold>"
+    lore:
+      - "<gray>Click to go to the previous page</gray>"
+  next:
+    name: "<gold>Next Page</gold>"
+    lore:
+      - "<gray>Click to go to the next page</gray>"
+  back:
+    name: "<gold>Back</gold>"
+    lore:
+      - "<gray>Click to go back</gray>"
+  parent-folder:
+    name: "<gold>Parent Folder</gold>"
+  parent:
+    name: "<gold>Parent Folder</gold>"
+    lore:
+      - "<gray>Click to go up one folder</gray>"
+  close:
+    name: "<red>Close</red>"
+    lore:
+      - "<gray>Click to close</gray>"
+  play:
+    name: "<green>Play</green>"
+    lore:
+      - "<gray>Click to resume playback</gray>"
+  pause:
+    name: "<red>Pause</red>"
+    lore:
+      - "<gray>Click to pause playback</gray>"
+  playback-unavailable:
+    name: "<gray>Not available</gray>"
+    lore:
+      - "<gray>Vanilla custom records play through the vanilla jukebox.</gray>"
+      - "<gray>So playback cannot be paused or seeked reliably here.</gray>"
+  playback-unavailable-pause:
+    name: "<gray>Not available</gray>"
+    lore:
+      - "<gray>Vanilla custom records play through the vanilla jukebox.</gray>"
+      - "<gray>So playback cannot be paused or resumed reliably here.</gray>"
+  playback-unavailable-loop:
+    name: "<gray>Not available</gray>"
+    lore:
+      - "<gray>Vanilla custom records play through the vanilla jukebox.</gray>"
+      - "<gray>So the loop mode cannot be controlled reliably here.</gray>"
+  playback-unavailable-progress:
+    name: "<gray>Progress unavailable</gray>"
+    lore:
+      - "<gray>Vanilla custom records do not expose reliable progress to the plugin.</gray>"
+      - "<gray>So the position cannot be seeked safely here.</gray>"
+  play-mode:
+    name: "<gold>Playback Mode</gold>"
+    lore:
+      - "<gray>Current playback mode</gray>"
+      - "<yellow>Silent: {silent}</yellow>"
+      - "<yellow>Speaker: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>Left click: toggle silent</yellow>"
+      - "<yellow>Right click: toggle speaker</yellow>"
+  play-mode-normal:
+    name: "<gold>Playback Mode</gold>"
+    lore:
+      - "<gray>Current playback mode:</gray>"
+      - "<yellow>Silent: {silent}</yellow>"
+      - "<yellow>Speaker: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>Left click: toggle silent</yellow>"
+      - "<yellow>Right click: toggle speaker</yellow>"
+  play-mode-silent:
+    name: "<gold>Playback Mode</gold>"
+    lore:
+      - "<gray>Current playback mode:</gray>"
+      - "<yellow>Silent: {silent}</yellow>"
+      - "<yellow>Speaker: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>Left click: toggle silent</yellow>"
+      - "<yellow>Right click: toggle speaker</yellow>"
+  play-mode-speaker:
+    name: "<gold>Playback Mode</gold>"
+    lore:
+      - "<gray>Current playback mode:</gray>"
+      - "<yellow>Silent: {silent}</yellow>"
+      - "<yellow>Speaker: {speaker}</yellow>"
+      - "<reset>"
+      - "<yellow>Left click: toggle silent</yellow>"
+      - "<yellow>Right click: toggle speaker</yellow>"
+  speaker-mode:
+    name: "<gold>Speaker Mode: {status}</gold>"
+    lore:
+      - "<gray>Click to toggle speaker mode</gray>"
+      - "<gray>Current: {status}</gray>"
+  speaker-mode-on:
+    name: "<gold>Speaker Mode: {status}</gold>"
+    lore:
+      - "<gray>Click to toggle speaker mode</gray>"
+      - "<gray>Current: {status}</gray>"
+  speaker-mode-off:
+    name: "<gold>Speaker Mode: {status}</gold>"
+    lore:
+      - "<gray>Click to toggle speaker mode</gray>"
+      - "<gray>Current: {status}</gray>"
+  speaker-mode-no-permission:
+    name: "<gold>Speaker Mode: {status}</gold>"
+    lore:
+      - "<red>You do not have permission to use speakers.</red>"
+  playlist:
+    name: "<gold>Playlist</gold>"
+    lore:
+      - "<gray>Click to open your playlists</gray>"
+  control-panel:
+    name: "<gold>Control Panel</gold>"
+    lore:
+      - "<gray>Click to open the control panel</gray>"
+  control-panel-playing:
+    name: "<gold>Control Panel</gold>"
+    lore:
+      - "<gray>Playback state: <yellow>{status}</yellow></gray>"
+      - ""
+      - "<yellow>Left click: open the panel</yellow>"
+  control-panel-paused:
+    name: "<gold>Control Panel</gold>"
+    lore:
+      - "<gray>Playback state: <yellow>{status}</yellow></gray>"
+      - ""
+      - "<yellow>Left click: open the panel</yellow>"
+  loop-mode-off:
+    name: "<gold>Loop Mode: </gold><red>Off</red>"
+    lore:
+      - "<gray>Click to cycle the loop mode</gray>"
+      - "<gray>Current: </gray><red>Off</red>"
+  loop-mode-single:
+    name: "<gold>Loop Mode: </gold><yellow>Single</yellow>"
+    lore:
+      - "<gray>Click to cycle the loop mode</gray>"
+      - "<gray>Current: </gray><yellow>Single</yellow>"
+  loop-mode-all:
+    name: "<gold>Loop Mode: </gold><green>All</green>"
+    lore:
+      - "<gray>Click to cycle the loop mode</gray>"
+      - "<gray>Current: </gray><green>All</green>"
+  protect-enabled:
+    name: "<green>Protection: On</green>"
+    lore:
+      - "<gray>Current state: </gray><green>On</green>"
+      - "<gray>Click to toggle protection</gray>"
+      - "<yellow>Click again to turn it off</yellow>"
+  protect-disabled:
+    name: "<red>Protection: Off</red>"
+    lore:
+      - "<gray>Current state: </gray><red>Off</red>"
+      - "<gray>Click to toggle protection</gray>"
+      - "<yellow>When on, the sign cannot be destroyed</yellow>"
+  search:
+    name: "<gold>Search Music</gold>"
+    lore:
+      - "<gray>Click to search for music</gray>"
+  recent-songs:
+    name: "<gold>Recently Played</gold>"
+    lore:
+      - "<gray>Recently played: <yellow>{count}</yellow> <gray>songs</gray>"
+  recent-songs-empty:
+    name: "<gold>Recently Played</gold>"
+    lore:
+      - "<gray>Nothing has been played yet</gray>"
+  master-playlist:
+    name: "<gold>Master Playlist</gold>"
+    lore:
+      - "<gold>Every song (shuffled)</gold>"
+  random-mode:
+    name: "<gold>Random Mode: {status}</gold>"
+    lore:
+      - "<gray>Click to toggle random playback</gray>"
+      - "<gray>Current state: {status}</gray>"
+  info-sign-mode:
+    name: "<gold>Info Sign: {status}</gold>"
+    lore:
+      - "<gold>While music plays</gold>"
+      - "<gold>show the song information</gold>"
+  prevent-destroy:
+    name: "<gold>Protection: {status}</gold>"
+    lore:
+      - "<gold>While nobody is listening</gold>"
+      - "<gold>prevent the sign from being destroyed</gold>"
+  create-playlist:
+    name: "<green>Create Playlist</green>"
+    lore:
+      - "<gray>Click to create a new playlist</gray>"
+  shuffle-playlist:
+    name: "<gold>Shuffle Playlist</gold>"
+    lore:
+      - "<gray>Click to shuffle the current playlist</gray>"
+  add-music-to-playlist:
+    name: "<green>Add Music to Playlist</green>"
+    lore:
+      - "<yellow>Do not forget to save!</yellow>"
+  save-playlist-change:
+    name: "<gold>Save Changes!</gold>"
+    lore:
+      - "<gray>Click to save the current playlist</gray>"
+  delete-playlist:
+    name: "<red>Delete Playlist</red>"
+    lore:
+      - "<gray>Click to delete the current playlist</gray>"
+  volume-control:
+    name: "<gold>Volume</gold>"
+    lore:
+      - "<yellow>Current volume: {volume}%</yellow>"
+      - "<reset>"
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level-muted:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level-low:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level-medium:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level-high:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  volume-level-full:
+    name: "<yellow>Volume: {volume}%</yellow>"
+    lore:
+      - "<green>Left click: increase (+{step})</green>"
+      - "<red>Right click: decrease (-{step})</red>"
+  speed-control:
+    name: "<gold>Playback Speed</gold>"
+    lore:
+      - "<yellow>Current speed: {speed}</yellow>"
+      - "<reset>"
+      - "<green>Left click: faster (+{step})</green>"
+      - "<red>Right click: slower (-{step})</red>"
+  stop:
+    name: "<red>Stop Playback</red>"
+    lore:
+      - "<gray>Click to stop playback</gray>"
+  destroy:
+    name: "<red>Destroy Player</red>"
+    lore:
+      - "<gray>Click to destroy this player</gray>"
+      - "<gray>and return to the settings screen</gray>"

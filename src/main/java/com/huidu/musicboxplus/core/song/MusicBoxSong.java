@@ -18,6 +18,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.util.*;
+import com.huidu.musicboxplus.common.config.SongItemConfig;
 
 public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSong {
     private final File file;
@@ -42,7 +43,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     // otherwise repeat for every slot on every GUI rebuild; invalidated when aliases/tags
     // change or the song-item config instance is swapped by a reload.
     private volatile List<String> cachedBaseLore;
-    private volatile GUIConfigManager.SongItemConfig cachedLoreConfig;
+    private volatile SongItemConfig cachedLoreConfig;
     // Non-null when this song is backed by in-memory player-created music instead of an NBS file.
     private final PlayerMusicSource playerMusic;
 
@@ -180,7 +181,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     // them is string-only work (placeholder replacement + alias/tag joins) that the renderer
     // repeats for every slot; aliases/tags mutate only through the methods above and the config
     // instance is swapped on reload, so both are cheap to detect.
-    private List<String> getBaseLoreLines(GUIConfigManager.SongItemConfig songItemConfig) {
+    private List<String> getBaseLoreLines(SongItemConfig songItemConfig) {
         List<String> cached = this.cachedBaseLore;
         if (cached != null && this.cachedLoreConfig == songItemConfig) {
             return cached;
@@ -261,14 +262,14 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     }
 
     public ItemStack getSongStack(Material material, List<String> extraLines, boolean glow) {
-        GUIConfigManager.SongItemConfig songItemConfig = GUIConfigManager.getInstance().getSongItemConfig();
+        SongItemConfig songItemConfig = GUIConfigManager.getInstance().getSongItemConfig();
         String itemName = songItemConfig.getNameFormat().replace("{song}", this.getName());
         return this.getSongStack(material, itemName, extraLines, glow);
     }
 
     public ItemStack getSongStack(Material material, String itemName, List<String> extraLines, boolean glow) {
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
-        GUIConfigManager.SongItemConfig songItemConfig = guiConfig.getSongItemConfig();
+        SongItemConfig songItemConfig = guiConfig.getSongItemConfig();
         Material finalMaterial = material != null ? material : resolveConfiguredMaterial(songItemConfig);
         if (finalMaterial == null) {
             finalMaterial = songItemConfig.getCustomMaterial();
@@ -385,7 +386,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         return this.getSongStack(resolveConfiguredMaterial(GUIConfigManager.getInstance().getSongItemConfig()));
     }
 
-    private static Material resolveConfiguredMaterial(GUIConfigManager.SongItemConfig config) {
+    private static Material resolveConfiguredMaterial(SongItemConfig config) {
         if (config.isCustomEnabled() || !config.isUseRandomDisc()) {
             return config.getCustomMaterial();
         }
@@ -502,7 +503,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         this.craftEngineItem = craftEngineItem;
     }
 
-    private String resolveItemModel(GUIConfigManager.SongItemConfig songItemConfig) {
+    private String resolveItemModel(SongItemConfig songItemConfig) {
         if (this.itemModel != null && !this.itemModel.trim().isEmpty()) {
             return this.itemModel;
         }

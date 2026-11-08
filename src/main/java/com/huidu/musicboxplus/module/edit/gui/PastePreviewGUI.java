@@ -1,21 +1,25 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.utils.MiniMessageUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.PastePreviewConfig;
 
-public class PastePreviewGUI implements InventoryHolder {
+public class PastePreviewGUI implements Menu {
 
     private final Player player;
     private final Inventory inventory;
-    private final GUIConfigManager.PastePreviewConfig config;
+    private final PastePreviewConfig config;
     private final Runnable onConfirm;
     private final Runnable onCancel;
     private final Runnable onClose;
@@ -44,27 +48,28 @@ public class PastePreviewGUI implements InventoryHolder {
 
         int infoSlot = config.getSlotForButton("info");
         if (infoSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig infoConfig = config.getButton("info");
+            HotbarButtonConfig infoConfig = config.getButton("info");
             ItemStack infoItem = infoConfig.createItem();
             inventory.setItem(infoSlot, infoItem);
         }
 
         int confirmSlot = config.getSlotForButton("confirm");
         if (confirmSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig confirmConfig = config.getButton("confirm");
+            HotbarButtonConfig confirmConfig = config.getButton("confirm");
             ItemStack confirmItem = confirmConfig.createItem();
             inventory.setItem(confirmSlot, confirmItem);
         }
 
         int cancelSlot = config.getSlotForButton("cancel");
         if (cancelSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig cancelConfig = config.getButton("cancel");
+            HotbarButtonConfig cancelConfig = config.getButton("cancel");
             ItemStack cancelItem = cancelConfig.createItem();
             inventory.setItem(cancelSlot, cancelItem);
         }
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int infoSlot = config.getSlotForButton("info");
         int confirmSlot = config.getSlotForButton("confirm");
         int cancelSlot = config.getSlotForButton("cancel");

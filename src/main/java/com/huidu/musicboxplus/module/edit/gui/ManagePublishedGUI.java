@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
@@ -15,21 +18,22 @@ import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
+import com.huidu.musicboxplus.common.config.ManagePublishedConfig;
 
-public class ManagePublishedGUI implements InventoryHolder {
+public class ManagePublishedGUI implements Menu {
 
     private final Player player;
     private final PublishedMusic published;
     private final PublishGUI parentGUI;
     private final Inventory inventory;
-    private final GUIConfigManager.ManagePublishedConfig config;
+    private final ManagePublishedConfig config;
 
     public ManagePublishedGUI(Player player, PublishedMusic published, PublishGUI parentGUI) {
         this.player = player;
@@ -48,7 +52,7 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         int infoSlot = config.getSlotForButton("info");
         if (infoSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig infoConfig = config.getButton("info");
+            HotbarButtonConfig infoConfig = config.getButton("info");
             List<String> lore = new ArrayList<>();
             for (String line : infoConfig.getLore()) {
                 lore.add(line.replace("{name}", published.getName())
@@ -65,7 +69,7 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         int priceSlot = config.getSlotForButton("price");
         if (priceSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig priceConfig = config.getButton("price");
+            HotbarButtonConfig priceConfig = config.getButton("price");
             List<String> lore = new ArrayList<>();
             for (String line : priceConfig.getLore()) {
                 lore.add(line.replace("{price}", String.format("%.0f", published.getPrice()))
@@ -79,7 +83,7 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         int statsSlot = config.getSlotForButton("stats");
         if (statsSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig statsConfig = config.getButton("stats");
+            HotbarButtonConfig statsConfig = config.getButton("stats");
             String status;
             if (published.isPending()) {
                 status = Lang.PUBLISH_STATUS_PENDING.toString();
@@ -102,7 +106,7 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         int updateSlot = config.getSlotForButton("update");
         if (updateSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig updateConfig = config.getButton("update");
+            HotbarButtonConfig updateConfig = config.getButton("update");
             ItemStack updateItem = updateConfig.createItem();
             inventory.setItem(updateSlot, updateItem);
         }
@@ -110,7 +114,7 @@ public class ManagePublishedGUI implements InventoryHolder {
         int toggleSlot = config.getSlotForButton("toggle");
         if (toggleSlot >= 0) {
             String toggleKey = published.isAvailable() ? "toggle-unpublish" : "toggle-republish";
-            GUIConfigManager.HotbarButtonConfig toggleConfig = config.getButton(toggleKey);
+            HotbarButtonConfig toggleConfig = config.getButton(toggleKey);
             if (toggleConfig != null) {
                 ItemStack toggleItem = toggleConfig.createItem();
                 inventory.setItem(toggleSlot, toggleItem);
@@ -119,14 +123,14 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         int deleteSlot = config.getSlotForButton("delete");
         if (deleteSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig deleteConfig = config.getButton("delete");
+            HotbarButtonConfig deleteConfig = config.getButton("delete");
             ItemStack deleteItem = deleteConfig.createItem();
             inventory.setItem(deleteSlot, deleteItem);
         }
 
         int backSlot = config.getSlotForButton("back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = config.getButton("back");
+            HotbarButtonConfig backConfig = config.getButton("back");
             ItemStack backItem = backConfig.createItem();
             inventory.setItem(backSlot, backItem);
         }
@@ -137,7 +141,10 @@ public class ManagePublishedGUI implements InventoryHolder {
         return sdf.format(new Date(timestamp));
     }
 
-    public void handleClick(int slot, boolean isShiftClick) {
+    @Override
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
+        boolean isShiftClick = click.shiftClick();
         int priceSlot = config.getSlotForButton("price");
         int updateSlot = config.getSlotForButton("update");
         int toggleSlot = config.getSlotForButton("toggle");

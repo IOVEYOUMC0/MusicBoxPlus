@@ -15,6 +15,7 @@ import com.huidu.musicboxplus.module.gui.playlist.PlayListListGUI;
 import com.huidu.musicboxplus.module.gui.song.SongContainerGUI;
 
 import java.util.List;
+import com.huidu.musicboxplus.common.config.PlaylistItemConfig;
 
 final class GUIPlaylistActions {
     private GUIPlaylistActions() {
@@ -35,7 +36,7 @@ final class GUIPlaylistActions {
 
     static void openPlayListAdder(PlayerWrapper wrapper, PlayListEditorGUI editorGUI) {
         SongContainerGUI gui = new SongContainerGUI(MusicBoxSongManager.getRootContainer(), wrapper);
-        GUIConfigManager.PlaylistItemConfig playlistConfig = GUIConfigManager.getInstance().getPlaylistItemConfig();
+        PlaylistItemConfig playlistConfig = GUIConfigManager.getInstance().getPlaylistItemConfig();
         SongContainerGUI.SongGUIParams params = SongContainerGUI.SongGUIParams.builder().onSongLeftClick((w, data) -> {
             MusicBoxSong song = data.getData();
             editorGUI.addSongAsync(song, () -> {

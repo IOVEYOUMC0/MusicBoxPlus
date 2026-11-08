@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
@@ -14,19 +17,20 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import com.huidu.musicboxplus.common.config.BPMSettingsConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
 
-public class BPMSettingsGUI implements InventoryHolder {
+public class BPMSettingsGUI implements Menu {
 
     private final PlayerMusic music;
     private final Player player;
     private final SettingsMenuGUI parentGUI;
     private final Inventory inventory;
-    private final GUIConfigManager.BPMSettingsConfig config;
+    private final BPMSettingsConfig config;
     private boolean handledClose = false;
 
     private int getMaxBpm() {
@@ -60,7 +64,7 @@ public class BPMSettingsGUI implements InventoryHolder {
 
         int currentSlot = config.getSlotForButton("current-bpm");
         if (currentSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig currentConfig = config.getButton("current-bpm");
+            HotbarButtonConfig currentConfig = config.getButton("current-bpm");
             if (currentConfig != null) {
                 List<String> lore = new ArrayList<>();
                 for (String line : currentConfig.getLore()) {
@@ -80,7 +84,7 @@ public class BPMSettingsGUI implements InventoryHolder {
 
         int resetSlot = config.getSlotForButton("reset");
         if (resetSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig resetConfig = config.getButton("reset");
+            HotbarButtonConfig resetConfig = config.getButton("reset");
             if (resetConfig != null) {
                 ItemStack resetButton = resetConfig.createItem();
                 inventory.setItem(resetSlot, resetButton);
@@ -89,7 +93,7 @@ public class BPMSettingsGUI implements InventoryHolder {
 
         int backSlot = config.getSlotForButton("back");
         if (backSlot >= 0) {
-            GUIConfigManager.HotbarButtonConfig backConfig = config.getButton("back");
+            HotbarButtonConfig backConfig = config.getButton("back");
             if (backConfig != null) {
                 ItemStack backButton = backConfig.createItem();
                 inventory.setItem(backSlot, backButton);
@@ -130,7 +134,8 @@ public class BPMSettingsGUI implements InventoryHolder {
         );
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int backSlot = config.getSlotForButton("back");
         int resetSlot = config.getSlotForButton("reset");
 

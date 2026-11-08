@@ -2,6 +2,8 @@ package com.huidu.musicboxplus.module.edit.gui;
 
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.module.gui.DeleteConfirmGUI;
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
 import com.huidu.musicboxplus.module.gui.song.SongPlayerControlGUI;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -74,29 +76,45 @@ public class EditGUIListener implements Listener {
             return;
         }
 
-        int slot = event.getRawSlot();
-
-        if (holder instanceof EditMenuGUI) {
+        // One branch for every menu that implements Menu: adding a screen no longer means editing
+        // this listener, and a menu cannot be silently unreachable because someone forgot to.
+        //
+        // This is now the only click dispatcher. MusicEditListener used to keep a parallel
+        // class→handler map, which meant DeleteConfirmGUI was handled twice (this listener and
+        // that map both fired), and every new screen had to be registered in two places.
+        if (holder instanceof Menu menu) {
+            // Cancel first, then decide whether to dispatch: a plugin-owned holder must never leave
+            // a click uncancelled, or vanilla mechanics can move its display items into the player's
+            // inventory (dupe) when the owning module was disabled mid-session.
             event.setCancelled(true);
-            if (slot >= 0 && slot < event.getInventory().getSize()) {
-                ((EditMenuGUI) holder).handleClick(slot);
+            if (!isModuleActive(holder)) {
+                return;
             }
-        } else if (holder instanceof SettingsMenuGUI) {
-            event.setCancelled(true);
+            int slot = event.getRawSlot();
             if (slot >= 0 && slot < event.getInventory().getSize()) {
-                ((SettingsMenuGUI) holder).handleClick(slot);
-            }
-        } else if (holder instanceof BPMSettingsGUI) {
-            event.setCancelled(true);
-            if (slot >= 0 && slot < event.getInventory().getSize()) {
-                ((BPMSettingsGUI) holder).handleClick(slot);
-            }
-        } else if (holder instanceof DeleteConfirmGUI) {
-            event.setCancelled(true);
-            if (slot >= 0 && slot < event.getInventory().getSize()) {
-                ((DeleteConfirmGUI) holder).handleClick(slot);
+                menu.handleClick(new MenuClick(slot, event.isRightClick(), event.isShiftClick()));
             }
         }
+    }
+
+    /**
+     * Whether the module that owns this screen is currently enabled. Moved here with the dispatch:
+     * it used to live in MusicEditListener, and a click must still do nothing after an admin turns
+     * the owning module off while the window is open.
+     */
+    private static boolean isModuleActive(InventoryHolder holder) {
+        MusicBox plugin = MusicBox.getInstance();
+        if (holder instanceof DeleteConfirmGUI) {
+            return true;
+        }
+        if (holder instanceof PlayerMusicShopGUI || holder instanceof PurchaseConfirmGUI) {
+            return plugin.isPlayerMusicShopModuleEnabled();
+        }
+        if (holder instanceof PublishGUI || holder instanceof PublishConfirmGUI
+                || holder instanceof ManagePublishedGUI || holder instanceof PublishReviewGUI) {
+            return plugin.isPublishModuleEnabled();
+        }
+        return plugin.isEditorModuleEnabled();
     }
 
     @EventHandler

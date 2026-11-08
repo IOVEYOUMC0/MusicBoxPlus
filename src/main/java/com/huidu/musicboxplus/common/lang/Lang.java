@@ -458,6 +458,27 @@ public enum Lang {
     SIGN_INFO_MODE_LORE("sign_info_mode_lore"),
     SIGN_RANDOM_MODE_LORE("sign_random_mode_lore"),
     SIGN_PLAYLIST_EDITOR_LORE("sign_playlist_editor_lore"),
+    // Operator tooling commands. The cli_ prefix keeps these apart from the editor's own
+    // EXPORT_* messages, which are about writing one song from the editor, not this command.
+    BACKUP_RUNNING("backup_running"),
+    BACKUP_STARTED("backup_started"),
+    BACKUP_CREATED("backup_created"),
+    BACKUP_FAILED("backup_failed"),
+    BACKUP_QUEUE_FULL("backup_queue_full"),
+    BACKUP_MYSQL_NOTE("backup_mysql_note"),
+    BACKUP_SKIPPED("backup_skipped"),
+    BACKUP_PRUNED("backup_pruned"),
+    CLI_EXPORT_USAGE("cli_export_usage"),
+    CLI_EXPORT_RUNNING("cli_export_running"),
+    CLI_EXPORT_UNKNOWN_PLAYER("cli_export_unknown_player"),
+    CLI_EXPORT_NO_SONGS("cli_export_no_songs"),
+    CLI_EXPORT_FAILED("cli_export_failed"),
+    CLI_EXPORT_QUEUE_FULL("cli_export_queue_full"),
+    CLI_EXPORT_DONE("cli_export_done"),
+    CLI_EXPORT_FAILURES("cli_export_failures"),
+    CLI_EXPORT_WARNINGS("cli_export_warnings"),
+    DOCTOR_HEADING("doctor_heading"),
+    DOCTOR_QUEUE_FULL("doctor_queue_full"),
     ;
 
     private final String key;

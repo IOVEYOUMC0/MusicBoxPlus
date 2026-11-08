@@ -21,6 +21,9 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
+import com.huidu.musicboxplus.common.config.LoopModeConfig;
+import com.huidu.musicboxplus.common.config.PlaybackStatusConfig;
+import com.huidu.musicboxplus.common.config.ToggleStatusConfig;
 
 // Builds the shared control-bar buttons. Each button resolves its item from the GUI config
 // first and only falls back to a hardcoded ItemStack when no config entry exists, so a server
@@ -56,12 +59,12 @@ public final class ButtonFactory {
     }
 
     private static String getToggleText(boolean enabled) {
-        GUIConfigManager.ToggleStatusConfig toggleStatusConfig = GUIConfigManager.getInstance().getToggleStatusConfig();
+        ToggleStatusConfig toggleStatusConfig = GUIConfigManager.getInstance().getToggleStatusConfig();
         return enabled ? toggleStatusConfig.getEnabled() : toggleStatusConfig.getDisabled();
     }
 
     private static String getPlaybackStatusText(boolean playing) {
-        GUIConfigManager.PlaybackStatusConfig playbackStatusConfig = GUIConfigManager.getInstance().getPlaybackStatusConfig();
+        PlaybackStatusConfig playbackStatusConfig = GUIConfigManager.getInstance().getPlaybackStatusConfig();
         return playing ? playbackStatusConfig.getPlaying() : playbackStatusConfig.getPaused();
     }
 
@@ -333,7 +336,7 @@ public final class ButtonFactory {
                 }
                 LoopMode loopMode = context.getLoopMode();
                 String buttonKey = "loop-mode-" + loopMode.name().toLowerCase();
-                GUIConfigManager.LoopModeConfig loopModeConfig = GUIConfigManager.getInstance().getLoopModeConfig();
+                LoopModeConfig loopModeConfig = GUIConfigManager.getInstance().getLoopModeConfig();
                 String modeText;
                 switch (loopMode) {
                     case SINGLE: modeText = loopModeConfig.getSingle(); break;

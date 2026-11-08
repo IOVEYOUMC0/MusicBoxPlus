@@ -22,6 +22,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import com.huidu.musicboxplus.common.config.ButtonMappingConfig;
 
 public class SongContainerGUI {
     private final FullSongContainer container;
@@ -90,7 +91,7 @@ public class SongContainerGUI {
         if (wrapper == null || wrapper.isRecentSongsLoaded()) {
             return;
         }
-        GUIConfigManager.ButtonMappingConfig mapping = GUIConfigManager.getInstance()
+        ButtonMappingConfig mapping = GUIConfigManager.getInstance()
                 .getGUIConfig(this.currentGuiType).getButtonMapping();
         if (!params.getButtonMap().containsKey(mapping.getRecentSongs())) {
             return;
@@ -101,7 +102,7 @@ public class SongContainerGUI {
     private void renderPage(GUI gui, int page, SongGUIParams params, String guiType) {
         SubSongContainer parent;
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getGUIConfig(guiType).getButtonMapping();
+        ButtonMappingConfig mapping = guiConfig.getGUIConfig(guiType).getButtonMapping();
         int indexLimit = guiConfig.getLayoutCharCount(guiType, mapping.getSongs());
         if (indexLimit <= 0) {
             indexLimit = 36;
@@ -144,7 +145,7 @@ public class SongContainerGUI {
         this.populateSongs(gui, layoutParser, mapping, page, params, guiType, skipElements);
     }
 
-    private void populateSongs(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping,
+    private void populateSongs(GUI gui, LayoutParser layoutParser, ButtonMappingConfig mapping,
             int page, SongGUIParams params, String guiType, int skipElements) {
         this.renderSongSlots(gui, layoutParser, mapping, page, params, guiType, skipElements, false);
     }
@@ -161,7 +162,7 @@ public class SongContainerGUI {
         }
 
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getGUIConfig(this.currentGuiType).getButtonMapping();
+        ButtonMappingConfig mapping = guiConfig.getGUIConfig(this.currentGuiType).getButtonMapping();
         this.refreshItems(this.currentParams);
         int pageCount = this.getPageCount(this.currentGuiType);
         if (this.currentPage >= pageCount) {
@@ -170,7 +171,7 @@ public class SongContainerGUI {
         this.refreshVisiblePage(this.currentGUI, this.currentPage, this.currentParams, this.currentGuiType, mapping);
     }
 
-    private void refreshVisiblePage(GUI gui, int page, SongGUIParams params, String guiType, GUIConfigManager.ButtonMappingConfig mapping) {
+    private void refreshVisiblePage(GUI gui, int page, SongGUIParams params, String guiType, ButtonMappingConfig mapping) {
         SubSongContainer parent;
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
         int indexLimit = guiConfig.getLayoutCharCount(guiType, mapping.getSongs());
@@ -229,7 +230,7 @@ public class SongContainerGUI {
         this.updateSlots(slots, () -> guiConfig.createButtonItem(this.currentGuiType, buttonName), () -> new ClickAction(action));
     }
 
-    private void updateSongSlots(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping,
+    private void updateSongSlots(GUI gui, LayoutParser layoutParser, ButtonMappingConfig mapping,
             int page, SongGUIParams params, String guiType, int skipElements) {
         this.renderSongSlots(gui, layoutParser, mapping, page, params, guiType, skipElements, true);
     }
@@ -237,7 +238,7 @@ public class SongContainerGUI {
     // Shared body for populateSongs (fresh GUI, addItem) and updateSongSlots (refresh,
     // updateItem / removeItem). updateMode only changes how the item lands in the inventory:
     // slots beyond the item list are cleared on refresh but simply not added when opening.
-    private void renderSongSlots(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping,
+    private void renderSongSlots(GUI gui, LayoutParser layoutParser, ButtonMappingConfig mapping,
             int page, SongGUIParams params, String guiType, int skipElements, boolean updateMode) {
         List<SongGUIItem> items = this.getItems();
         MusicBoxSong playerSong = this.wrapper.getActivePlayer() != null ? (MusicBoxSong) this.wrapper.getActivePlayer().getMusicBoxSong() : null;
@@ -318,7 +319,7 @@ public class SongContainerGUI {
 
     private int getPageCount(String guiType) {
         GUIConfigManager guiConfig = GUIConfigManager.getInstance();
-        GUIConfigManager.ButtonMappingConfig mapping = guiConfig.getGUIConfig(guiType).getButtonMapping();
+        ButtonMappingConfig mapping = guiConfig.getGUIConfig(guiType).getButtonMapping();
         int slotsPerPage = guiConfig.getLayoutCharCount(guiType, mapping.getSongs());
         if (slotsPerPage <= 0) {
             slotsPerPage = 36;

@@ -1,5 +1,8 @@
 package com.huidu.musicboxplus.module.edit.gui;
 
+import com.huidu.musicboxplus.module.gui.minecraft.Menu;
+import com.huidu.musicboxplus.module.gui.minecraft.MenuClick;
+
 import com.huidu.musicboxplus.MusicBox;
 import com.huidu.musicboxplus.common.Permissions;
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
@@ -16,18 +19,19 @@ import com.huidu.musicboxplus.module.gui.GUIInputManager;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
+import com.huidu.musicboxplus.common.config.EditMenuConfig;
+import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
 
-public class EditMenuGUI implements InventoryHolder {
+public class EditMenuGUI implements Menu {
 
     private final Player player;
     private final Inventory inventory;
-    private final GUIConfigManager.EditMenuConfig config;
+    private final EditMenuConfig config;
 
     public EditMenuGUI(Player player) {
         this.player = player;
@@ -59,7 +63,7 @@ public class EditMenuGUI implements InventoryHolder {
         if (!key.equals("back") && !player.hasPermission(Permissions.EDIT)) {
             return;
         }
-        GUIConfigManager.HotbarButtonConfig buttonConfig = config.getButton(key);
+        HotbarButtonConfig buttonConfig = config.getButton(key);
         ItemStack item = ItemUtils.createStack(
                 buttonConfig.getMaterial(),
                 buttonConfig.getName(),
@@ -69,7 +73,8 @@ public class EditMenuGUI implements InventoryHolder {
         inventory.setItem(slot, item);
     }
 
-    public void handleClick(int slot) {
+    public void handleClick(MenuClick click) {
+        int slot = click.slot();
         int createSlot = config.getSlotForButton("create");
         int selectSlot = config.getSlotForButton("select");
         int deleteSlot = config.getSlotForButton("delete");

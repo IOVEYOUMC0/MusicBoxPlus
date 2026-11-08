@@ -12,10 +12,11 @@ import org.junit.jupiter.api.Test;
 //
 // Every registry here is static, so a re-enable does not get a fresh copy of it -- the same objects
 // come back, and anything a session left in them is still reachable, still called, and still pins the
-// previous session's players and GUIs. These tests cover the ones that are now cleared, and they are
-// careful about the one that must NOT be, for the opposite reason: MusicEditListener.GUI_HANDLERS is
-// filled by a static initialiser that does not run a second time, so clearing it would leave every
-// GUI click unhandled forever.
+// previous session's players and GUIs. These tests cover the ones that are cleared on shutdown.
+//
+// The class -> handler click map that used to be exempt from this no longer exists: menus now
+// implement Menu and are dispatched by EditGUIListener, so there is no static registry to leave
+// filled and nothing to special-case.
 class StaticRegistryShutdownTest {
 
     @Test

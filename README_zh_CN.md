@@ -44,40 +44,52 @@ MusicBoxPlus 是 [MusicBox](https://github.com/Spliterash/MusicBox) 的完全重
 
 | 命令 | 说明 | 权限 |
 |------|------|------|
-| `/musicbox` | 打开主音乐菜单 | `musicbox.use` |
-| `/musicbox play <song> [speaker\|radio\|silent\|unsilent]` | 播放歌曲 | `musicbox.use` |
-| `/musicbox stop [player]` | 停止自己或他人播放 | `musicbox.stop` / `musicbox.stop.others` |
-| `/musicbox volume <0-100\|up\|down\|reset>` | 调节音量 | `musicbox.volume` |
-| `/musicbox speed <value>` | 调节播放速度 | `musicbox.speed` |
-| `/musicbox shop` | 打开商店 | `musicbox.shop` |
-| `/musicbox shopmusic` | 玩家音乐商店别名 | `musicbox.shopmusic` |
-| `/musicbox edit create <name>` | 创建音乐 | `musicbox.edit` |
-| `/musicbox edit gui` | 打开编辑器 | `musicbox.edit` |
-| `/musicbox reload [all\|config\|lang\|songs\|gui\|database\|aliases]` | 重载插件数据 | `musicbox.admin` |
+| `/musicbox` | 打开主音乐菜单 | `musicboxplus.use` |
+| `/musicbox play <song> [speaker\|radio\|silent\|unsilent]` | 播放歌曲 | `musicboxplus.use` |
+| `/musicbox stop [player]` | 停止自己或他人播放 | `musicboxplus.stop` / `musicboxplus.stop.others` |
+| `/musicbox volume <0-100\|up\|down\|reset>` | 调节音量 | `musicboxplus.volume` |
+| `/musicbox speed <value>` | 调节播放速度 | `musicboxplus.speed` |
+| `/musicbox shop` | 打开商店 | `musicboxplus.shop` |
+| `/musicbox shopmusic` | 玩家音乐商店别名 | `musicboxplus.shopmusic` |
+| `/musicbox edit create <name>` | 创建音乐 | `musicboxplus.edit` |
+| `/musicbox edit gui` | 打开编辑器 | `musicboxplus.edit` |
+| `/musicbox reload [all\|config\|lang\|songs\|gui\|database\|aliases]` | 重载插件数据 | `musicboxplus.admin` |
+| `/musicbox backup` | 把配置、语言文件、歌曲与 SQLite 数据库打包到 `backups/`（保留最新 10 份） | `musicboxplus.admin` |
+| `/musicbox export <玩家\|uuid>` | 把该玩家全部作品导出为 `.nbs` 到 `exports/` | `musicboxplus.admin` |
+| `/musicbox doctor` | 只读自检：数据库延迟、结构版本、曲库与缓存规模、模块开关 | `musicboxplus.admin` |
+
+`backup` 会先对 SQLite 的 WAL 做 checkpoint，保证复制出的 `data.db` 含有最新写入；MySQL 后端不会把数据库放进压缩包，请用 `mysqldump`。`doctor` 不写任何数据、不触发重载，用来在不翻日志的情况下回答“它为什么是这个行为”。
 
 ## 权限
 
 | 权限 | 说明 | 默认 |
 |------|------|------|
-| `musicbox.use` | 基本使用 | true |
-| `musicbox.stop` | 停止自己的播放 | true |
-| `musicbox.stop.others` | 停止他人播放 | op |
-| `musicbox.speaker` | 使用音箱模式 | true |
-| `musicbox.hear` | 听到音箱音乐 | true |
-| `musicbox.playlist` | 创建和管理播放列表 | true |
-| `musicbox.volume` | 调节音量 | true |
-| `musicbox.speed` | 调节播放速度 | true |
-| `musicbox.autoplay` | 进服自动播放 | true |
-| `musicbox.loop` | 切换循环模式 | true |
-| `musicbox.shop` | 使用商店 | true |
-| `musicbox.shopmusic` | 玩家音乐商店 | true |
-| `musicbox.jukebox` | 使用唱片机 | true |
-| `musicbox.edit` | 创建和编辑音乐 | op |
-| `musicbox.sign` | 创建音乐告示牌 | op |
-| `musicbox.give` | 给予唱片 | op |
-| `musicbox.mute` | 停止他人当前音乐 | op |
-| `musicbox.play.other` | 为他人播放 | op |
-| `musicbox.admin` | 管理命令（重载等） | op |
+| `musicboxplus.use` | 基本使用 | true |
+| `musicboxplus.stop` | 停止自己的播放 | true |
+| `musicboxplus.stop.others` | 停止他人播放 | op |
+| `musicboxplus.speaker` | 使用音箱模式 | true |
+| `musicboxplus.hear` | 听到音箱音乐 | true |
+| `musicboxplus.playlist` | 创建和管理播放列表 | true |
+| `musicboxplus.volume` | 调节音量 | true |
+| `musicboxplus.speed` | 调节播放速度 | true |
+| `musicboxplus.autoplay` | 进服自动播放 | true |
+| `musicboxplus.shop` | 使用商店 | true |
+| `musicboxplus.shopmusic` | 玩家音乐商店 | true |
+| `musicboxplus.edit` | 创建和编辑音乐 | op |
+| `musicboxplus.edit.limit.unlimited` | 绕过每人作品数量上限 | op |
+| `musicboxplus.sign` | 创建音乐告示牌 | op |
+| `musicboxplus.sign.protect` | 保护音乐告示牌不被破坏 | op |
+| `musicboxplus.give` | 给予唱片 | op |
+| `musicboxplus.tag` | 管理歌曲标签与别名 | op |
+| `musicboxplus.mute` | 停止他人当前音乐 | op |
+| `musicboxplus.play.other` | 为他人播放 | op |
+| `musicboxplus.silent.other` | 修改他人的静音模式 | op |
+| `musicboxplus.control` | 远程控制他人播放 | op |
+| `musicboxplus.publish.review` | 审核已发布作品 | op |
+| `musicboxplus.reload` | 重载插件数据 | op |
+| `musicboxplus.admin` | 管理命令（重载、备份、导出、自检） | op |
+
+插件命令名是 `musicboxplus`，并以 `musicbox` 作为别名，两种写法都可用；权限节点统一使用 `musicboxplus.` 前缀，与 `plugin.yml` 一致。
 
 ## 配置
 

@@ -21,6 +21,8 @@ import org.bukkit.inventory.ItemStack;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import com.huidu.musicboxplus.common.config.LoopModeConfig;
+import com.huidu.musicboxplus.common.config.VolumeControlConfig;
 
 final class ControlPanelButtonFactory {
     private ControlPanelButtonFactory() {
@@ -92,7 +94,7 @@ final class ControlPanelButtonFactory {
         if (isJukebox && loopMode == LoopMode.ALL) {
             loopMode = LoopMode.OFF;
         }
-        GUIConfigManager.LoopModeConfig loopModeConfig = configManager.getLoopModeConfig();
+        LoopModeConfig loopModeConfig = configManager.getLoopModeConfig();
         String modeText;
         switch (loopMode) {
             case SINGLE:
@@ -120,7 +122,7 @@ final class ControlPanelButtonFactory {
     static ItemStack createVolumeButton(GUIConfigManager configManager, MusicBoxSongPlayer currentPlayer, Player viewer) {
         int currentVolume = getCurrentVolume(currentPlayer, viewer);
         int step = MusicBox.getInstance().getConfigObject().getVolume().getStep();
-        GUIConfigManager.VolumeControlConfig volumeConfig = configManager.getVolumeControlConfig();
+        VolumeControlConfig volumeConfig = configManager.getVolumeControlConfig();
         Material volumeMaterial;
         int customModelData;
         if (currentVolume == 0) {
