@@ -119,7 +119,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
                 this.refresh();
             }
         }));
-        
+
         MusicBoxSongPlayer currentPlayer = this.getCurrentMusicPlayer();
         if (currentPlayer instanceof PlayerSongPlayer) {
             this.layoutParser.registerPlayerButton(mapping.getBack(), "back", p -> {
@@ -138,13 +138,13 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
                 p.closeInventory();
             });
         }
-        
+
         if (currentPlayer instanceof SignPlayer) {
             this.layoutParser.registerButton(mapping.getStop(), () -> this.getConfiguredControlButton(
                 "destroy",
                 ItemUtils.createStack(Material.BARRIER, Lang.CONTROL_DESTROY_PLAYER.toString(), Lang.CONTROL_DESTROY_PLAYER_LORE.toList())
             ), () -> new PlayerClickAction(p -> this.handleDestroy(p)));
-            
+
             this.layoutParser.registerButton(mapping.getProtect(), () -> ControlPanelButtonFactory.createProtectButton(this.configManager, this.getCurrentMusicPlayer(), this.viewer), () -> new PlayerClickAction(p -> this.handleTogglePreventDestroy(p)));
         } else if (currentPlayer instanceof JukeboxPlayer) {
             this.layoutParser.registerButton(mapping.getStop(), () -> this.getConfiguredControlButton(
@@ -156,7 +156,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
         } else {
             this.layoutParser.registerButton(mapping.getStop(), () -> GUIActions.getStopStack(), () -> new PlayerClickAction(p -> this.handleStop(p)));
         }
-        
+
         boolean canControlLoop = this.canControlLoopMode();
         boolean isJukebox = currentPlayer instanceof JukeboxPlayer;
         this.layoutParser.registerButton(mapping.getLoop(), () -> ControlPanelButtonFactory.createLoopButton(this.configManager, this.getPlaybackContext(), isJukebox), canControlLoop ? () -> new ClickAction(() -> {
@@ -181,7 +181,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
             this.layoutParser.parseAndApply(layout);
         }
     }
-    
+
     private void handleStop(Player p) {
         MusicBoxSongPlayer player = this.getCurrentMusicPlayer();
         if (player == null) {
@@ -504,7 +504,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
             });
         }
     }
-    
+
     private boolean canSwitchSong() {
         return this.canSwitchSong(this.getCurrentMusicPlayer());
     }
@@ -715,7 +715,7 @@ public class SongPlayerControlGUI implements PlayerControlGUI {
         }
         if (this.viewer != null) {
             com.huidu.musicboxplus.core.player.VolumeManager.getInstance().setVolumeByAmount(
-                this.viewer, 
+                this.viewer,
                 com.huidu.musicboxplus.core.player.VolumeManager.getPlayerVolume(this.viewer) + delta
             );
             this.refresh();

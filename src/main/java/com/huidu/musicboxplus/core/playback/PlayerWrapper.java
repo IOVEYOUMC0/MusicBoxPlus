@@ -398,17 +398,17 @@ public class PlayerWrapper {
             return;
         }
         int maxRecentSongs = MusicBox.getInstance().getConfigObject().getMaxRecentSongs();
-        
+
         recentSongs.remove(song);
         recentSongs.addFirst(song);
-        
+
         while (recentSongs.size() > maxRecentSongs) {
             recentSongs.removeLast();
         }
-        
+
         saveRecentSongsBatchInternal();
     }
-    
+
     private void saveRecentSongsBatchInternal() {
         Player player = getPlayer();
         if (player == null) {
@@ -604,6 +604,12 @@ public class PlayerWrapper {
     }
 
     public void setPlaybackSpeedMultiplier(float playbackSpeedMultiplier) {
+        // Math.min/Math.max propagate NaN, so a NaN (a literal "NaN" the speed command parses
+        // happily, or a bad arithmetic result) used to be stored as-is and every later
+        // tick/seconds computation returned NaN -- the cursor then never advanced again.
+        if (!Float.isFinite(playbackSpeedMultiplier)) {
+            return;
+        }
         MusicBoxConfig.SpeedConfig speedConfig = MusicBox.getInstance().getConfigObject().getSpeed();
         float min = speedConfig.getMinSpeed();
         float max = speedConfig.getMaxSpeed();

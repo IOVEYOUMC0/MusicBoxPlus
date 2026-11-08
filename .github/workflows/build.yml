@@ -1,0 +1,55 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # The suite normally finishes in about two minutes; the timeout only exists to stop a hung
+    # Gradle daemon or a blocked network fetch from burning a runner for hours.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # The build compiles against paper-api, whose newest class files are Java 25 bytecode, so the
+      # toolchain in build.gradle.kts needs a real JDK 25 here; compiling with 21 fails on the
+      # class-file version before it ever reaches our sources.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and test
+        # The NBS corpus lives under Reference/, which is git-ignored, so CI has no real .nbs files.
+        # Tests that need them skip (roughly 45 of 512) instead of failing; a green CI run therefore
+        # does not prove format handling. Run the suite locally with the corpus before touching the
+        # NBS reader/writer.
+        run: ./gradlew build --no-daemon --console=plain
+
+      - name: Upload plugin jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: MusicBox
+          path: build/libs/MusicBox-*.jar
+          if-no-files-found: error
+
+      # The XML reports are the evidence for the run; keeping them makes a failure diagnosable
+      # without re-running the job.
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            build/reports/tests/**
+            build/test-results/**
+          if-no-files-found: ignore

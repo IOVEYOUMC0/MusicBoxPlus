@@ -69,9 +69,9 @@ public class GUIConfigManager {
         "MusicBox", "Playlist", "Control", "Volume", "Search",
         "Music", "Player", "Menu", "Shop", "Song", "Sign", "Settings", "Editor"
     ));
-    
+
     private static final int INVENTORY_COLS = 9;
-    
+
     // One definition of "the rows of a layout", shared by the row count and every slot-index walk
     // below. They used to disagree: a YAML block scalar keeps its trailing newline, and counting
     // that empty field made the menu a row taller than the layout it was built from.
@@ -97,7 +97,7 @@ public class GUIConfigManager {
         }
         return -1;
     }
-    
+
     // All slots matching c in the layout, in row-major order.
     public static List<Integer> getSlotsForChar(String layout, char c) {
         List<Integer> slots = new ArrayList<>();
@@ -129,9 +129,11 @@ public class GUIConfigManager {
     }
 
     public GUIConfigManager(JavaPlugin plugin) {
-        instance = this;
         this.plugin = plugin;
         this.loadConfig();
+        // Published only after the whole configuration exists. It used to be set before loadConfig(),
+        // so getInstance() could hand out a manager whose config and maps were still empty.
+        instance = this;
     }
 
     public void loadConfig() {
@@ -373,7 +375,11 @@ public class GUIConfigManager {
     }
 
     public void reload() {
-        this.loadConfig();
+        // Build a fresh manager and publish it with a single volatile write, instead of clearing and
+        // refilling every map in place. A GUI render on a Folia region thread used to be able to
+        // observe an empty button table, a default layout, or the new layout paired with the previous
+        // section configs; with the swap a reader always sees one complete configuration (old or new).
+        new GUIConfigManager(this.plugin);
     }
 
     public ProgressBarConfig getProgressBarConfig(String guiName) {
@@ -614,7 +620,7 @@ public class GUIConfigManager {
         }
         editorConfig.title = editorSection.getString("title", "<gold>Music Editor <dark_gray>- <yellow>{name}");
         editorConfig.layout = editorSection.getString("layout", editorConfig.layout);
-        
+
         ConfigurationSection buttonMappingSection = editorSection.getConfigurationSection("button-mapping");
         if (buttonMappingSection != null) {
             for (String key : buttonMappingSection.getKeys(false)) {
@@ -626,7 +632,7 @@ public class GUIConfigManager {
             editorConfig.editAreaChar = editorConfig.getButtonMapping().getOrDefault("edit-area", 'E');
             editorConfig.emptyChar = editorConfig.getButtonMapping().getOrDefault("empty", 'X');
         }
-        
+
         ConfigurationSection buttonsSection = editorSection.getConfigurationSection("buttons");
         if (buttonsSection != null) {
             for (String key : buttonsSection.getKeys(false)) {
@@ -636,7 +642,7 @@ public class GUIConfigManager {
                 }
             }
         }
-        
+
         ConfigurationSection guiSection = editorSection.getConfigurationSection("gui");
         if (guiSection != null) {
             GUISectionConfigLoader.loadEditorItemConfig(guiSection, "empty-slot", editorConfig.emptySlot);
@@ -656,10 +662,10 @@ public class GUIConfigManager {
             editorConfig.canOnlyDeleteHint = StringUtils.t(guiSection.getString("can-only-delete-hint", editorConfig.canOnlyDeleteHint));
             editorConfig.nowPlayingText = StringUtils.t(guiSection.getString("now-playing-text", editorConfig.nowPlayingText));
         }
-        
+
         return editorConfig;
     }
-    
+
     public JavaPlugin getPlugin() {
         return this.plugin;
     }
@@ -693,7 +699,7 @@ public class GUIConfigManager {
             return instrumentConfig;
         }
         instrumentConfig.layout = instrumentSection.getString("layout", instrumentConfig.layout);
-        
+
         ConfigurationSection buttonMappingSection = instrumentSection.getConfigurationSection("button-mapping");
         if (buttonMappingSection != null) {
             for (String key : buttonMappingSection.getKeys(false)) {
@@ -703,7 +709,7 @@ public class GUIConfigManager {
                 }
             }
         }
-        
+
         ConfigurationSection buttonsSection = instrumentSection.getConfigurationSection("buttons");
         if (buttonsSection != null) {
             for (String key : buttonsSection.getKeys(false)) {
@@ -739,10 +745,10 @@ public class GUIConfigManager {
         }
         selectConfig.title = section.getString("title", selectConfig.title);
         selectConfig.layout = section.getString("layout", selectConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, selectConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, selectConfig.buttons);
-        
+
         return selectConfig;
     }
 
@@ -757,10 +763,10 @@ public class GUIConfigManager {
         }
         settingsConfig.title = section.getString("title", settingsConfig.title);
         settingsConfig.layout = section.getString("layout", settingsConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, settingsConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, settingsConfig.buttons);
-        
+
         return settingsConfig;
     }
 
@@ -791,10 +797,10 @@ public class GUIConfigManager {
                 bpmConfig.steps = validSteps;
             }
         }
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, bpmConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, bpmConfig.buttons);
-        
+
         return bpmConfig;
     }
 
@@ -809,10 +815,10 @@ public class GUIConfigManager {
         }
         publishConfig.title = section.getString("title", publishConfig.title);
         publishConfig.layout = section.getString("layout", publishConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, publishConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, publishConfig.buttons);
-        
+
         return publishConfig;
     }
 
@@ -827,10 +833,10 @@ public class GUIConfigManager {
         }
         confirmConfig.title = section.getString("title", confirmConfig.title);
         confirmConfig.layout = section.getString("layout", confirmConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, confirmConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, confirmConfig.buttons);
-        
+
         return confirmConfig;
     }
 
@@ -845,10 +851,10 @@ public class GUIConfigManager {
         }
         manageConfig.title = section.getString("title", manageConfig.title);
         manageConfig.layout = section.getString("layout", manageConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, manageConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, manageConfig.buttons);
-        
+
         return manageConfig;
     }
 
@@ -863,10 +869,10 @@ public class GUIConfigManager {
         }
         shopConfig.title = section.getString("title", shopConfig.title);
         shopConfig.layout = section.getString("layout", shopConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, shopConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, shopConfig.buttons);
-        
+
         return shopConfig;
     }
 
@@ -881,10 +887,10 @@ public class GUIConfigManager {
         }
         reviewConfig.title = section.getString("title", reviewConfig.title);
         reviewConfig.layout = section.getString("layout", reviewConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, reviewConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, reviewConfig.buttons);
-        
+
         return reviewConfig;
     }
 
@@ -899,10 +905,10 @@ public class GUIConfigManager {
         }
         purchaseConfig.title = section.getString("title", purchaseConfig.title);
         purchaseConfig.layout = section.getString("layout", purchaseConfig.layout);
-        
+
         GUISectionConfigLoader.loadButtonMapping(section, purchaseConfig.getButtonMapping());
         GUISectionConfigLoader.loadButtonsConfig(section, purchaseConfig.buttons);
-        
+
         return purchaseConfig;
     }
 

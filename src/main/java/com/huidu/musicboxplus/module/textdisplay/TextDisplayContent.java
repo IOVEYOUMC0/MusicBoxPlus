@@ -62,7 +62,9 @@ final class TextDisplayContent {
     }
 
     private static Component formatTime(String current, String total) {
-        return Lang.TEXT_PLAYER_TIME_FORMAT.toComponent(
+        // Dynamic parse: this line changes every second, and processComponent's LRU is the one that
+        // keeps the static GUI strings hot (the same reason the progress bar has a dynamic path).
+        return Lang.TEXT_PLAYER_TIME_FORMAT.toDynamicComponent(
             "{current}", current,
             "{total}", total
         );

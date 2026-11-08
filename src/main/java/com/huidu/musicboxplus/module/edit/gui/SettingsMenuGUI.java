@@ -274,25 +274,25 @@ public class SettingsMenuGUI implements InventoryHolder {
     }
 
     private void openPublishGUI() {
-        PlayerMusicManager.getInstance().saveMusicAsync(music, success -> {
-            if (!success) {
-                Scheduler.entity(player, () -> {
-                    MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
-                    open();
-                });
+        PlayerMusicManager.getInstance().saveMusicAsync(music, success -> Scheduler.entity(player, () -> {
+            // A save may complete after logout or after the owner opened another editor. Never let
+            // that stale settings screen release a new session's lock or restore its inventory.
+            if (MusicEditListener.getOpenGUI(player.getUniqueId()) != parentGUI) {
                 return;
             }
-            parentGUI.stopAutoSaveTask();
+            if (!success) {
+                MessageUtils.send(player, Lang.SAVE_FAILED_RETRY);
+                open();
+                return;
+            }
+            handledClose = true;
             parentGUI.setSubGuiOpen(true);
-            MusicEditListener.exitEditMode(music.getUniqueId());
-            MusicEditListener.removeOpenGUI(player.getUniqueId());
-            Scheduler.entity(player, () -> {
-                player.closeInventory();
-                parentGUI.setSubGuiOpen(false);
-                PlayerInventoryState.restoreAndRemove(player);
+            parentGUI.closeAfterSave();
+            if (MusicEditListener.getOpenGUI(player.getUniqueId()) == null
+                    && !PlayerInventoryState.hasSavedState(player.getUniqueId())) {
                 new PublishGUI(player).open();
-            });
-        });
+            }
+        }));
     }
 
     private void goBack() {

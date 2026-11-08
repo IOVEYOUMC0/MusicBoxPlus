@@ -11,10 +11,39 @@ import org.bukkit.metadata.Metadatable;
 import java.util.*;
 
 public final class BukkitUtils {
-    public static final List<Material> DISCS = Collections.unmodifiableList(Arrays.asList(Material.MUSIC_DISC_13, Material.MUSIC_DISC_CAT, Material.MUSIC_DISC_BLOCKS, Material.MUSIC_DISC_CHIRP, Material.MUSIC_DISC_FAR, Material.MUSIC_DISC_MALL, Material.MUSIC_DISC_MELLOHI, Material.MUSIC_DISC_STAL, Material.MUSIC_DISC_STRAD, Material.MUSIC_DISC_WARD, Material.MUSIC_DISC_11, Material.MUSIC_DISC_WAIT, Material.MUSIC_DISC_OTHERSIDE, Material.MUSIC_DISC_5, Material.MUSIC_DISC_PIGSTEP, Material.MUSIC_DISC_RELIC));
+
+    // Discovered from Material instead of listed by hand: the hand-written list stopped at the discs
+    // that existed when it was written, so a disc added by a later server version could never be
+    // handed out as a random reward even though the server supports it. Any Material whose name
+    // starts with MUSIC_DISC_ is a real, playable disc in whatever version is running. Built lazily
+    // (Material.values() clones its array) and cached: the set cannot change while the server runs.
+    private static volatile List<Material> discs;
+
+    /** Every playable music disc the running server version knows about, sorted by name. */
+    public static List<Material> discs() {
+        List<Material> cached = discs;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (BukkitUtils.class) {
+            cached = discs;
+            if (cached == null) {
+                List<Material> found = new ArrayList<>();
+                for (Material material : Material.values()) {
+                    if (material.name().startsWith("MUSIC_DISC_") && material.isItem()) {
+                        found.add(material);
+                    }
+                }
+                found.sort(Comparator.comparing(Material::name));
+                cached = List.copyOf(found);
+                discs = cached;
+            }
+        }
+        return cached;
+    }
 
     public static Material getRandomDisc() {
-        return ArrayUtils.getRandom(DISCS);
+        return ArrayUtils.getRandom(discs());
     }
 
     // Runs work on a server tick thread. This is the context-free fallback (it routes to the

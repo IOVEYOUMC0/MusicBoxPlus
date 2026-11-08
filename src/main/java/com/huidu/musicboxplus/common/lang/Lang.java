@@ -282,7 +282,7 @@ public enum Lang {
     EDIT_HELP_IMPORT("edit_help_import"),
     EDIT_HELP_WEB("edit_help_web"),
     EDIT_HELP_FOOTER("edit_help_footer"),
-    
+
     PLAYER_NOT_FOUND("player_not_found"),
     MUSIC_STOPPED("music_stopped"),
     MUSIC_STOPPED_OTHER("music_stopped_other"),
@@ -307,23 +307,23 @@ public enum Lang {
     SPEED_INVALID("speed_invalid"),
     SPEED_BUTTON("speed_button"),
     SPEED_BUTTON_LORE("speed_button_lore"),
-    
+
     SIGN_CREATED("sign_created"),
     SIGN_CONTROL_HINT("sign_control_hint"),
     SIGN_OPTIONS_HINT("sign_options_hint"),
     SIGN_PROTECT_ENABLED("sign_protect_enabled"),
     SIGN_PROTECT_DISABLED("sign_protect_disabled"),
-    
+
     EDIT_LOCKED("edit_locked"),
     EDIT_LOCKED_HINT("edit_locked_hint"),
     EDIT_LOCKED_OFFLINE_HINT("edit_locked_offline_hint"),
-    
+
     AUTOSAVE_SAVED("autosave_saved"),
-    
+
     LIMIT_CURRENT("limit_current"),
     LIMIT_UNLIMITED("limit_unlimited"),
     LIMIT_UPGRADE_HINT("limit_upgrade_hint"),
-    
+
     CONTROL_PROTECT_ENABLED("control_protect_enabled"),
     CONTROL_PROTECT_DISABLED("control_protect_disabled"),
     CONTROL_PROTECT_STATUS("control_protect_status"),
@@ -334,7 +334,7 @@ public enum Lang {
     CONTROL_DESTROY_PLAYER_LORE("control_destroy_player_lore"),
     CONTROL_PROGRESS_UNAVAILABLE("control_progress_unavailable"),
     CONTROL_PROGRESS_UNAVAILABLE_LORE("control_progress_unavailable_lore"),
-    
+
     EXTENDED_OCTAVE_DISABLED("extended_octave_disabled"),
     EXTENDED_OCTAVE_RANGE("extended_octave_range"),
     EXTENDED_OCTAVE_CONFIG("extended_octave_config"),
@@ -355,7 +355,7 @@ public enum Lang {
     EDIT_DESCRIPTION_UPDATED("edit_description_updated"),
     PURCHASE_SAVE_FAILED("purchase_save_failed"),
     OPERATION_FAILED("operation_failed"),
-    
+
     NBS_INPUT_PROMPT("nbs_input_prompt"),
     NBS_FILE_LOCATION("nbs_file_location"),
     NBS_FILENAME_EMPTY("nbs_filename_empty"),
@@ -386,7 +386,7 @@ public enum Lang {
     EXPORT_SUCCESS("export_success"),
     EXPORT_FAILED("export_failed"),
     EXPORT_WARNING_PITCH_CLAMPED("export_warning_pitch_clamped"),
-    
+
     PUBLISH_PRICE_EDIT_PROMPT("publish_price_edit_prompt"),
     PUBLISH_ORIGINAL_NOT_FOUND("publish_original_not_found"),
     PUBLISH_SYNC_SUCCESS("publish_sync_success"),
@@ -395,7 +395,7 @@ public enum Lang {
     PUBLISH_REPUBLISHED("publish_republished"),
     PUBLISH_OPERATION_FAILED("publish_operation_failed"),
     PUBLISH_DELETED("publish_deleted"),
-    
+
     EDIT_NOTE_EXTENDED_OCTAVE_ONLY_DELETE("edit_note_extended_octave_only_delete"),
     EDIT_CLEAR_CANCELLED("edit_clear_cancelled"),
     EDIT_NO_NOTES_TO_CLEAR("edit_no_notes_to_clear"),
@@ -407,7 +407,7 @@ public enum Lang {
     EDIT_PASTE_NO_SPACE("edit_paste_no_space"),
     EDIT_NOTES_DELETED_MSG("edit_notes_deleted"),
     EDIT_INSTRUMENT_CHANGED("edit_instrument_changed"),
-    
+
     PUBLISH_SYSTEM_DISABLED("publish_system_disabled"),
     PUBLISH_LIMIT_REACHED_MSG("publish_limit_reached_msg"),
     PUBLISH_SUCCESS_MSG("publish_success_msg"),
@@ -420,7 +420,7 @@ public enum Lang {
     PUBLISH_PRICE_RANGE_ERROR("publish_price_range_error"),
     PUBLISH_PRICE_SET("publish_price_set"),
     PUBLISH_PRICE_INVALID_NUMBER("publish_price_invalid_number"),
-    
+
     PURCHASE_SUCCESS_MSG("purchase_success_msg"),
     PURCHASE_MUSIC_NOT_FOUND("purchase_music_not_found"),
     PURCHASE_MUSIC_UNAVAILABLE("purchase_music_unavailable"),
@@ -491,7 +491,7 @@ public enum Lang {
     public String toString() {
         return this.toString(new String[0]);
     }
-    
+
     public net.kyori.adventure.text.Component toComponent(String ... replacements) {
         LanguageConfig config = LanguageConfig.getInstance();
         if (config == null) {
@@ -499,7 +499,23 @@ public enum Lang {
         }
         return MiniMessageUtils.processComponent(config.getRawResolved(this.key, replacements));
     }
-    
+
+    /**
+     * Like {@link #toComponent} but parsed through the dynamic (small, self-evicting) MiniMessage
+     * cache.
+     *
+     * <p>For strings that change every second -- the text-display clock is the case this exists for
+     * -- {@code processComponent} would miss its 1024-entry LRU once per second per display and
+     * evict the static GUI button names and lore that cache is there to keep.
+     */
+    public net.kyori.adventure.text.Component toDynamicComponent(String ... replacements) {
+        LanguageConfig config = LanguageConfig.getInstance();
+        if (config == null) {
+            return MiniMessageUtils.processDynamicComponent("<red>[LanguageConfig not initialized]</red>");
+        }
+        return MiniMessageUtils.processDynamicComponent(config.getRawResolved(this.key, replacements));
+    }
+
     public List<net.kyori.adventure.text.Component> toComponentList(String ... replacements) {
         LanguageConfig config = LanguageConfig.getInstance();
         if (config == null) {

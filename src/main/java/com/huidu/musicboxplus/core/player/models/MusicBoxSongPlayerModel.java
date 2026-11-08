@@ -95,9 +95,9 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
         if (destroyed) {
             return;
         }
-        
+
         destroyed = true;
-        
+
         synchronized (lock) {
             MusicBoxSongPlayer owner = this.ownerPlayer;
             if (owner != null) {
@@ -125,23 +125,23 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
     public MusicBoxSong getMusicBoxSong() {
         return playList != null ? (MusicBoxSong) playList.getCurrent() : null;
     }
-    
+
     public boolean isSongEndNormal() {
         return songEndNormal;
     }
-    
+
     public boolean isNextCreated() {
         return nextCreated;
     }
-    
+
     public void setNextCreated(boolean nextCreated) {
         this.nextCreated = nextCreated;
     }
-    
+
     public MusicBoxSongPlayer getMusicBoxSongPlayer() {
         return positionPlayer != null ? positionPlayer : this.ownerPlayer;
     }
-    
+
     // Player to report in API events. Prefers the real player implementation (block players
     // implement PositionPlayer, which is how downstream plugins get a location) and only
     // falls back to this, so the event's player field is never null.
@@ -174,7 +174,7 @@ public class MusicBoxSongPlayerModel implements MusicBoxSongPlayer, com.huidu.mu
         if (destroyed) {
             return;
         }
-        
+
         MusicBoxSongPlayer owner = this.ownerPlayer;
         SongEndAction action = SongEndAction.decide(loopMode, playList.hasNext(), owner != null,
                 owner != null && owner.isPersistentOnEnd());

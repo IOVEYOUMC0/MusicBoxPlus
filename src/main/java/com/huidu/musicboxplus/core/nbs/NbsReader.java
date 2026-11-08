@@ -221,6 +221,12 @@ public final class NbsReader {
                     break;
                 }
                 layer += layerJump;
+                // The header's height is a u16, so a layer at or above 65536 cannot be represented in
+                // the song at all. Without this bound the accumulator could be driven past Integer.MAX
+                // by a file that keeps jumping inside one tick run, producing negative layer ids.
+                if (layer > 0xFFFF) {
+                    throw new IOException("NBS layer index out of range (max 65535): " + layer);
+                }
                 int instrument = c.u8("noteInstrument");
                 int key = c.u8("noteKey");
                 int velocity = 100;

@@ -106,8 +106,15 @@ public final class MusicBox extends JavaPlugin {
         // plugin comes back up looking healthy -- listeners registered, no errors -- while the
         // playback clock refuses to start and every async task is silently dropped.
         shuttingDown = false;
+        // Invalidate restore callbacks from a previous enable; ordinary restoreAll calls must not
+        // clear each other's in-flight names.
+        TextDisplayStore.resetRestoreSession();
         com.huidu.musicboxplus.core.player.AbstractEnginePlayer.resetClock();
         AsyncTaskManager.reset();
+        // Reopen the song loader's admission for this enable. Shutdown closes it permanently, and
+        // without this the next /musicbox reload (or a PlugMan re-enable) would reject every
+        // submission and load no songs, on a server that otherwise looks healthy.
+        com.huidu.musicboxplus.core.song.MusicBoxSongContainer.resetLoader();
         migrateLegacyDataFolder();
 
         // Touch classes that onDisable references so the Paper plugin classloader is
@@ -298,6 +305,7 @@ public final class MusicBox extends JavaPlugin {
             SmartConfigManager mainConfigManager = getOrCreateConfigManager(Paths.CONFIG_FILE, Paths.CONFIG_FILE);
             byte[] configBytes = mainConfigManager.loadConfig();
             configObject = MusicBoxConfig.parseConfig(new ByteArrayInputStream(configBytes));
+            MusicBoxConfig.warnUnknownKeys(configBytes, getResource(Paths.CONFIG_FILE), getLogger());
             getLogger().info(logText("Loaded config.yml", "已加载 config.yml"));
             DebugLogger.debug("config.yml: " + mainConfigManager.getConfigStats());
         } catch (IOException | MusicBoxConfig.ConfigParseException e) {
@@ -386,18 +394,25 @@ public final class MusicBox extends JavaPlugin {
         } finally {
             reloadLock.unlock();
         }
-        
+
         long startTime = System.currentTimeMillis();
         loaded = false;
         CompletableFuture<Void> completion = new CompletableFuture<>();
-        reloadPlaybackState.captureAsync().whenComplete((playbackSnapshot, captureError) ->
-                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() -> {
-                    if (captureError != null) {
-                        failReload(completion, captureError);
-                        return;
-                    }
-                    continueReload(playbackSnapshot, startTime, completion);
-                }));
+        try {
+            reloadPlaybackState.captureAsync().whenComplete((playbackSnapshot, captureError) ->
+                    com.huidu.musicboxplus.common.utils.scheduler.Scheduler.global(() -> {
+                        if (captureError != null) {
+                            failReload(completion, captureError);
+                            return;
+                        }
+                        continueReload(playbackSnapshot, startTime, completion);
+                    }));
+        } catch (Throwable failure) {
+            // Nothing has been torn down yet, but `reloading` is already set. Without this the flag
+            // stayed true for the rest of the process: every later reload answered "Already
+            // reloading" and `loaded` stayed false, so the plugin sat out the session silently.
+            failReload(completion, failure);
+        }
         return completion;
     }
 
@@ -446,6 +461,15 @@ public final class MusicBox extends JavaPlugin {
                               CompletableFuture<Void> completion, Throwable throwable) {
         reloadLock.lock();
         try {
+            if (shuttingDown) {
+                // A disable (or a /reload) landed while this reload was in flight. Carrying on would
+                // re-open the web server, rebuild players and set loaded=true after onDisable ran --
+                // the exact opposite of what the shutdown steps just tore down, and the next enable
+                // would then find two servers and duplicate tasks.
+                loaded = false;
+                completion.completeExceptionally(new IllegalStateException("Plugin is shutting down"));
+                return;
+            }
             if (throwable != null) {
                 loaded = false;
                 getLogger().log(Level.SEVERE, logText("Plugin reload failed", "插件重载失败"), throwable);
@@ -502,6 +526,7 @@ public final class MusicBox extends JavaPlugin {
             SmartConfigManager configManager = getOrCreateConfigManager(Paths.CONFIG_FILE, Paths.CONFIG_FILE);
             byte[] configBytes = configManager.loadConfig();
             configObject = MusicBoxConfig.parseConfig(new ByteArrayInputStream(configBytes));
+            MusicBoxConfig.warnUnknownKeys(configBytes, getResource(Paths.CONFIG_FILE), getLogger());
             configManager.cleanupOldBackups();
             getLogger().info(logText("Reloaded config.yml", "已重载 config.yml"));
             DebugLogger.debug("config.yml: " + configManager.getConfigStats());

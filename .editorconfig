@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# The build files are Kotlin, but Gradle convention in this repo is 4 spaces too.
+[*.{kts,kt}]
+indent_size = 4
+
+[*.{yml,yaml,json}]
+indent_size = 2
+
+# Config and language files are read by humans as much as by the plugin; two spaces keeps the
+# deeply nested GUI layout sections readable.
+[src/main/resources/**.{yml,yaml}]
+indent_size = 2
+
+[*.md]
+# Trailing spaces are meaningful in Markdown (hard line breaks).
+trim_trailing_whitespace = false
+
+[*.{bat,cmd}]
+end_of_line = crlf
+
+[*.{jar,zip,nbs,ogg,png,ico,gif}]
+insert_final_newline = false

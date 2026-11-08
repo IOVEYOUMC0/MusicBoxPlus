@@ -38,17 +38,17 @@ public class DatabaseLoader {
         try {
             MusicBoxConfig config = MusicBox.getInstance().getConfigObject();
             MusicBoxConfig.DatabaseSetting dbConfig = config.getDatabase();
-            
+
             if (dbConfig == null) {
                 this.base = createDefaultSQLite();
                 return;
             }
-            
+
             String type = dbConfig.getType();
             if (type == null) {
                 type = "sqlite";
             }
-            
+
             if ("mysql".equalsIgnoreCase(type)) {
                 MusicBoxConfig.MySQLSetting mysqlConfig = dbConfig.getMysql();
                 if (mysqlConfig == null) {
@@ -72,7 +72,7 @@ public class DatabaseLoader {
                 "无法连接到数据库"), ex);
         }
     }
-    
+
     private SQLite createDefaultSQLite() {
         File dbFile = new File(MusicBox.getInstance().getDataFolder(), "data.db");
         MusicBox.getInstance().getLogger().info("Using SQLite database file: " + dbFile.getName());
@@ -96,7 +96,7 @@ public class DatabaseLoader {
         }
         return false;
     }
-    
+
     public static void shutdown() {
         DatabaseLoader localInstance = instance;
         if (localInstance != null && localInstance.base != null) {

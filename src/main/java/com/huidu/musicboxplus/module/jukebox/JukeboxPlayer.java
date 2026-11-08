@@ -146,12 +146,22 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
                 return;
             }
             JukeboxPlaylistImpl playlist = new JukeboxPlaylistImpl(jukebox.getLocation());
-            if (playlist.getCurrent() == null) {
+            JukeboxStartGuard expected = JukeboxStartGuard.capture(playlist, list -> {
+                MusicBoxSong selected = list.getCurrent();
+                return selected == null ? null : selected.getHash();
+            });
+            if (expected == null) {
                 MusicBox.getInstance().getLogger().fine("Skipping jukebox player creation without a current song at " + jukebox.getLocation());
                 return;
             }
             // Deferred until the arrangement is in memory, so inserting a disc never makes the
             // region thread read and parse the .nbs. Warm songs still construct inline.
+            //
+            // The disc is pinned here and re-checked on arrival: compilation is asynchronous, and in
+            // that window the player can swap in a different disc (or take this one out). Building
+            // the playlist anyway started the OLD song list against the NEW disc, and the swap's own
+            // createNew then found a player already occupying the location and did nothing.
+            // Capture AFTER construction: an empty jukebox may now hold a disc from its chest.
             com.huidu.musicboxplus.core.player.PlaybackSetup.whenReady(playlist,
                     run -> com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(jukebox.getLocation(), run),
                     () -> {
@@ -160,12 +170,28 @@ public class JukeboxPlayer extends AbstractBlockPlayer implements com.huidu.musi
                         if (com.huidu.musicboxplus.core.player.AbstractBlockPlayer.findByLocation(jukebox.getLocation()) != null) {
                             return;
                         }
+                        if (!stillMatches(jukebox, expected)) {
+                            return;
+                        }
                         new JukeboxPlayer(playlist, MusicBox.getInstance().getConfigObject().getJukeboxRadius(), jukebox);
                         com.huidu.musicboxplus.core.player.PlaybackSetup.prefetchNext(playlist);
                     });
         } catch (JukeboxPlaylistInitException e) {
             MusicBox.getInstance().getLogger().fine("Cannot create jukebox player: " + e.getMessage());
         }
+    }
+
+    /** Whether the jukebox still holds the song selected by the constructed playlist. */
+    private static boolean stillMatches(Jukebox jukebox, JukeboxStartGuard expected) {
+        if (!(jukebox.getLocation().getBlock().getState(false) instanceof Jukebox live)) {
+            return false;
+        }
+        ItemStack liveRecord = live.getRecord();
+        if (liveRecord == null || liveRecord.getType() == Material.AIR) {
+            return false;
+        }
+        MusicBoxSong liveSong = MusicBoxSongManager.findByItem(liveRecord).orElse(null);
+        return expected.stillMatches(liveSong == null ? null : liveSong.getHash());
     }
 
     // True when the click was consumed by opening the control panel. A jukebox with nothing

@@ -59,7 +59,7 @@ public final class GUIActions {
             }
         };
     }
-    
+
     private static void initCaches() {
         MusicBoxConfig config = MusicBox.getInstance().getConfigObject();
         MusicBoxConfig.CacheSetting cacheConfig = config != null ? config.getCache() : null;

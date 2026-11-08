@@ -98,11 +98,11 @@ public final class ItemUtils {
         }
         return stack;
     }
-    
+
     public static ItemStack createStack(Material material, Component name, @Nullable List<Component> lore) {
         return ItemUtils.createStack(material, name, lore, 0);
     }
-    
+
     public static ItemStack createStack(Material material, Component name, @Nullable List<Component> lore, int customModelData) {
         ItemStack stack = new ItemStack(material);
         if (material == Material.AIR) {
@@ -144,7 +144,7 @@ public final class ItemUtils {
         }
         return stack;
     }
-    
+
     public static ItemStack addLoreComponents(ItemStack stack, List<Component> additionalLore) {
         if (stack == null || additionalLore == null || additionalLore.isEmpty()) {
             return stack;

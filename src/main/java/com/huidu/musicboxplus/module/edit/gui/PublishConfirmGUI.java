@@ -130,14 +130,14 @@ public class PublishConfirmGUI implements InventoryHolder {
         if (slot == priceSlot) {
             double minPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMinPrice();
             double maxPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMaxPrice();
-            
+
             double change;
             if (isShiftClick) {
                 change = isRightClick ? -100 : 100;
             } else {
                 change = isRightClick ? -10 : 10;
             }
-            
+
             currentPrice = Math.max(minPrice, Math.min(maxPrice, currentPrice + change));
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.0f);
             updateInventory();

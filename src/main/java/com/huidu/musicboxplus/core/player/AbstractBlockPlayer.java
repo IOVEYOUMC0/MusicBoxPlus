@@ -61,7 +61,7 @@ implements PositionPlayer {
     // position from a base class.
     private volatile Location targetLocation;
 
-    
+
     public static void registerWorldUnloadListener() {
         if (!listenerRegistered) {
             listenerRegistered = true;
@@ -70,7 +70,7 @@ implements PositionPlayer {
         }
         startCleanupTask();
     }
-    
+
     private static void startCleanupTask() {
         if (cleanupTaskRegistered) {
             return;
@@ -87,7 +87,7 @@ implements PositionPlayer {
         );
         logger.info("BlockPlayer cleanup task started (interval: {} ticks)", CLEANUP_INTERVAL_TICKS);
     }
-    
+
     private static void performCleanup() {
         int removedCount = 0;
         Iterator<Map.Entry<LocationKey, AbstractBlockPlayer>> iterator = players.entrySet().iterator();
@@ -129,7 +129,7 @@ implements PositionPlayer {
             logger.debug("Cleanup removed {} invalid block players, {} remaining", removedCount, players.size());
         }
     }
-    
+
     public static void shutdown() {
         if (cleanupTask != null) {
             cleanupTask.cancel();
@@ -151,14 +151,14 @@ implements PositionPlayer {
         infoSignIndex.clear();
         logger.info("BlockPlayer shutdown complete");
     }
-    
+
     private static class WorldUnloadListener implements Listener {
         @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onWorldUnload(WorldUnloadEvent event) {
             cleanupWorld(event.getWorld());
         }
     }
-    
+
     public static void cleanupWorld(World world) {
         if (world == null) {
             return;
@@ -185,7 +185,7 @@ implements PositionPlayer {
             }
         }
     }
-    
+
     private final MusicBoxSongPlayerModel musicBoxModel;
     private final RangePlayerModel rangePlayerModel;
     private final LocationKey locationKey;
@@ -573,23 +573,28 @@ implements PositionPlayer {
         } catch (Exception ex) {
             logger.debug("Exception during super.destroy(): {}", ex.getMessage());
         }
-        
+
         try {
             unindexChunk(this);
             if (!this.musicBoxModel.isNextCreated()) {
-                players.remove(this.locationKey);
+                // remove(key, value): destroy can run from the block's region, from the global cleanup
+                // and from shutdown. Between the isNextCreated() check above and this call another
+                // thread may already have registered a NEW player for the same location, and a plain
+                // remove(key) would delete that one -- leaving it audible but unindexed, so nothing
+                // could ever find and stop it.
+                players.remove(this.locationKey, this);
             }
         } catch (Exception ex) {
             logger.debug("Exception removing player from map: {}", ex.getMessage());
         }
-        
+
         boolean normalEnd = false;
         try {
             normalEnd = this.musicBoxModel.isSongEndNormal();
         } catch (Exception ex) {
             logger.debug("Exception checking song end status: {}", ex.getMessage());
         }
-        
+
         if (normalEnd) {
             try {
                 this.songEnd();
@@ -597,7 +602,7 @@ implements PositionPlayer {
                 logger.debug("Exception during songEnd(): {}", ex.getMessage());
             }
         }
-        
+
         Location infoSign = this.getInfoSign();
         if (infoSign != null) {
             // LocationKey tolerates a null world, so dropping the index entry is always safe.
@@ -622,19 +627,19 @@ implements PositionPlayer {
                 });
             }
         }
-        
+
         try {
             this.rangePlayerModel.destroy();
         } catch (Exception ex) {
             logger.debug("Exception destroying range player model: {}", ex.getMessage());
         }
-        
+
         try {
             this.musicBoxModel.destroy();
         } catch (Exception ex) {
             logger.debug("Exception destroying music box model: {}", ex.getMessage());
         }
-        
+
         try {
             PlayerManager.unregisterPlayer(this);
         } catch (Exception ex) {
@@ -648,7 +653,7 @@ implements PositionPlayer {
     public MusicBoxSongPlayerModel getMusicBoxModel() {
         return this.musicBoxModel;
     }
-    
+
 
     public RangePlayerModel getRangePlayerModel() {
         return this.rangePlayerModel;
@@ -658,7 +663,7 @@ implements PositionPlayer {
         return this.getTick();
     }
 
-    
+
     public LocationKey getLocationKey() {
         return this.locationKey;
     }

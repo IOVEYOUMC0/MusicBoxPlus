@@ -3,6 +3,7 @@ package com.huidu.musicboxplus.module.web;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.module.edit.MusicEditListener;
 import com.huidu.musicboxplus.module.edit.MusicNote;
 import com.huidu.musicboxplus.module.edit.PlayerMusic;
@@ -118,94 +119,133 @@ final class MusicApiHandler implements HttpHandler {
             // Session player ids are always UUIDs in practice; fall through if not.
         }
 
+        UUID musicId = music.getUniqueId();
         try {
-            // synchronized: two browser tabs can PUT the same song concurrently, and the
-            // apply+save mutates the shared object — serialize them so one tab cannot clobber
-            // the other's partial write mid-save.
-            synchronized (music) {
-                JsonObject json = support.json().fromJson(body, JsonObject.class);
-                if (json == null) {
-                    support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Invalid JSON");
-                    return;
-                }
-                PlayerMusic beforeSnapshot = music.snapshot();
-                // The editor's autosave always sends the full note array, and the notes branch below
-                // clears them again before repopulating -- so copying them into this snapshot is work
-                // thrown away on every save.
-                boolean replacingNotes = json.has("notes") && json.get("notes").isJsonArray();
-                PlayerMusic updatedSnapshot = replacingNotes
-                        ? beforeSnapshot.snapshotWithoutNotes()
-                        : beforeSnapshot.snapshot();
-                int maxPitch = support.getMaxPitchForMusic(beforeSnapshot);
-                int maxTick = support.getMaxTickForMusic(beforeSnapshot);
-
-                if (json.has("title") && json.get("title").isJsonPrimitive()) {
-                    String title = json.get("title").getAsString();
-                    String normalizedTitle = normalizeTitle(title);
-                    if (normalizedTitle != null && !normalizedTitle.trim().isEmpty()) {
-                        updatedSnapshot.setName(normalizedTitle);
-                    }
-                }
-                if (json.has("tempo") && json.get("tempo").isJsonPrimitive()) {
-                    int tempo = support.getJsonInt(json, "tempo", "Tempo must be a number");
-                    if (tempo < support.getMinBpm() || tempo > support.getMaxBpm()) {
-                        support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Tempo out of range");
-                        return;
-                    }
-                    updatedSnapshot.setBpm(tempo);
-                }
-                if (json.has("beatSubdivision") && json.get("beatSubdivision").isJsonPrimitive()) {
-                    int beatSubdivision = support.getJsonInt(json, "beatSubdivision", "Beat subdivision must be a number");
-                    if (beatSubdivision < 1 || beatSubdivision > 16) {
-                        support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Beat subdivision out of range");
-                        return;
-                    }
-                    updatedSnapshot.setBeatSubdivision(beatSubdivision);
-                }
-                if (json.has("timeSignature") && json.get("timeSignature").isJsonPrimitive()) {
-                    String timeSignature = json.get("timeSignature").getAsString();
-                    if (!support.getSupportedTimeSignatures().contains(timeSignature)) {
-                        support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Unsupported time signature");
-                        return;
-                    }
-                    updatedSnapshot.setTimeSignature(PlayerMusic.TimeSignature.fromString(timeSignature));
-                }
-                if (json.has("description") && json.get("description").isJsonPrimitive()) {
-                    updatedSnapshot.setDescription(normalizeDescription(json.get("description").getAsString()));
-                }
-                if (json.has("notes") && json.get("notes").isJsonArray()) {
-                    var notesArray = json.getAsJsonArray("notes");
-                    if (notesArray.size() > MusicFileImporter.MAX_IMPORT_NOTES) {
-                        support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Too many notes (max "
-                                + MusicFileImporter.MAX_IMPORT_NOTES + ")");
-                        return;
-                    }
-                    for (JsonElement elem : notesArray) {
-                        MusicNote note = support.parseMusicNoteForWeb(elem, maxPitch, maxTick);
-                        if (!updatedSnapshot.addNote(note)) {
-                            throw new JsonParseException("Duplicate note at pitch " + note.getPitch() + ", tick " + note.getTick());
-                        }
-                    }
-                }
-
-                music.applySnapshot(updatedSnapshot);
-                boolean saved = PlayerMusicManager.getInstance().saveMusicSync(music);
-                if (!saved) {
-                    music.applySnapshot(beforeSnapshot);
-                    support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed");
-                    return;
-                }
+            JsonObject json = support.json().fromJson(body, JsonObject.class);
+            if (json == null) {
+                support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Invalid JSON");
+                return;
             }
-            MusicEditListener.notifyMusicUpdated(music.getUniqueId());
+            // One lock order for every write path: PlayerMusicManager takes its own monitor and then
+            // the song's. This used to be `synchronized (music)` around saveMusicSync -- the song
+            // monitor outside the manager's -- which is the reverse of what rename/delete do, i.e. an
+            // ABBA deadlock as soon as a browser PUT and a rename overlap.
+            boolean saved = PlayerMusicManager.getInstance().updateMusicSync(musicId, working -> {
+                applyJsonUpdate(json, working);
+                return working;
+            });
+            if (!saved) {
+                support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed");
+                return;
+            }
             support.writeTextResponse(exchange, HttpStatus.OK, "Saved");
+            // The in-game editor notification is a side channel: the save is already committed, so a
+            // failure to schedule it must not turn a successful request into an HTTP 500 (it did).
+            try {
+                Scheduler.global(() -> MusicEditListener.notifyMusicUpdated(musicId));
+            } catch (RuntimeException failure) {
+                support.logServerError("Notifying in-game editors failed for music " + musicId, failure);
+            }
+        } catch (RejectedRequest e) {
+            support.writeTextResponse(exchange, e.status, e.getMessage());
         } catch (JsonParseException e) {
             support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Invalid JSON: " + e.getMessage());
         } catch (CompletionException e) {
-            String message = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
-            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed: " + message);
+            // Logged in full, answered generically: see WebApiSupport.logServerError.
+            support.logServerError("Saving music failed", e);
+            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed");
         } catch (Exception e) {
-            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed: " + e.getMessage());
+            support.logServerError("Saving music failed", e);
+            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Save failed");
         }
+    }
+
+    // A field the request got wrong. Thrown from inside the locked mutation and answered here, so a
+    // request that fails validation never reaches the live song.
+    private static final class RejectedRequest extends RuntimeException {
+        private final int status;
+
+        private RejectedRequest(int status, String message) {
+            super(message);
+            this.status = status;
+        }
+    }
+
+    /**
+     * Applies the request's fields to the working copy the manager handed over.
+     *
+     * <p>Notes are only replaced when the request carries them, which is what keeps a title/BPM-only
+     * save from re-sending (and re-inserting) the whole note table.
+     */
+    private void applyJsonUpdate(JsonObject json, PlayerMusic working) {
+        // A field of the wrong JSON type used to be skipped in silence and the request still answered
+        // "Saved", so the editor believed a change had landed while the song kept its old value.
+        boolean replacingNotes = requireType(json, "notes", JsonElement::isJsonArray, "notes must be an array");
+        int maxPitch = support.getMaxPitchForMusic(working);
+        int maxTick = support.getMaxTickForMusic(working);
+
+        if (requireType(json, "title", JsonElement::isJsonPrimitive, "title must be a string")) {
+            String title = json.get("title").getAsString();
+            String normalizedTitle = normalizeTitle(title);
+            if (normalizedTitle != null && !normalizedTitle.trim().isEmpty()) {
+                working.setName(normalizedTitle);
+            }
+        }
+        if (requireType(json, "tempo", JsonElement::isJsonPrimitive, "Tempo must be a number")) {
+            int tempo = support.getJsonInt(json, "tempo", "Tempo must be a number");
+            if (tempo < support.getMinBpm() || tempo > support.getMaxBpm()) {
+                throw new RejectedRequest(HttpStatus.BAD_REQUEST, "Tempo out of range");
+            }
+            working.setBpm(tempo);
+        }
+        if (requireType(json, "beatSubdivision", JsonElement::isJsonPrimitive, "Beat subdivision must be a number")) {
+            int beatSubdivision = support.getJsonInt(json, "beatSubdivision", "Beat subdivision must be a number");
+            if (beatSubdivision < 1 || beatSubdivision > 16) {
+                throw new RejectedRequest(HttpStatus.BAD_REQUEST, "Beat subdivision out of range");
+            }
+            working.setBeatSubdivision(beatSubdivision);
+        }
+        if (requireType(json, "timeSignature", JsonElement::isJsonPrimitive, "time signature must be a string")) {
+            String timeSignature = json.get("timeSignature").getAsString();
+            if (!support.getSupportedTimeSignatures().contains(timeSignature)) {
+                throw new RejectedRequest(HttpStatus.BAD_REQUEST, "Unsupported time signature");
+            }
+            working.setTimeSignature(PlayerMusic.TimeSignature.fromString(timeSignature));
+        }
+        if (requireType(json, "description", JsonElement::isJsonPrimitive, "description must be a string")) {
+            working.setDescription(normalizeDescription(json.get("description").getAsString()));
+        }
+        if (replacingNotes) {
+            var notesArray = json.getAsJsonArray("notes");
+            if (notesArray.size() > MusicFileImporter.MAX_IMPORT_NOTES) {
+                throw new RejectedRequest(HttpStatus.BAD_REQUEST, "Too many notes (max "
+                        + MusicFileImporter.MAX_IMPORT_NOTES + ")");
+            }
+            working.clearNotes();
+            for (JsonElement elem : notesArray) {
+                MusicNote note = support.parseMusicNoteForWeb(elem, maxPitch, maxTick);
+                if (!working.addNote(note)) {
+                    throw new JsonParseException("Duplicate note at pitch " + note.getPitch() + ", tick " + note.getTick());
+                }
+            }
+        }
+    }
+
+    /**
+     * True when the field is present and of the expected type; throws a 400 when it is present with
+     * the wrong type, and returns false (nothing to do) when it is absent.
+     */
+    private static boolean requireType(JsonObject json, String field,
+                                       java.util.function.Predicate<JsonElement> expected,
+                                       String message) {
+        if (!json.has(field)) {
+            return false;
+        }
+        JsonElement value = json.get(field);
+        if (!expected.test(value)) {
+            throw new RejectedRequest(HttpStatus.BAD_REQUEST, message);
+        }
+        return true;
     }
 
     private String normalizeTitle(String title) {

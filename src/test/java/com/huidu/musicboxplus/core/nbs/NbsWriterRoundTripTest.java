@@ -22,7 +22,7 @@ class NbsWriterRoundTripTest {
 
     @Test
     void roundTripsEveryFileInTheBundledCorpus() throws IOException {
-        List<Path> files = corpusFiles(NbsCorpus.BUNDLED);
+        List<Path> files = corpusFiles(NbsCorpus.bundled());
         assertTrue(files.size() > 0, "bundled corpus is missing");
         for (Path file : files) {
             assertRoundTrips(NbsReader.read(file), file.getFileName().toString());

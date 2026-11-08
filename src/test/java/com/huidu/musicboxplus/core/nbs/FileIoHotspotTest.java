@@ -50,8 +50,8 @@ class FileIoHotspotTest {
     @Test
     void readBreakdownPerFile() throws Exception {
         // NbsCorpus.collect returns root-relative paths; resolve back to real files.
-        List<Path> files = NbsCorpus.collect(NbsCorpus.BUNDLED).stream()
-                .map(NbsCorpus.BUNDLED::resolve)
+        List<Path> files = NbsCorpus.collect(NbsCorpus.bundled()).stream()
+                .map(NbsCorpus.bundled()::resolve)
                 .toList();
         long sumIo = 0;
         long sumMetadata = 0;
@@ -92,13 +92,13 @@ class FileIoHotspotTest {
     @Test
     void simulatedLibraryLoad() throws Exception {
         Path lib = tempDir.resolve("lib");
-        List<Path> corpus = NbsCorpus.collect(NbsCorpus.BUNDLED);
+        List<Path> corpus = NbsCorpus.collect(NbsCorpus.bundled());
         List<Path> allFiles = new ArrayList<>();
         for (int copy = 0; copy < 5; copy++) {
             for (Path rel : corpus) {
                 Path dst = lib.resolve("copy" + copy).resolve(rel.getFileName().toString());
                 Files.createDirectories(dst.getParent());
-                Files.copy(NbsCorpus.BUNDLED.resolve(rel), dst);
+                Files.copy(NbsCorpus.bundled().resolve(rel), dst);
                 allFiles.add(dst);
             }
         }
@@ -170,8 +170,8 @@ class FileIoHotspotTest {
 
     @Test
     void writeHotspot() throws Exception {
-        List<Path> files = NbsCorpus.collect(NbsCorpus.BUNDLED).stream()
-                .map(NbsCorpus.BUNDLED::resolve)
+        List<Path> files = NbsCorpus.collect(NbsCorpus.bundled()).stream()
+                .map(NbsCorpus.bundled()::resolve)
                 .toList();
         Path outDir = tempDir.resolve("written");
         Files.createDirectories(outDir);

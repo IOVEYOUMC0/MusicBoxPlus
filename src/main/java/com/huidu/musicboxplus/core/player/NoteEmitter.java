@@ -155,9 +155,13 @@ public final class NoteEmitter {
                 continue;
             }
 
-            int key = song.key(note);
             int finePitch = song.finePitch(note);
             int instrument = song.instrument(note);
+            // A custom instrument declares the key its sample was recorded at; the pitch tables
+            // assume every sample sits at 45, so the note is moved into that frame first. No-op for
+            // vanilla instruments, and it keeps a note's rendered pitch absolute instead of
+            // depending on which sample the file happened to use.
+            int key = instruments.adjustKey(instrument, song.key(note));
 
             String sound;
             float pitch;

@@ -181,27 +181,24 @@ public class PurchaseConfirmGUI implements InventoryHolder {
                             // Refund rather than deliver: addItem on a disconnected Player writes
                             // into an inventory that is never saved, and giveDisc would still
                             // report success, so the buyer would be charged for nothing.
-                            EconomyUtils.depositPlayer(player, paidPrice);
-                            PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
+                            refundAndForgetCopy(purchasedMusic, paidPrice);
                             return;
                         }
                         if (PublishedMusicManager.getInstance().recordSuccessfulPurchase(published.getUniqueId(), player, paidPrice)) {
                             if (PlayerMusicDiscHelper.giveDisc(player, purchasedMusic, published)) {
                                 PublishedMusicManager.getInstance().rollbackRecordedPurchase(published.getUniqueId(), paidPrice);
-                                EconomyUtils.depositPlayer(player, paidPrice);
-                                PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
+                                refundAndForgetCopy(purchasedMusic, paidPrice);
                                 MessageUtils.send(player, Lang.OPERATION_FAILED);
                                 return;
                             }
                             completePurchase(Lang.PURCHASE_SUCCESS_MSG);
                         } else {
-                            EconomyUtils.depositPlayer(player, paidPrice);
-                            PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
+                            refundAndForgetCopy(purchasedMusic, paidPrice);
                             MessageUtils.send(player, Lang.PURCHASE_PAYMENT_FAILED);
                         }
-                    }, () -> {
+                    }, purchasedMusic -> {
                         purchasing = false;
-                        EconomyUtils.depositPlayer(player, paidPrice);
+                        refundAndForgetCopy(purchasedMusic, paidPrice);
                         MessageUtils.send(player, Lang.PURCHASE_SAVE_FAILED);
                     });
                     break;
@@ -217,17 +214,22 @@ public class PurchaseConfirmGUI implements InventoryHolder {
                         if (PublishedMusicManager.getInstance().recordAuthorClaim(published.getUniqueId(), player)) {
                             if (PlayerMusicDiscHelper.giveDisc(player, purchasedMusic, published)) {
                                 PublishedMusicManager.getInstance().rollbackAuthorClaim(published.getUniqueId(), player);
+                                PlayerMusicManager.getInstance().discardUnsavedMusic(purchasedMusic.getUniqueId());
                                 PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
                                 MessageUtils.send(player, Lang.OPERATION_FAILED);
                                 return;
                             }
                             completePurchase(Lang.PURCHASE_AUTHOR_CLAIM_SUCCESS);
                         } else {
+                            PlayerMusicManager.getInstance().discardUnsavedMusic(purchasedMusic.getUniqueId());
                             PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
                             MessageUtils.send(player, Lang.PURCHASE_OWN_MUSIC_MSG);
                         }
-                    }, () -> {
+                    }, purchasedMusic -> {
                         purchasing = false;
+                        // No money moved on this branch, but the copy must still be withdrawn.
+                        PlayerMusicManager.getInstance().discardUnsavedMusic(purchasedMusic.getUniqueId());
+                        PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
                         MessageUtils.send(player, Lang.PURCHASE_SAVE_FAILED);
                     });
                     break;
@@ -289,15 +291,30 @@ public class PurchaseConfirmGUI implements InventoryHolder {
         return false;
     }
 
-    private void savePurchasedMusic(Consumer<PlayerMusic> onSuccess, Runnable onFailure) {
+    private void savePurchasedMusic(Consumer<PlayerMusic> onSuccess, Consumer<PlayerMusic> onFailure) {
         PlayerMusic purchasedMusic = published.toPlayerMusic(player.getName(), player.getUniqueId());
         PlayerMusicManager.getInstance().saveMusicAsync(purchasedMusic, success -> {
             if (!success) {
-                onFailure.run();
+                // The failure callback needs the id: the copy is already cached by the manager and
+                // must be withdrawn, which the success-only signature made impossible.
+                onFailure.accept(purchasedMusic);
                 return;
             }
             onSuccess.accept(purchasedMusic);
         });
+    }
+
+    // Refunds the buyer and withdraws the song copy this purchase created.
+    //
+    // The copy is cached and queued for persistence before the write is attempted, so a refund that
+    // only returns money would leave a playable, editable song in the buyer's library -- and the
+    // pending save would still flush it to the database once storage recovered. Discarding locally
+    // first is what makes the refund actually undo the purchase; the async delete then removes any
+    // row an earlier attempt may have committed.
+    private void refundAndForgetCopy(PlayerMusic purchasedMusic, double paidPrice) {
+        PlayerMusicManager.getInstance().discardUnsavedMusic(purchasedMusic.getUniqueId());
+        EconomyUtils.depositPlayer(player, paidPrice);
+        PlayerMusicManager.getInstance().deleteMusicAsync(purchasedMusic.getUniqueId());
     }
 
     private void completePurchase(Lang message) {

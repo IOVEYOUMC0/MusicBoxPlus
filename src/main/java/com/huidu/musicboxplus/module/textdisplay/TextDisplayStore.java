@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -67,7 +66,7 @@ public final class TextDisplayStore {
     // Names between "decided to restore" and "inserted into the registry". Restore hops onto each
     // display's own region thread, so without this a second restoreAll could look at the registry,
     // still see nothing, and spawn a second set of entities for the same display.
-    private static final Set<String> RESTORING = ConcurrentHashMap.newKeySet();
+    private static final RestoreGate RESTORING = new RestoreGate();
 
     // Nothing may be written before the file has been read. Otherwise a server that never reached
     // restoreAll -- module off, failed startup, unreadable file -- would save its empty state over
@@ -83,6 +82,15 @@ public final class TextDisplayStore {
     private static volatile boolean saveClosed = false;
     private static CompletableFuture<Void> saveChain = CompletableFuture.completedFuture(null);
     private static final AtomicLong saveGeneration = new AtomicLong();
+
+    // How long one capture pass may take before it is treated as "keep the stored copy".
+    //
+    // A capture completes from inside a region task. If that task is dropped -- plugin disabled
+    // between routing and execution, chunk unloaded after queueing, region retired -- the future
+    // never completes, and because saves are chained with thenCompose one hanging link silently
+    // stops every later save for the rest of the process (the periodic timer, create, move, delete).
+    // The timeout turns that into the ordinary "keep what we last wrote" path.
+    private static final long CAPTURE_TIMEOUT_SECONDS = 5L;
 
     private TextDisplayStore() {
     }
@@ -100,6 +108,10 @@ public final class TextDisplayStore {
     // Also runs on /musicboxplus reload. Existing displays are rebound in place so they keep one
     // set of entities while their playlists follow the freshly loaded song objects.
     public static void restoreAll() {
+        // Multiple calls in one enabled session share reservations. Only an explicit lifecycle
+        // boundary can abandon queued work: a slow/live restore must never expire into a duplicate.
+        long session = RESTORING.generation();
+
         List<Map<String, Object>> stored;
         try {
             stored = read();
@@ -133,22 +145,26 @@ public final class TextDisplayStore {
             // Clean song references even when the display's world is not mounted yet.
             SongList storedSongs = readSongs(entry, name);
             normalizePlaylistEntry(entry, storedSongs.songs);
-            if (TextDisplayPlayerManager.get(name).isPresent() || !RESTORING.add(key(name))) {
+            if (TextDisplayPlayerManager.get(name).isPresent()) {
+                continue;
+            }
+            RestoreGate.Token token = RESTORING.claim(session, key(name));
+            if (token == null) {
                 continue;
             }
             World world = MusicBox.getInstance().getServer().getWorld(string(entry, "world", ""));
             if (world == null) {
                 // The record stays; a world a multiverse-style plugin mounts later, or one that is
                 // temporarily unavailable, must not cost the operator their display.
-                RESTORING.remove(key(name));
+                RESTORING.complete(token);
                 waiting++;
                 continue;
             }
             try {
-                restore(name, world, entry);
+                restore(name, world, entry, token);
                 restored++;
             } catch (Exception e) {
-                RESTORING.remove(key(name));
+                RESTORING.complete(token);
                 MusicBox.getInstance().getLogger().log(Level.WARNING,
                         "Failed to restore text display '" + name + "'", e);
             }
@@ -161,12 +177,19 @@ public final class TextDisplayStore {
         saveSoon();
     }
 
+    // Called once at the start of onEnable, NOT on reload/restoreAll. A dropped region task from
+    // the previous enabled session may be abandoned here; its callback can no longer commit.
+    public static void resetRestoreSession() {
+        RESTORING.resetSession();
+    }
+
     // Drops a display for good. The only thing that ever removes a record, which is what separates
     // "the operator deleted this" from every other way a display can leave the registry.
     public static void forget(String name) {
         if (name == null) {
             return;
         }
+        RESTORING.cancel(key(name));
         synchronized (RECORDS) {
             RECORDS.remove(key(name));
         }
@@ -216,7 +239,8 @@ public final class TextDisplayStore {
         return config.saveToString();
     }
 
-    private static void restore(String name, World world, Map<String, Object> entry) {
+    private static void restore(String name, World world, Map<String, Object> entry,
+                                RestoreGate.Token token) {
         Location location = new Location(world,
                 number(entry, "x", 0).doubleValue(),
                 number(entry, "y", 0).doubleValue(),
@@ -235,7 +259,9 @@ public final class TextDisplayStore {
         // would otherwise build its arrangement on a region thread at startup, one whole-file
         // read and parse each, all while the server is coming up.
         IPlayList prepared = songs.songs.isEmpty() ? null : buildPlaylist(songs.songs, entry);
-        com.huidu.musicboxplus.core.player.PlaybackSetup.whenReady(prepared,
+        RESTORING.whenReady(token,
+                ready -> com.huidu.musicboxplus.core.player.PlaybackSetup.whenReady(prepared,
+                        Runnable::run, ready),
                 run -> Scheduler.region(location, run),
                 () -> restoreOnRegion(name, location, range, speed, options, prepared, playing, entry));
     }
@@ -245,6 +271,10 @@ public final class TextDisplayStore {
                                         TextDisplayPlayer.DisplayOptions options, IPlayList prepared,
                                         boolean playing, Map<String, Object> entry) {
         try {
+            // A command may have created the display while its arrangement was being prepared.
+            if (TextDisplayPlayerManager.get(name).isPresent()) {
+                return;
+            }
             location.getChunk().load();
             if (prepared == null) {
                 TextDisplayPlayerManager.restoreIdle(name, location, range, options);
@@ -260,13 +290,9 @@ public final class TextDisplayStore {
         } catch (Exception e) {
             MusicBox.getInstance().getLogger().log(Level.WARNING,
                     "Failed to spawn restored text display '" + name + "'", e);
-        } finally {
-            RESTORING.remove(key(name));
-            // No saveSoon() here. restoreAll() already saves once after its loop, and every save
-            // captures EVERY live display on its region thread and re-serialises the whole file --
-            // so a per-display save turned restoring N displays into N+1 full passes over N
-            // displays (N^2 region tasks) for a file that only changes once, at the end.
         }
+        // RestoreGate releases this exact token. No saveSoon() here: restoreAll already queues a
+        // full capture pass, and saving once per display would turn N restores into N^2 tasks.
     }
 
     private static IPlayList buildPlaylist(List<MusicBoxSong> songs, Map<String, Object> entry) {
@@ -506,13 +532,18 @@ public final class TextDisplayStore {
     // down. Folia's global thread cannot synchronously read every region, so use the last complete
     // records captured while the plugin was running instead of blocking or reading foreign state.
     // ponytail: a capture still in flight is left to the next normal save; waiting here can deadlock.
-    public static synchronized void saveNow() {
-        saveClosed = true;
-        saveGeneration.incrementAndGet();
-        try {
-            write(toYaml(snapshotRecords()));
-        } catch (Exception e) {
-            MusicBox.getInstance().getLogger().log(Level.WARNING, "Failed to save text displays", e);
+    public static void saveNow() {
+        // Close before taking the save lock: a restore constructor can notify plugin listeners,
+        // which may themselves save. Never wait for a committing restore while holding that lock.
+        RESTORING.closeSession();
+        synchronized (TextDisplayStore.class) {
+            saveClosed = true;
+            saveGeneration.incrementAndGet();
+            try {
+                write(toYaml(snapshotRecords()));
+            } catch (Exception e) {
+                MusicBox.getInstance().getLogger().log(Level.WARNING, "Failed to save text displays", e);
+            }
         }
     }
 
@@ -584,8 +615,16 @@ public final class TextDisplayStore {
         CompletableFuture<?>[] futures = captures.stream()
                 .map(HandleCapture::result)
                 .toArray(CompletableFuture<?>[]::new);
-        return CompletableFuture.allOf(futures).thenApplyAsync(ignored -> {
+        return CompletableFuture.allOf(futures)
+                .orTimeout(CAPTURE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                .exceptionally(failure -> null)
+                .thenApplyAsync(ignored -> {
             for (HandleCapture capture : captures) {
+                // A capture that timed out still has a pending future; join() on it would block this
+                // serialisation thread forever instead of letting the next save run.
+                if (!capture.result().isDone() || capture.result().isCompletedExceptionally()) {
+                    continue;
+                }
                 Map<String, Object> entry = capture.result().join();
                 if (entry != null) {
                     // The handle may have been deleted/replaced while its region snapshot was in

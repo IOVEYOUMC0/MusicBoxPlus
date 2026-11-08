@@ -59,7 +59,7 @@ public class PlayerInventoryState {
         File folder = new File(folderName.trim());
         return folder.isAbsolute() ? folder : new File(instance.getDataFolder(), folderName.trim());
     }
-    
+
     private final UUID playerUUID;
     private final ItemStack[] contents;
     private final ItemStack[] armor;
@@ -92,7 +92,7 @@ public class PlayerInventoryState {
         this.savedTime = System.currentTimeMillis();
     }
 
-    private PlayerInventoryState(UUID playerUUID, ItemStack[] contents, ItemStack[] armor, 
+    private PlayerInventoryState(UUID playerUUID, ItemStack[] contents, ItemStack[] armor,
                                   ItemStack offHand, int heldSlot, long savedTime) {
         this.playerUUID = playerUUID;
         this.contents = contents;
@@ -268,7 +268,7 @@ public class PlayerInventoryState {
             ItemStack[] armor = deserializeItemStackArray(armorData);
             ItemStack[] offHand = deserializeItemStackArray(offHandData);
 
-            return new PlayerInventoryState(UUID.fromString(uuidStr), contents, armor, 
+            return new PlayerInventoryState(UUID.fromString(uuidStr), contents, armor,
                     offHand.length > 0 ? offHand[0] : null, heldSlot, savedTime);
         } catch (Exception e) {
             MusicBox.getInstance().getLogger().warning("加载玩家物品栏状态失败: " + playerUUID + " - " + e.getMessage());
@@ -325,10 +325,20 @@ public class PlayerInventoryState {
 
     public static void restoreAndRemove(Player player) {
         PlayerInventoryState state = savedStates.remove(player.getUniqueId());
-        if (state != null) {
+        if (state == null) {
+            return;
+        }
+        try {
             state.restore(player);
             state.deleteFromDisk();
             MessageUtils.send(player, Lang.EDIT_INVENTORY_RESTORED);
+        } catch (RuntimeException failure) {
+            // restore() clears the live inventory before writing the saved slots back, so dropping
+            // the state here after a failure left the player half-restored with no copy in memory to
+            // retry from -- and the .dat on disk could then overwrite a real inventory on restart.
+            // Put it back (without clobbering a newer state) and keep the disk copy for the retry.
+            savedStates.putIfAbsent(player.getUniqueId(), state);
+            MusicBox.getInstance().getLogger().warning("恢复玩家物品栏失败: " + failure.getMessage());
         }
     }
 

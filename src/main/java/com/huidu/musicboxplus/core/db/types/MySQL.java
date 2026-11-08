@@ -14,7 +14,7 @@ import java.util.logging.Level;
 public class MySQL extends AbstractBase {
     private final HikariDataSource dataSource;
     private final String tablePrefix;
-    
+
     @Override
     public boolean isMySQL() {
         return true;
@@ -23,7 +23,7 @@ public class MySQL extends AbstractBase {
     public MySQL(MusicBoxConfig.MySQLSetting config) {
         super("MySQL");
         this.tablePrefix = config.getTablePrefix() != null ? config.getTablePrefix() : "";
-        
+
         HikariLogConfigurator.configure(MusicBox.getInstance());
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl("jdbc:mysql://" + config.getHost() + ":" + config.getPort() + "/" + config.getDatabase() + "?useSSL=false&useUnicode=true&characterEncoding=UTF-8&serverTimezone=UTC");
@@ -40,7 +40,7 @@ public class MySQL extends AbstractBase {
         hikariConfig.addDataSourceProperty("cachePrepStmts", "true");
         hikariConfig.addDataSourceProperty("prepStmtCacheSize", "250");
         hikariConfig.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        
+
         HikariDataSource created = null;
         try {
             created = new HikariDataSource(hikariConfig);
@@ -65,12 +65,12 @@ public class MySQL extends AbstractBase {
     protected Connection acquireConnection() throws SQLException {
         return this.dataSource.getConnection();
     }
-    
+
     @Override
     protected String getTablePrefix() {
         return this.tablePrefix;
     }
-    
+
     @Override
     public void shutdown() {
         if (this.dataSource != null && !this.dataSource.isClosed()) {

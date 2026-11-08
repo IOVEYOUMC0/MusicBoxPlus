@@ -21,7 +21,7 @@ public class StopExecutor implements SubCommand {
     @Override
     public void execute(CommandSender sender, String[] args) {
         Player target;
-        
+
         if (args.length > 0) {
             if (!sender.hasPermission(Permissions.STOP_OTHERS)) {
                 MessageUtils.send(sender, Lang.NO_PERMISSIONS);
@@ -38,7 +38,7 @@ public class StopExecutor implements SubCommand {
             MessageUtils.send(sender, Lang.ONLY_PLAYERS);
             return;
         }
-        
+
         stopPlayer(target, sender);
     }
 
@@ -48,7 +48,7 @@ public class StopExecutor implements SubCommand {
             MessageUtils.send(sender, Lang.ERROR_OCCURRED);
             return;
         }
-        
+
         MusicBoxSongPlayer player = wrapper.getActivePlayer();
         if (player != null && !player.isDestroyed()) {
             // Fires MusicBoxStopEvent first; a listener may veto the stop.
@@ -64,7 +64,7 @@ public class StopExecutor implements SubCommand {
             }
             return;
         }
-        
+
         boolean found = false;
         for (AbstractBlockPlayer blockPlayer : AbstractBlockPlayer.getAll()) {
             if (blockPlayer.isDestroyed()) continue;
@@ -76,7 +76,7 @@ public class StopExecutor implements SubCommand {
                 break;
             }
         }
-        
+
         if (found) {
             if (sender.equals(target)) {
                 MessageUtils.send(sender, Lang.MUSIC_STOPPED);

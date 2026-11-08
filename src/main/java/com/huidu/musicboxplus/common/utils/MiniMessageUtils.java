@@ -176,7 +176,7 @@ public final class MiniMessageUtils {
             return removeDefaultItalic(Component.text(input));
         }
     }
-    
+
     private static Component removeDefaultItalic(Component component) {
         if (component == null) {
             return Component.empty();

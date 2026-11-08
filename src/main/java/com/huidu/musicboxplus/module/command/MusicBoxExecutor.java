@@ -102,6 +102,9 @@ implements TabExecutor {
         if (plugin.isEditorModuleEnabled()) {
             subs.put("edit", new EditExecutor());
         }
+        // Operator tooling: not tied to a gameplay module, so it is always available to admins.
+        subs.put("backup", new BackupExecutor());
+        subs.put("export", new ExportExecutor());
         return subs;
     }
 

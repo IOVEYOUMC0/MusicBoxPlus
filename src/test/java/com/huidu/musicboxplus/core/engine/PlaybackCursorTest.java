@@ -18,7 +18,7 @@ class PlaybackCursorTest {
     private static final long MS = 1_000_000L;
 
     private static CompiledSong firstSong() throws Exception {
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             Path file = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().findFirst().orElseThrow();
             return CompiledSong.compile(NbsReader.read(file));
         }
@@ -188,7 +188,7 @@ class PlaybackCursorTest {
     @Test
     void everyBundledSongPlaysThroughExactlyOnce() throws Exception {
         List<String> failures = new ArrayList<>();
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             for (Path file : stream.filter(p -> p.toString().endsWith(".nbs")).sorted().toList()) {
                 CompiledSong song = CompiledSong.compile(NbsReader.read(file));
                 PlaybackCursor cursor = playing(song);

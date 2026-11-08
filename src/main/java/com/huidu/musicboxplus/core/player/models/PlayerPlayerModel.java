@@ -15,11 +15,11 @@ public class PlayerPlayerModel {
         wrapper.setBarVisible(true);
         wrapper.setBarTitle(wrapper.buildBossBarTitle(model.getMusicBoxSong()));
     }
-    
+
     public void addPlayerToSong() {
         model.addPlayer(wrapper.getPlayer());
     }
-    
+
     public void nextTick(int all, int current) {
         ++this.lastProgressUpdate;
         if (this.lastProgressUpdate >= 20) {

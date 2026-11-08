@@ -19,25 +19,36 @@ import java.util.Map;
 public class GUI
 implements InventoryHolder {
     private Inventory inventory;
-    private final Map<Integer, InventoryAction> runnableMap = new HashMap<Integer, InventoryAction>();
+    private final Map<Integer, InventoryAction> runnableMap = new HashMap<>();
     private static volatile boolean listenerRegistered = false;
     private static final Object LISTENER_LOCK = new Object();
     private static GUIListener guiListener;
 
     public GUI(String title, int rows) {
-        int slots;
-        if (rows < 1 || rows > 6) {
-            rows = 3;
-        }
-        if ((slots = rows * 9) < 9 || slots > 54) {
-            rows = 3;
-        }
-        this.createInventory(title, rows);
+        // One parsing path: MiniMessage runs here for both overloads instead of the two separate
+        // createInventory copies this class used to carry.
+        this(MiniMessageUtils.processComponent(title), rows);
     }
 
-    private void createInventory(String title, int rows) {
-        int slots = rows * 9;
-        Component titleComponent = MiniMessageUtils.processComponent(title);
+    public GUI(Component title, int rows) {
+        createInventory(title, clampRows(rows));
+    }
+
+    public GUI(String title) {
+        this(title, 6);
+    }
+
+    public GUI(Component title) {
+        this(title, 6);
+    }
+
+    // A menu is 1..6 rows. Anything else is a caller bug; falling back to 3 keeps the old behaviour
+    // without the second, unreachable bounds check on the slot count.
+    private static int clampRows(int rows) {
+        return rows >= 1 && rows <= 6 ? rows : 3;
+    }
+
+    private void createInventory(Component title, int rows) {
         // "primary thread" means "a server tick thread" here: on Folia Bukkit.isPrimaryThread() is
         // CraftServer.isPrimaryThread() -> TickThread.isTickThread(), which is true on EVERY region
         // thread, not just the global one. That is what this guard is for -- it catches an async or
@@ -47,47 +58,12 @@ implements InventoryHolder {
             throw new IllegalStateException("GUI必须在服务器线程创建，请使用 Scheduler.global() 包装调用");
         }
         try {
-            this.inventory = Bukkit.createInventory(this, slots, titleComponent);
+            this.inventory = Bukkit.createInventory(this, rows * 9, title);
         }
         catch (Exception e) {
             MusicBox.getInstance().getLogger().severe("创建库存失败: " + e.getMessage());
             throw new RuntimeException("创建库存失败: " + e.getMessage(), e);
         }
-    }
-    
-    public GUI(Component title, int rows) {
-        int slots;
-        if (rows < 1 || rows > 6) {
-            rows = 3;
-        }
-        if ((slots = rows * 9) < 9 || slots > 54) {
-            rows = 3;
-        }
-        this.createInventory(title, rows);
-    }
-    
-    private void createInventory(Component title, int rows) {
-        int slots = rows * 9;
-        // Same as the String overload above: a tick-thread check, not an ownership check (on Folia
-        // every region thread answers true).
-        if (!Bukkit.isPrimaryThread()) {
-            throw new IllegalStateException("GUI必须在服务器线程创建，请使用 Scheduler.global() 包装调用");
-        }
-        try {
-            this.inventory = Bukkit.createInventory(this, slots, title);
-        }
-        catch (Exception e) {
-            MusicBox.getInstance().getLogger().severe("创建库存失败: " + e.getMessage());
-            throw new RuntimeException("创建库存失败: " + e.getMessage(), e);
-        }
-    }
-
-    public GUI(String title) {
-        this(title, 6);
-    }
-    
-    public GUI(Component title) {
-        this(title, 6);
     }
 
     public void open(Player player) {
@@ -118,7 +94,7 @@ implements InventoryHolder {
         this.inventory.clear(slot);
         this.runnableMap.remove(slot);
     }
-    
+
     public void updateItem(int slot, ItemStack item) {
         if (!isValidSlot(slot)) {
             return;
@@ -163,25 +139,16 @@ implements InventoryHolder {
     }
 
     public GUI cloneWithNewTitle(String title) {
-        ItemStack[] content = this.inventory.getContents();
-        int slots = content.length;
-        int rows = Math.min(6, Math.max(1, slots / 9));
-        GUI gui = new GUI(title, rows);
-        gui.runnableMap.putAll(this.runnableMap);
-        ItemStack[] newContent = new ItemStack[rows * 9];
-        System.arraycopy(content, 0, newContent, 0, Math.min(slots, newContent.length));
-        gui.inventory.setContents(newContent);
-        return gui;
+        return cloneWithNewTitle(MiniMessageUtils.processComponent(title));
     }
-    
+
     public GUI cloneWithNewTitle(Component title) {
         ItemStack[] content = this.inventory.getContents();
-        int slots = content.length;
-        int rows = Math.min(6, Math.max(1, slots / 9));
+        int rows = rowsOf(content.length);
         GUI gui = new GUI(title, rows);
         gui.runnableMap.putAll(this.runnableMap);
         ItemStack[] newContent = new ItemStack[rows * 9];
-        System.arraycopy(content, 0, newContent, 0, Math.min(slots, newContent.length));
+        System.arraycopy(content, 0, newContent, 0, Math.min(content.length, newContent.length));
         gui.inventory.setContents(newContent);
         return gui;
     }
@@ -192,12 +159,17 @@ implements InventoryHolder {
 
     public void setTitle(Component title) {
         ItemStack[] content = this.inventory.getContents();
-        int slots = content.length;
-        int rows = Math.min(6, Math.max(1, slots / 9));
+        int rows = rowsOf(content.length);
         this.createInventory(title, rows);
         ItemStack[] newContent = new ItemStack[rows * 9];
-        System.arraycopy(content, 0, newContent, 0, Math.min(slots, newContent.length));
+        System.arraycopy(content, 0, newContent, 0, Math.min(content.length, newContent.length));
         this.inventory.setContents(newContent);
+    }
+
+    // Slot count to row count, used by both title-replacing paths. An inventory is always a whole
+    // number of rows, so this cannot round down into a smaller menu except for an empty one.
+    private static int rowsOf(int slots) {
+        return Math.min(6, Math.max(1, slots / 9));
     }
 
     public Inventory getInventory() {
@@ -215,7 +187,7 @@ implements InventoryHolder {
             }
         }
     }
-    
+
     public static void unregisterListener() {
         if (listenerRegistered && guiListener != null) {
             synchronized (LISTENER_LOCK) {
@@ -246,6 +218,25 @@ implements InventoryHolder {
             }
             if (holder instanceof GUI) {
                 ((GUI)holder).onInventoryClick(e);
+            }
+        }
+
+        // Cancelling clicks alone left every menu open to dragging: an item dragged into a display
+        // slot stays in the top inventory until the next repaint clears it, which deletes it.
+        // Only drags that touch the plugin-owned top inventory are cancelled, so a player can still
+        // reorganise their own inventory while a menu is open.
+        @EventHandler
+        public void onDrag(org.bukkit.event.inventory.InventoryDragEvent e) {
+            Inventory top = e.getView().getTopInventory();
+            if (!(top.getHolder() instanceof GUI)) {
+                return;
+            }
+            int topSize = top.getSize();
+            for (int rawSlot : e.getRawSlots()) {
+                if (rawSlot < topSize) {
+                    e.setCancelled(true);
+                    return;
+                }
             }
         }
     }

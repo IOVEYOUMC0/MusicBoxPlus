@@ -28,6 +28,12 @@ public final class SongInstruments {
 
     private static final String OGG_SUFFIX = ".ogg";
 
+    // NBS centres vanilla instruments on key 45 (F#4). A custom instrument declares the key its own
+    // recording sits at, which defaults to 45 but is not required to be.
+    private static final int NBS_DEFAULT_KEY = 45;
+    private static final int MIN_SAMPLE_KEY = 0;
+    private static final int MAX_SAMPLE_KEY = 87;
+
     // A custom instrument that merely points at the vanilla pling sample keeps using the
     // vanilla sound, so no resource pack is required.
     private static final String PLING_SOUND = VanillaInstrument.PLING.soundName();
@@ -43,12 +49,43 @@ public final class SongInstruments {
     // instrument and no resource-pack substitution replaced it. Those are the ids the server
     // can address by registry entry instead of by name.
     private final boolean[] plainVanilla;
+    // The key each instrument's sample is recorded at; 45 for vanilla and for resource-pack
+    // overrides (those are authored against the vanilla layout).
+    private final int[] sampleKeys;
     private final int vanillaCount;
 
-    private SongInstruments(String[][] variants, boolean[] plainVanilla, int vanillaCount) {
+    private SongInstruments(String[][] variants, boolean[] plainVanilla, int[] sampleKeys, int vanillaCount) {
         this.variants = variants;
         this.plainVanilla = plainVanilla;
+        this.sampleKeys = sampleKeys;
         this.vanillaCount = vanillaCount;
+    }
+
+    /**
+     * The key {@code instrumentId}'s sample sits at: 45 for vanilla (and resource-pack) instruments,
+     * or the key the file declared for a custom instrument.
+     */
+    public int sampleKey(int instrumentId) {
+        return instrumentId >= 0 && instrumentId < sampleKeys.length
+                ? sampleKeys[instrumentId]
+                : NBS_DEFAULT_KEY;
+    }
+
+    /**
+     * Shifts a note key into the reference frame the instrument's sample was recorded in.
+     *
+     * <p>Pitch is computed as though every sample sat at key 45, which is true for the vanilla
+     * instruments. A custom sample recorded at another key plays {@code 45 - sampleKey} semitones off
+     * unless the note is moved by the opposite amount first. With this applied, a note's rendered
+     * pitch is absolute instead of depending on the sample the file happened to use.
+     */
+    public int adjustKey(int instrumentId, int key) {
+        int sampleKey = sampleKey(instrumentId);
+        return sampleKey == NBS_DEFAULT_KEY ? key : key - sampleKey + NBS_DEFAULT_KEY;
+    }
+
+    private static int clampSampleKey(int pitch) {
+        return Math.max(MIN_SAMPLE_KEY, Math.min(MAX_SAMPLE_KEY, pitch));
     }
 
     public static SongInstruments of(RawNbsSong song) {
@@ -77,6 +114,7 @@ public final class SongInstruments {
         int total = vanilla + customInstruments.size();
         String[][] table = new String[total][];
         boolean[] plain = new boolean[total];
+        int[] sampleKeys = new int[total];
         for (int id = 0; id < total; id++) {
             String base;
             String override = id < vanilla ? soundOverrides.get(id) : null;
@@ -88,9 +126,14 @@ public final class SongInstruments {
             } else {
                 base = customSoundName(customInstruments.get(id - vanilla));
             }
+            // A custom instrument carries the key its sample was recorded at; everything else is
+            // authored against the vanilla layout, whose centre key is 45.
+            sampleKeys[id] = id < vanilla
+                    ? NBS_DEFAULT_KEY
+                    : clampSampleKey(customInstruments.get(id - vanilla).pitch());
             table[id] = buildVariants(base);
         }
-        return new SongInstruments(table, plain, vanilla);
+        return new SongInstruments(table, plain, sampleKeys, vanilla);
     }
 
     // Sound name for transpose mode: no bucket suffix.

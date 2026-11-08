@@ -33,7 +33,7 @@ implements SubCommand {
         }
         SongAliasConfig aliasConfig = SongAliasConfig.getInstance();
         switch (action) {
-            case "addalias": 
+            case "addalias":
             case "add-alias": {
                 if (args.length < 3) {
                     MessageUtils.send(sender, Lang.TAG_USAGE_ADDALIAS);
@@ -43,7 +43,7 @@ implements SubCommand {
                 MessageUtils.send(sender, Lang.TAG_ADDED_ALIAS, "{alias}", args[2], "{song}", song.getName());
                 break;
             }
-            case "removealias": 
+            case "removealias":
             case "remove-alias": {
                 if (args.length < 3) {
                     MessageUtils.send(sender, Lang.TAG_USAGE_REMOVEALIAS);
@@ -57,7 +57,7 @@ implements SubCommand {
                 MessageUtils.send(sender, Lang.TAG_ALIAS_NOT_FOUND, "{alias}", args[2], "{song}", song.getName());
                 break;
             }
-            case "addtag": 
+            case "addtag":
             case "add-tag": {
                 if (args.length < 3) {
                     MessageUtils.send(sender, Lang.TAG_USAGE_ADDTAG);
@@ -67,7 +67,7 @@ implements SubCommand {
                 MessageUtils.send(sender, Lang.TAG_ADDED_TAG, "{tag}", args[2], "{song}", song.getName());
                 break;
             }
-            case "removetag": 
+            case "removetag":
             case "remove-tag": {
                 if (args.length < 3) {
                     MessageUtils.send(sender, Lang.TAG_USAGE_REMOVETAG);
@@ -81,7 +81,7 @@ implements SubCommand {
                 MessageUtils.send(sender, Lang.TAG_TAG_NOT_FOUND, "{tag}", args[2], "{song}", song.getName());
                 break;
             }
-            case "list": 
+            case "list":
             case "info": {
                 MessageUtils.send(sender, Lang.TAG_LIST_HEADER, "{song}", song.getName());
                 MessageUtils.send(sender, Lang.TAG_LIST_ALIASES, "{aliases}", song.getAliases().isEmpty() ? Lang.UNKNOWN.toString() : String.join(", ", song.getAliases()));

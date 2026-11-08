@@ -40,57 +40,21 @@ public class MusicBoxSongContainer implements FullSongContainer {
     private final boolean displayGlow;
     private final String displaySkullOwner;
     private final List<String> displayLore;
-    private static volatile ExecutorService songLoader = createSongLoader();
+    private static final ManagedSongLoader SONG_LOADER = new ManagedSongLoader(
+            Math.max(2, Math.min(SONG_LOADER_THREADS, Runtime.getRuntime().availableProcessors())),
+            1024, 10L, TimeUnit.SECONDS, action -> {
+                Thread thread = new Thread(action, "MusicBox-SongLoader");
+                thread.setDaemon(true);
+                return thread;
+            });
 
-    private static ExecutorService createSongLoader() {
-        int threads = Math.max(2, Math.min(SONG_LOADER_THREADS, Runtime.getRuntime().availableProcessors()));
-        // Unbounded queue, no rejection policy. The task count is bounded by the number of song
-        // files, so the queue cannot grow without limit, and the bounded queue it replaces filled
-        // immediately (the submission loop is pure in-memory while each worker does a whole-file
-        // read) -- at which point CallerRunsPolicy ran one full song load, plus any MIDI conversion,
-        // on whichever thread submitted it. That submitter is the CompletableFuture continuation,
-        // i.e. a ForkJoinPool.commonPool thread shared with the rest of the JVM.
-        return new ThreadPoolExecutor(threads, threads, 0L, TimeUnit.MILLISECONDS,
-                new LinkedBlockingQueue<>(), r -> {
-            Thread t = new Thread(r, "MusicBox-SongLoader");
-            t.setDaemon(true);
-            return t;
-        });
-    }
-
-    private static ExecutorService getSongLoader() {
-        ExecutorService loader = songLoader;
-        if (loader == null || loader.isShutdown() || loader.isTerminated()) {
-            synchronized (MusicBoxSongContainer.class) {
-                loader = songLoader;
-                if (loader == null || loader.isShutdown() || loader.isTerminated()) {
-                    songLoader = loader = createSongLoader();
-                }
-            }
-        }
-        return loader;
+    /** Rearm a stopped loader at plugin enable; constructing the worker pool remains lazy. */
+    public static void resetLoader() {
+        SONG_LOADER.reset();
     }
 
     public static void shutdownLoader() {
-        ExecutorService loader = songLoader;
-        if (loader == null) {
-            return;
-        }
-        loader.shutdown();
-        try {
-            if (!loader.awaitTermination(10L, TimeUnit.SECONDS)) {
-                loader.shutdownNow();
-            }
-        } catch (InterruptedException e) {
-            loader.shutdownNow();
-            Thread.currentThread().interrupt();
-        } finally {
-            synchronized (MusicBoxSongContainer.class) {
-                if (songLoader == loader) {
-                    songLoader = null;
-                }
-            }
-        }
+        SONG_LOADER.shutdown();
     }
 
     public MusicBoxSongContainer(File folder, MusicBoxSongContainer parent) {
@@ -194,81 +158,113 @@ public class MusicBoxSongContainer implements FullSongContainer {
         this.allSongCount = 0;
     }
 
-    @SuppressWarnings({"deprecation", "rawtypes", "unchecked"})
     public CompletableFuture<Void> loadAsync(File folder) {
-        ExecutorService loader = getSongLoader();
-        File[] songFiles = folder.listFiles(f -> f.getName().endsWith(".nbs"));
-        File[] folders = folder.listFiles(File::isDirectory);
-        if (songFiles == null) {
-            songFiles = new File[]{};
+        SongDirectoryTraversal.Session traversal;
+        try {
+            // Pins the root's real path and enforces the depth/directory/song budget for the whole
+            // load. A directory link loop or an oversized library now fails the load explicitly
+            // instead of recursing until the pool or the heap gives out.
+            traversal = SongDirectoryTraversal.open(folder);
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
         }
-        if (folders == null) {
-            folders = new File[]{};
+        return loadAsync(folder, SONG_LOADER.captureSession(), traversal);
+    }
+
+    @SuppressWarnings("deprecation")
+    private CompletableFuture<Void> loadAsync(File folder, ManagedSongLoader.Session session,
+                                              SongDirectoryTraversal.Session traversal) {
+        if (!SONG_LOADER.isActive(session)) {
+            return CompletableFuture.failedFuture(new RejectedExecutionException("Song loader session is closed"));
         }
-        ArrayList<CompletableFuture<Void>> futures = new ArrayList<>();
-        List songsTemp = Collections.synchronizedList(new ArrayList(songFiles.length));
+        SongDirectoryTraversal.Result listing;
+        try {
+            listing = traversal.list(folder);
+        } catch (IOException e) {
+            // A partial library must not be published as if it were complete.
+            return CompletableFuture.failedFuture(e);
+        }
+        List<File> songFiles = listing.songs();
+        List<File> folders = listing.directories();
+        ArrayList<CompletableFuture<?>> futures = new ArrayList<>();
+        List<MusicBoxSong> songsTemp = Collections.synchronizedList(new ArrayList<>(songFiles.size()));
         for (File file : songFiles) {
-            futures.add(CompletableFuture.runAsync(() -> {
+            futures.add(SONG_LOADER.submit(session, () -> {
                 try {
                     MusicBoxSong song = new MusicBoxSong(file, this);
                     songsTemp.add(song);
                 } catch (SongNullException e) {
                     MusicBox.getInstance().getLogger().warning("Can't load " + file);
                 }
-            }, loader));
+                return null;
+            }));
         }
-        List subContainersTemp = Collections.synchronizedList(new ArrayList(folders.length));
-        ArrayList<CompletionStage> subFolderFutures = new ArrayList<>();
+        List<MusicBoxSongContainer> subContainersTemp = Collections.synchronizedList(new ArrayList<>(folders.size()));
         for (File subFolder : folders) {
-            CompletionStage subFuture = CompletableFuture.supplyAsync(() -> {
+            CompletableFuture<Void> subFuture = SONG_LOADER.submit(session, () -> {
                 MusicBoxSongContainer container = new MusicBoxSongContainer(subFolder, this);
                 subContainersTemp.add(container);
                 return container;
-            }, loader).thenCompose(container -> container.loadAsync(subFolder));
-            subFolderFutures.add(subFuture);
+            }).thenCompose(container -> container.loadAsync(subFolder, session, traversal));
+            futures.add(subFuture);
         }
-        return ((CompletableFuture) CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenCombine(CompletableFuture.allOf(subFolderFutures.toArray(new CompletableFuture[0])), (a, b) -> null))
-            .thenRun(() -> {
-                ArrayList<MusicBoxSong> sortedSongs = new ArrayList<>(songsTemp);
-                sortedSongs.sort(Comparator.comparing(song -> sortKey(song.getName())));
-                this.songs = Collections.unmodifiableList(sortedSongs);
-
-                ArrayList<MusicBoxSongContainer> sortedContainers = new ArrayList<>(subContainersTemp);
-                sortedContainers.sort(Comparator.comparing(container -> sortKey(container.getName())));
-                this.subContainers = Collections.unmodifiableList(sortedContainers);
-                this.rebuildAllSongsCache();
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture<?>[0])).thenRun(() -> {
+            // Sorting may be expensive: keep it outside the lifecycle monitor. Only publish fields
+            // while the captured session is still active, so old completions cannot win after reset.
+            List<MusicBoxSong> loadedSongs = Collections.unmodifiableList(
+                    sortedBySortKey(new ArrayList<>(songsTemp), MusicBoxSong::getName));
+            List<MusicBoxSongContainer> loadedContainers = Collections.unmodifiableList(
+                    sortedBySortKey(new ArrayList<>(subContainersTemp), MusicBoxSongContainer::getName));
+            List<MusicBoxSong> loadedAllSongs = new ArrayList<>(loadedSongs);
+            for (MusicBoxSongContainer container : loadedContainers) {
+                loadedAllSongs.addAll(container.getAllSongs());
+            }
+            List<MusicBoxSong> allLoadedSongs = Collections.unmodifiableList(loadedAllSongs);
+            SONG_LOADER.publish(session, () -> {
+                this.songs = loadedSongs;
+                this.subContainers = loadedContainers;
+                this.allSongs = allLoadedSongs;
+                this.allSongCount = allLoadedSongs.size();
             });
+        });
     }
 
     public void loadSync(File folder) {
-        File[] songFiles = folder.listFiles(f -> f.getName().endsWith(".nbs"));
-        File[] folders = folder.listFiles(File::isDirectory);
-        if (songFiles == null) {
-            songFiles = new File[]{};
+        SongDirectoryTraversal.Session traversal;
+        try {
+            traversal = SongDirectoryTraversal.open(folder);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("Cannot traverse song folder " + folder, e);
         }
-        if (folders == null) {
-            folders = new File[]{};
+        this.loadSync(folder, traversal);
+    }
+
+    private void loadSync(File folder, SongDirectoryTraversal.Session traversal) {
+        SongDirectoryTraversal.Result listing;
+        try {
+            listing = traversal.list(folder);
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException("Cannot traverse song folder " + folder, e);
         }
-        this.loadSongsSync(songFiles);
-        this.loadSubContainersSync(folders);
+        this.loadSongsSync(listing.songs());
+        this.loadSubContainersSync(listing.directories(), traversal);
         this.rebuildAllSongsCache();
     }
 
-    private void loadSubContainersSync(File[] folders) {
-        ArrayList<MusicBoxSongContainer> subContainersTemp = new ArrayList<>(folders.length);
+    private void loadSubContainersSync(List<File> folders, SongDirectoryTraversal.Session traversal) {
+        ArrayList<MusicBoxSongContainer> subContainersTemp = new ArrayList<>(folders.size());
         for (File folder : folders) {
             MusicBoxSongContainer container = new MusicBoxSongContainer(folder, this);
-            container.loadSync(folder);
+            container.loadSync(folder, traversal);
             subContainersTemp.add(container);
         }
-        subContainersTemp.sort(Comparator.comparing(container -> sortKey(container.getName())));
-        this.subContainers = Collections.unmodifiableList(subContainersTemp);
+        this.subContainers = Collections.unmodifiableList(
+                sortedBySortKey(subContainersTemp, MusicBoxSongContainer::getName));
     }
 
     @SuppressWarnings("deprecation")
-    private void loadSongsSync(File[] songFiles) {
-        ArrayList<MusicBoxSong> songsTemp = new ArrayList<>(songFiles.length);
+    private void loadSongsSync(List<File> songFiles) {
+        ArrayList<MusicBoxSong> songsTemp = new ArrayList<>(songFiles.size());
         for (File file : songFiles) {
             try {
                 MusicBoxSong song = new MusicBoxSong(file, this);
@@ -277,8 +273,7 @@ public class MusicBoxSongContainer implements FullSongContainer {
                 MusicBox.getInstance().getLogger().warning("Can't load " + file);
             }
         }
-        songsTemp.sort(Comparator.comparing(song -> sortKey(song.getName())));
-        this.songs = Collections.unmodifiableList(songsTemp);
+        this.songs = Collections.unmodifiableList(sortedBySortKey(songsTemp, MusicBoxSong::getName));
     }
 
     private void rebuildAllSongsCache() {
@@ -299,6 +294,26 @@ public class MusicBoxSongContainer implements FullSongContainer {
     // color codes, plain text also handles the MiniMessage tag style).
     private static String sortKey(String name) {
         return MiniMessageUtils.toPlainText(MiniMessageUtils.processComponent(name));
+    }
+
+    // Decorate-sort-undecorate. sortKey() MiniMessage-parses the name and serialises a fresh string
+    // per call, and a comparator calls it O(n log n) times -- a 279-song folder was ~2200 parses per
+    // load, and loadSongsSync/loadSubContainersSync/the async combine all did it. One key per
+    // element makes it n.
+    private record SortKeyed<T>(String key, T value) {
+    }
+
+    private static <T> List<T> sortedBySortKey(List<T> items, java.util.function.Function<T, String> name) {
+        List<SortKeyed<T>> keyed = new ArrayList<>(items.size());
+        for (T item : items) {
+            keyed.add(new SortKeyed<>(sortKey(name.apply(item)), item));
+        }
+        keyed.sort(Comparator.comparing(SortKeyed::key));
+        List<T> sorted = new ArrayList<>(keyed.size());
+        for (SortKeyed<T> entry : keyed) {
+            sorted.add(entry.value());
+        }
+        return sorted;
     }
 
     @Override

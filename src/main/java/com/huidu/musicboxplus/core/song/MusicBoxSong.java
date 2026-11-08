@@ -28,6 +28,8 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     private final float speed;
     private final int duration;
     private final int hash;
+    // Disc/database hash remains stable, but compiled content belongs to this exact generation.
+    private final long compiledIdentity = CompiledSongCache.newIdentity();
     private final Set<String> aliases = new HashSet<String>();
     private final Set<String> tags = new HashSet<String>();
     private String jukeboxPlayable;
@@ -341,7 +343,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
     public boolean isCompiled() {
         Map<Integer, String> overrides = PlayerSongServices.buildSoundOverrides();
         return matching(this.compiled, overrides) != null
-                || CompiledSongCache.get(this.hash, overrides) != null;
+                || CompiledSongCache.get(this.compiledIdentity, overrides) != null;
     }
 
     // Still synchronized: two threads racing a cold song should parse it once, not twice.
@@ -356,7 +358,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         // Rebuilding costs a full re-read and re-parse of the file on the caller's thread, which
         // is the thread handling the interaction that started the song, so a shared strong cache
         // of what is actually in rotation stands in front of it.
-        compiled = CompiledSongCache.get(this.hash, overrides);
+        compiled = CompiledSongCache.get(this.compiledIdentity, overrides);
         if (compiled != null) {
             this.compiled = new SoftReference<>(new Compiled(compiled, overrides));
             return compiled;
@@ -375,7 +377,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
             throw new SongNullException("Song can't be loaded");
         }
         this.compiled = new SoftReference<>(new Compiled(compiled, overrides));
-        CompiledSongCache.put(this.hash, overrides, compiled);
+        CompiledSongCache.put(this.compiledIdentity, overrides, compiled);
         return compiled;
     }
 

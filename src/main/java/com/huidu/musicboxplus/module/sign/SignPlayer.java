@@ -112,7 +112,7 @@ extends AbstractBlockPlayer {
         }
         return this.ownerUuid.equals(player.getUniqueId());
     }
-    
+
     public boolean canToggleProtect(Player player) {
         if (player == null) {
             return false;
@@ -160,10 +160,10 @@ extends AbstractBlockPlayer {
         if (player == null || newCurrent <= 0) {
             return;
         }
-        
+
         String line3 = SignUtils.getSignLine(sign, 3);
         boolean preventDestroy = line3 != null && line3.contains("P");
-        
+
         if (preventDestroy) {
             switch (pin) {
                 case 1:
@@ -495,10 +495,10 @@ extends AbstractBlockPlayer {
         if (this.sign == null) {
             return;
         }
-        
+
         String line3 = SignUtils.getSignLine(this.sign, 3);
         String newLine3;
-        
+
         if (this.preventDestroy) {
             if (line3 != null) {
                 newLine3 = line3.replace("P", "").trim();
@@ -512,7 +512,7 @@ extends AbstractBlockPlayer {
             this.preventDestroy = true;
             this.getRangePlayerModel().setAutoDestroyMillis(0);
         }
-        
+
         // The sign block mutation + world write must run on the sign block's owning region,
         // not the clicking player's region (Folia thread-ownership requirement).
         Scheduler.region(this.sign.getLocation(), () -> {

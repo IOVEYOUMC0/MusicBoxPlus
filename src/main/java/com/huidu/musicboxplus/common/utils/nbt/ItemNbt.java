@@ -31,8 +31,16 @@ public final class ItemNbt {
 
     // Meta-based read for the same reason: findByItem scans chests and would otherwise clone the
     // meta once per key checked.
+    //
+    // 0 is returned for "no tag" AND for a tag whose value is 0 -- song hashes are plain integers and
+    // 0 is a valid one. Callers that must tell the two apart use getOptional().
     public static int get(ItemMeta meta, String key) {
         Integer value = meta.getPersistentDataContainer().get(key(key), PersistentDataType.INTEGER);
         return value != null ? value : 0;
+    }
+
+    // Null when the tag is absent, the stored value otherwise (including a stored 0).
+    public static Integer getOptional(ItemMeta meta, String key) {
+        return meta.getPersistentDataContainer().get(key(key), PersistentDataType.INTEGER);
     }
 }

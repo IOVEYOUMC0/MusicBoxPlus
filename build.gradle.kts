@@ -76,6 +76,78 @@ tasks.test {
     useJUnitPlatform()
 }
 
+// plugin.yml is the file the server reads, while Gradle owns the version. Substituting it here
+// keeps the two from drifting: bumping `version` above is the only edit a release needs.
+//
+// Plain replacement in the task action rather than filter/expand: those run as script closures,
+// which the configuration cache cannot serialise (Gradle 9 rejects the whole build). The version is
+// also declared as an input, so changing it re-runs the task instead of reusing a stale copy.
+val pluginVersion = version.toString()
+tasks.processResources {
+    inputs.property("version", pluginVersion)
+    val version = pluginVersion
+    doLast {
+        val pluginFile = destinationDir.resolve("plugin.yml")
+        if (pluginFile.isFile) {
+            val text = pluginFile.readText()
+            val updated = text.replace("\${version}", version)
+            if (updated != text) {
+                pluginFile.writeText(updated)
+            }
+        }
+    }
+}
+
+// Offline replacement for the formatter/linter plugin this project cannot add: spotless,
+// checkstyle and errorprone are not in the local dependency cache, and adding them would break
+// `--offline` builds. These rules are the small set that has actually caused bugs here, checked
+// with no dependency at all.
+//
+// Deliberately checks src/main only: tests legitimately print and assert on odd strings.
+val verifySources by tasks.registering {
+    group = "verification"
+    description = "Fails on debug leftovers, merge markers and whitespace damage in main sources."
+    val sourceDir = layout.projectDirectory.dir("src/main/java")
+    inputs.dir(sourceDir)
+    doLast {
+        val forbidden = mapOf(
+            "System.out." to "use the plugin logger or MessageUtils",
+            "System.err." to "use the plugin logger",
+            "printStackTrace(" to "log the exception instead of printing it",
+            "<<<<<<<" to "unresolved merge marker",
+            ">>>>>>>" to "unresolved merge marker",
+        )
+        val problems = mutableListOf<String>()
+        sourceDir.asFile.walkTopDown()
+            .filter { it.isFile && it.extension == "java" }
+            .forEach { file ->
+                file.readLines().forEachIndexed { index, line ->
+                    forbidden.forEach { (needle, hint) ->
+                        if (line.contains(needle)) {
+                            problems += "${file.relativeTo(sourceDir.asFile)}:${index + 1}: $needle ($hint)"
+                        }
+                    }
+                    if (line.contains('\t')) {
+                        problems += "${file.relativeTo(sourceDir.asFile)}:${index + 1}: tab character"
+                    }
+                    if (line.endsWith(" ") || line.endsWith("\t")) {
+                        problems += "${file.relativeTo(sourceDir.asFile)}:${index + 1}: trailing whitespace"
+                    }
+                }
+            }
+        if (problems.isNotEmpty()) {
+            throw GradleException(
+                "Source verification failed with ${problems.size} problem(s):\n" +
+                    problems.joinToString("\n") { "  $it" }
+            )
+        }
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifySources)
+}
+
 tasks.named<ShadowJar>("shadowJar") {
     archiveClassifier.set("")
     // Relocate HikariCP like the former Maven shade config did, so it cannot collide with

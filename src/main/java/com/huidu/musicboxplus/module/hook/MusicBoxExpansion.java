@@ -59,52 +59,52 @@ extends PlaceholderExpansion {
             return "";
         }
         switch (params.toLowerCase()) {
-            case "now_playing": 
-            case "song": 
+            case "now_playing":
+            case "song":
             case "current_song": {
                 return this.getCurrentSongName(wrapper);
             }
-            case "song_author": 
+            case "song_author":
             case "author": {
                 return this.getCurrentSongAuthor(wrapper);
             }
-            case "song_original_author": 
+            case "song_original_author":
             case "original_author": {
                 return this.getCurrentSongOriginalAuthor(wrapper);
             }
-            case "song_length": 
-            case "length": 
+            case "song_length":
+            case "length":
             case "duration": {
                 return this.getSongLength(wrapper);
             }
-            case "song_progress": 
+            case "song_progress":
             case "progress": {
                 return this.getSongProgress(wrapper);
             }
-            case "song_progress_percent": 
+            case "song_progress_percent":
             case "progress_percent": {
                 return this.getSongProgressPercent(wrapper);
             }
-            case "is_playing": 
+            case "is_playing":
             case "playing": {
                 return this.isPlaying(wrapper);
             }
-            case "is_paused": 
+            case "is_paused":
             case "paused": {
                 return this.isPaused(wrapper);
             }
             case "status": {
                 return this.getStatus(wrapper);
             }
-            case "mode": 
+            case "mode":
             case "playback_mode": {
                 return this.getPlaybackMode(wrapper);
             }
-            case "is_speaker": 
+            case "is_speaker":
             case "speaker_mode": {
                 return wrapper.isSpeaker() ? "true" : "false";
             }
-            case "is_silent": 
+            case "is_silent":
             case "silent_mode": {
                 return wrapper.isSilent() ? "true" : "false";
             }
@@ -117,12 +117,12 @@ extends PlaceholderExpansion {
             case "total_songs": {
                 return String.valueOf(MusicBoxSongManager.getAllSongs().size());
             }
-            case "playlist_count": 
-            case "recent_songs_count": 
+            case "playlist_count":
+            case "recent_songs_count":
             case "recent_count": {
                 return this.getPlaylistCount(wrapper);
             }
-            case "recent_song": 
+            case "recent_song":
             case "last_song": {
                 return this.getRecentSong(wrapper);
             }

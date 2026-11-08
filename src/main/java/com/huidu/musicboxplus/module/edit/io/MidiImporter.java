@@ -30,7 +30,29 @@ public class MidiImporter {
         return importFromFile(file, player.getName(), player.getUniqueId());
     }
 
+    /**
+     * Bounds the file before the parser sees it.
+     *
+     * <p>{@code maxImportFileBytes} used to be enforced only by {@link MusicFileImporter}, i.e. only
+     * on the web/editor path; the auto-conversion path called the parser directly, so the cap did not
+     * apply there. The MIDI parser also materialises every event into a list, so an unbounded file is
+     * an unbounded allocation.
+     */
+    private static void checkImportSize(File file, long maxBytes) throws IOException {
+        if (file == null) {
+            throw new IOException("MIDI file is null");
+        }
+        if (!file.isFile()) {
+            throw new IOException("MIDI file not found");
+        }
+        long length = file.length();
+        if (length > maxBytes) {
+            throw new IOException("Import file too large (max " + (maxBytes / (1024 * 1024)) + " MB)");
+        }
+    }
+
     public ImportResult importFromFile(File file, String author, UUID authorUUID) throws IOException {
+        checkImportSize(file, MusicFileImporter.MAX_IMPORT_FILE_BYTES);
         Sequence sequence;
         try {
             sequence = MidiSystem.getSequence(file);
@@ -51,6 +73,7 @@ public class MidiImporter {
     // Parses a MIDI file into a raw NBS song without touching the player-music database, unlike
     // importFromFile. Used by the server-side MIDI to NBS auto-conversion.
     public RawNbsSong parseToSong(File file) throws IOException {
+        checkImportSize(file, MusicFileImporter.MAX_IMPORT_FILE_BYTES);
         Sequence sequence;
         try {
             sequence = MidiSystem.getSequence(file);
@@ -72,6 +95,9 @@ public class MidiImporter {
         PlayerMusic music = buildPlayerMusic(sequence, author, authorUUID, fileName, warnings);
 
         if (!PlayerMusicManager.getInstance().saveMusicSync(music)) {
+            // saveMusicSync caches the song before writing, so a failed write leaves it visible in the
+            // player's library (and in the editor's "my music" list) with nothing behind it.
+            PlayerMusicManager.getInstance().discardUnsavedMusic(music);
             throw new IllegalStateException("Failed to save imported music");
         }
 

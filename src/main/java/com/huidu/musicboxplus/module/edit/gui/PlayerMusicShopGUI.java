@@ -68,13 +68,13 @@ public class PlayerMusicShopGUI implements InventoryHolder {
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= musicSlots.size()) break;
-            
+
             int slot = musicSlots.get(slotIndex);
             PublishedMusic music = musicList.get(i);
-            
+
             GUIConfigManager.HotbarButtonConfig musicConfig = config.getButton("music-item");
-            
-            String descLine = music.getDescription() != null && !music.getDescription().isEmpty() 
+
+            String descLine = music.getDescription() != null && !music.getDescription().isEmpty()
                     ? Lang.SHOP_MUSIC_DESCRIPTION_PREFIX.toString("{description}", music.getDescription()) : "";
             boolean ownMusic = music.getAuthorUUID().equals(player.getUniqueId());
             boolean canClaimOwn = ownMusic && PublishedMusicManager.getInstance().canClaimOwnMusic(music, player);
@@ -82,7 +82,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
             String action = ownMusic
                     ? (canClaimOwn ? Lang.SHOP_MUSIC_ACTION_OWN_CLAIM.toString() : Lang.SHOP_MUSIC_ACTION_OWN.toString())
                     : Lang.SHOP_MUSIC_ACTION_BUY.toString();
-            
+
             List<String> lore = new ArrayList<>();
             for (String line : musicConfig.getLore()) {
                 lore.add(line.replace("{name}", music.getName())
@@ -95,7 +95,7 @@ public class PlayerMusicShopGUI implements InventoryHolder {
                         .replace("{sales}", String.valueOf(music.getSalesCount()))
                         .replace("{action}", action));
             }
-            
+
             String name = musicConfig.getName().replace("{name}", music.getName());
             ItemStack item = ItemUtils.createStack(musicConfig.getMaterial(), name, lore, musicConfig.getCustomModelData(), musicConfig.getItemModel(), musicConfig.getCraftEngineItem());
             inventory.setItem(slot, item);

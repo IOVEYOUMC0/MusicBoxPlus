@@ -284,7 +284,7 @@ public class EditExecutor implements SubCommand {
         MessageUtils.send(player, Lang.EDIT_LIST_HEADER);
         MessageUtils.send(player, Lang.EDIT_LIST_TITLE_MSG, "{count}", String.valueOf(musicList.size()));
         MessageUtils.send(player, Lang.EDIT_LIST_HEADER);
-        
+
         for (int i = 0; i < musicList.size(); i++) {
             PlayerMusic music = musicList.get(i);
             MessageUtils.send(player, Lang.EDIT_LIST_ITEM_MSG,
@@ -293,7 +293,7 @@ public class EditExecutor implements SubCommand {
                 "{notes}", String.valueOf(music.getNoteCount())
             );
         }
-        
+
         MessageUtils.send(player, Lang.EDIT_LIST_FOOTER);
     }
 
@@ -430,18 +430,18 @@ public class EditExecutor implements SubCommand {
 
         String sessionId = webServer.createSession(player.getUniqueId(), music.getUniqueId());
         String url = webServer.buildSessionUrl(sessionId);
-        
+
         MessageUtils.send(player, Lang.EDIT_WEB_LINK, "{name}", music.getName(), "{url}", url);
     }
 
     private void openMusicSelect(Player player) {
         List<PlayerMusic> musicList = musicManager.getMusicByPlayer(player);
-        
+
         if (musicList.isEmpty()) {
             MessageUtils.send(player, Lang.EDIT_NO_MUSIC);
             return;
         }
-        
+
         if (musicList.size() == 1) {
             MusicEditListener.enterEditMode(player, musicList.get(0));
         } else {

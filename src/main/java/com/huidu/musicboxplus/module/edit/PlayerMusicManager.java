@@ -18,6 +18,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -27,10 +28,16 @@ public class PlayerMusicManager {
     private static final Object LOCK = new Object();
     private final Map<UUID, List<PlayerMusic>> playerMusicCache = new ConcurrentHashMap<>();
     private final Map<UUID, PlayerMusic> musicByIdCache = new ConcurrentHashMap<>();
-    private final Map<UUID, PlayerMusic> pendingSaveSnapshots = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> pendingSaveSignatures = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> lastSavedSignatures = new ConcurrentHashMap<>();
-    private final Map<UUID, Integer> lastWrittenNoteSignatures = new ConcurrentHashMap<>();
+    // What still has to reach the database. Each song's saves are ordered by a version so a failed
+    // write can never put an older snapshot back over one the player edited in the meantime.
+    private final PendingSaves pendingSaves = new PendingSaves();
+    // SHA-256 strings, not 32-bit object hashes: equality here can skip a durable write.
+    private final Map<UUID, String> lastSavedDigests = new ConcurrentHashMap<>();
+    private final Map<UUID, String> lastWrittenNoteDigests = new ConcurrentHashMap<>();
+    // Compared under this manager's monitor. Old asynchronous completions must not write behind a
+    // newer synchronous save (or after a pending queue has drained and been refilled).
+    private final Map<UUID, Long> lastSavedVersions = new ConcurrentHashMap<>();
+    private final java.util.function.Predicate<PlayerMusic> persistenceOverride;
     private final Map<UUID, CompletableFuture<Boolean>> saveChains = new ConcurrentHashMap<>();
 
     public static PlayerMusicManager getInstance() {
@@ -49,6 +56,13 @@ public class PlayerMusicManager {
     }
 
     private PlayerMusicManager() {
+        this.persistenceOverride = null;
+    }
+
+    // Inject only the durable-write boundary for deterministic ordering/rollback tests, without
+    // starting Bukkit or a JDBC pool. Public entry points still use the same coordinator below.
+    PlayerMusicManager(java.util.function.Predicate<PlayerMusic> persistenceOverride) {
+        this.persistenceOverride = Objects.requireNonNull(persistenceOverride);
     }
 
     private void cacheMusic(PlayerMusic music) {
@@ -58,9 +72,15 @@ public class PlayerMusicManager {
 
         UUID musicId = music.getUniqueId();
         UUID authorUUID = music.getAuthorUUID();
-        musicByIdCache.put(musicId, music);
+        PlayerMusic previous = musicByIdCache.put(musicId, music);
         // Rebuild any disc adapter so edits/renames are reflected on player-music discs.
         com.huidu.musicboxplus.core.song.MusicBoxSongManager.invalidatePlayerMusicAdapter(musicId);
+        if (previous == music) {
+            // Normal editor saves keep the same object. Removing and re-adding it to a
+            // CopyOnWriteArrayList copied the entire owner's catalogue twice per save (and once
+            // more through saveMusic's redundant call), despite no membership change.
+            return;
+        }
 
         List<PlayerMusic> playerMusicList = playerMusicCache.computeIfAbsent(
                 authorUUID, k -> new CopyOnWriteArrayList<>());
@@ -198,40 +218,26 @@ public class PlayerMusicManager {
         }
         cacheMusic(music);
 
-        PlayerMusic snapshot = music.snapshot();
-        pendingSaveSnapshots.put(snapshot.getUniqueId(), snapshot);
-        pendingSaveSignatures.put(snapshot.getUniqueId(), calculateSnapshotSignature(snapshot));
+        stageSnapshot(music);
     }
 
     public CompletableFuture<Boolean> saveMusicAsync(PlayerMusic music) {
         cacheMusic(music);
-        PlayerMusic snapshot = music.snapshot();
-        UUID musicId = snapshot.getUniqueId();
-        int snapshotSignature = calculateSnapshotSignature(snapshot);
-        pendingSaveSnapshots.put(musicId, snapshot);
-        pendingSaveSignatures.put(musicId, snapshotSignature);
-        if (Objects.equals(lastSavedSignatures.get(musicId), snapshotSignature)) {
-            pendingSaveSnapshots.remove(musicId, snapshot);
-            pendingSaveSignatures.remove(musicId, snapshotSignature);
-            return CompletableFuture.completedFuture(true);
-        }
+        PendingSaves.Save staged = stageSnapshot(music);
+        UUID musicId = staged.snapshot().getUniqueId();
+        // Do not decide a signature hit on the caller's thread: a synchronous/in-flight write may
+        // still change the durable row. Every path rechecks it under the persistence monitor.
         if (!MusicBox.getInstance().isEnabled()) {
-            boolean saved = saveMusicSyncInternal(snapshot);
-            if (saved) {
-                pendingSaveSnapshots.remove(musicId, snapshot);
-                pendingSaveSignatures.remove(musicId, snapshotSignature);
-                lastSavedSignatures.put(musicId, snapshotSignature);
-            }
-            return CompletableFuture.completedFuture(saved);
+            return CompletableFuture.completedFuture(persistSaveSync(staged));
         }
-        CompletableFuture<Boolean> previous = saveChains.get(musicId);
-        if (previous == null) {
-            previous = CompletableFuture.completedFuture(true);
-        }
-
-        CompletableFuture<Boolean> next = previous.handle((ignored, throwable) -> null)
-                .thenCompose(ignored -> persistLatestSnapshotAsync(musicId));
-        saveChains.put(musicId, next);
+        // Publishing the successor atomically avoids two callers branching off the same predecessor.
+        // Attach cleanup outside compute: a completed predecessor may run thenCompose inline.
+        CompletableFuture<Boolean> next = saveChains.compute(musicId, (id, previous) -> {
+            CompletableFuture<Boolean> predecessor = previous == null
+                    ? CompletableFuture.completedFuture(true) : previous;
+            return predecessor.handle((ignored, throwable) -> null)
+                    .thenCompose(ignored -> persistLatestSaveAsync(id));
+        });
         next.whenComplete((result, throwable) -> saveChains.remove(musicId, next));
         return next;
     }
@@ -262,22 +268,16 @@ public class PlayerMusicManager {
         });
     }
 
-    private CompletableFuture<Boolean> persistLatestSnapshotAsync(UUID musicId) {
-        PlayerMusic snapshot = pendingSaveSnapshots.get(musicId);
-        Integer signature = pendingSaveSignatures.get(musicId);
-        if (snapshot == null || signature == null) {
-            return CompletableFuture.completedFuture(true);
-        }
-        if (Objects.equals(lastSavedSignatures.get(musicId), signature)) {
-            pendingSaveSnapshots.remove(musicId, snapshot);
-            pendingSaveSignatures.remove(musicId, signature);
+    private CompletableFuture<Boolean> persistLatestSaveAsync(UUID musicId) {
+        PendingSaves.Save save = pendingSaves.peek(musicId);
+        if (save == null) {
             return CompletableFuture.completedFuture(true);
         }
 
         CompletableFuture<Boolean> future = new CompletableFuture<>();
         AsyncTaskManager.runAsync(() -> {
             try {
-                future.complete(persistSnapshotSync(musicId, snapshot, signature));
+                future.complete(persistSaveSync(save));
             } catch (Exception e) {
                 future.completeExceptionally(e);
             }
@@ -285,129 +285,108 @@ public class PlayerMusicManager {
         return future;
     }
 
-    private boolean persistSnapshotSync(UUID musicId, PlayerMusic snapshot, int signature) {
-        // Share the delete's monitor so a save already in flight when the delete ran sees the
-        // cache entry gone and skips the upsert, instead of writing the stale row back and
-        // resurrecting the deleted music.
+    boolean persistSaveSync(PendingSaves.Save save) {
+        UUID musicId = save.snapshot().getUniqueId();
+        // Keep ordering with explicit delete. Coalesce to the current pending entry before writing:
+        // an executor callback may have captured an older entry before a synchronous save completed.
         synchronized (this) {
-            if (musicByIdCache.get(musicId) == null) {
-                pendingSaveSnapshots.remove(musicId, snapshot);
-                pendingSaveSignatures.remove(musicId, signature);
-                return true;
+            while (true) {
+                if (musicByIdCache.get(musicId) == null) {
+                    pendingSaves.retire(musicId, save.version());
+                    return false;
+                }
+                PendingSaves.Save latest = pendingSaves.peek(musicId);
+                Long durableVersion = lastSavedVersions.get(musicId);
+                if (latest == null) {
+                    // This token may have been explicitly withdrawn by a failed Web update.
+                    // Only an already-durable completion can succeed without a pending entry.
+                    return durableVersion != null && save.version() <= durableVersion;
+                }
+                // The currently staged entry is authoritative even when an aborted Web request
+                // restored an earlier editor retry. Never resurrect a withdrawn captured request.
+                save = latest;
+                if (durableVersion != null && save.version() <= durableVersion) {
+                    pendingSaves.retire(musicId, save.version());
+                } else if (Objects.equals(lastSavedDigests.get(musicId), save.fingerprint().song())) {
+                    lastSavedVersions.put(musicId, save.version());
+                    pendingSaves.retire(musicId, save.version());
+                } else {
+                    if (!saveMusicSyncInternal(save.snapshot(), save.fingerprint().notes())) {
+                        // Entry remains staged on failure. Never put an old snapshot over a new one.
+                        return false;
+                    }
+                    lastSavedDigests.put(musicId, save.fingerprint().song());
+                    lastSavedVersions.put(musicId, save.version());
+                    pendingSaves.retire(musicId, save.version());
+                }
+                latest = pendingSaves.peek(musicId);
+                if (latest == null || latest.version() <= save.version()) {
+                    return true;
+                }
+                // Iterative rather than recursive: continuous edits must not grow the Java stack.
+                save = latest;
             }
-            if (Objects.equals(lastSavedSignatures.get(musicId), signature)) {
-                pendingSaveSnapshots.remove(musicId, snapshot);
-                pendingSaveSignatures.remove(musicId, signature);
-                return true;
-            }
-
-            boolean saved = saveMusicSyncInternal(snapshot);
-            if (!saved) {
-                pendingSaveSnapshots.put(musicId, snapshot);
-                pendingSaveSignatures.put(musicId, signature);
-                return false;
-            }
-
-            lastSavedSignatures.put(musicId, signature);
-            pendingSaveSnapshots.remove(musicId, snapshot);
-            pendingSaveSignatures.remove(musicId, signature);
-
-            PlayerMusic newerSnapshot = pendingSaveSnapshots.get(musicId);
-            Integer newerSignature = pendingSaveSignatures.get(musicId);
-            if (newerSnapshot != null && newerSignature != null && newerSignature != signature) {
-                return persistSnapshotSync(musicId, newerSnapshot, newerSignature);
-            }
-            return true;
         }
     }
 
-    private int calculateSnapshotSignature(PlayerMusic music) {
-        int result = Objects.hash(
-                music.getUniqueId(),
-                music.getName(),
-                music.getAuthor(),
-                music.getAuthorUUID(),
-                music.getTimeSignature(),
-                music.getBpm(),
-                music.getBeatSubdivision(),
-                music.getDescription(),
-                music.getCreatedAt()
-        );
-        for (MusicNote note : music.getNotesSortedByTick()) {
-            result = 31 * result + note.getPitch();
-            result = 31 * result + note.getTick();
-            result = 31 * result + note.getInstruments().hashCode();
+    // Model monitor covers capture, fingerprint and publication. A slow old snapshot can no longer
+    // be assigned a newer queue token after another caller captured and committed newer content.
+    PendingSaves.Save stageSnapshot(PlayerMusic music) {
+        synchronized (music) {
+            PlayerMusic snapshot = music.snapshot();
+            return pendingSaves.stage(snapshot.getUniqueId(), snapshot);
         }
-        return result;
     }
 
-    /**
-     * Fingerprint of the notes alone, used to decide whether `player_music_notes` needs rewriting.
-     *
-     * Deliberately folded over the note list in storage order, not sorted order: the list only
-     * changes when notes are added or removed, so an unchanged song folds to an unchanged value.
-     * Two different orderings of the same set can fold differently, which only costs a redundant
-     * rewrite -- unlike a false match, which would drop a save. The whole-snapshot signature above
-     * keeps the sorted fold, so a pure reorder is still recognised as "already saved".
-     */
-    static int calculateNotesSignature(PlayerMusic music) {
-        int result = 1;
-        for (MusicNote note : music.getNotes()) {
-            result = 31 * result + note.getPitch();
-            result = 31 * result + note.getTick();
-            result = 31 * result + note.getInstruments().hashCode();
-        }
-        return result;
+    // Test access to the same coordinator the public save methods use.
+    PendingSaves.Save stageSaveForTest(PlayerMusic music) {
+        musicByIdCache.put(music.getUniqueId(), music);
+        return stageSnapshot(music);
+    }
+
+    PendingSaves.Save pendingSaveForTest(UUID id) {
+        return pendingSaves.peek(id);
     }
 
     /**
      * True when this instance has no record of committing exactly these notes.
      *
-     * The record is per process: after a restart the first save of each song rewrites its notes in
-     * full, as before. On a database shared by several servers, a metadata-only save leaves whatever
-     * another server wrote in the note table alone -- previously it deleted and replaced that
-     * server's notes with this one's stale copy.
+     * <p>The comparison is a SHA-256 content digest, not {@code Objects.hash}/{@code hashCode}. A
+     * 32-bit fold of (pitch, tick, instruments) collides easily enough to be reachable by ordinary
+     * edits -- pitch 45/tick 0 and pitch 44/tick 31 fold to the same int -- and a false match drops a
+     * real save, which is exactly the failure direction that must never happen here.
+     *
+     * <p>The record is per process: after a restart the first save of each song rewrites its notes in
+     * full. On a database shared by several servers, a metadata-only save leaves whatever another
+     * server wrote in the note table alone.
      */
-    boolean needsNoteRewrite(UUID musicId, int notesSignature) {
-        return !Objects.equals(lastWrittenNoteSignatures.get(musicId), notesSignature);
+    boolean needsNoteRewrite(UUID musicId, String notesDigest) {
+        return !Objects.equals(lastWrittenNoteDigests.get(musicId), notesDigest);
     }
 
-    void markNotesWritten(UUID musicId, int notesSignature) {
-        lastWrittenNoteSignatures.put(musicId, notesSignature);
+    void markNotesWritten(UUID musicId, String notesDigest) {
+        lastWrittenNoteDigests.put(musicId, notesDigest);
     }
 
     public boolean saveMusicSync(PlayerMusic music) {
         cacheMusic(music);
 
-        PlayerMusic snapshot = music.snapshot();
-        int snapshotSignature = calculateSnapshotSignature(snapshot);
-        boolean saved = persistSnapshotSync(snapshot.getUniqueId(), snapshot, snapshotSignature);
-        if (saved) {
-            pendingSaveSnapshots.remove(snapshot.getUniqueId());
-            pendingSaveSignatures.remove(snapshot.getUniqueId());
-        } else {
-            pendingSaveSnapshots.put(snapshot.getUniqueId(), snapshot);
-            pendingSaveSignatures.put(snapshot.getUniqueId(), snapshotSignature);
-        }
-        return saved;
+        PendingSaves.Save staged = stageSnapshot(music);
+        // A failure leaves the snapshot staged (persistSaveSync puts it back when nothing newer
+        // arrived), so both the shutdown flush and the next save still have a chance to persist it.
+        return persistSaveSync(staged);
     }
 
     public void flushPendingSavesSync() {
-        if (pendingSaveSnapshots.isEmpty()) {
+        if (pendingSaves.isEmpty()) {
             return;
         }
 
         int attempted = 0;
         int saved = 0;
-        for (PlayerMusic snapshot : new ArrayList<>(pendingSaveSnapshots.values())) {
-            Integer signature = pendingSaveSignatures.get(snapshot.getUniqueId());
-            if (signature == null) {
-                continue;
-            }
+        for (PendingSaves.Save save : pendingSaves.staged()) {
             attempted++;
-            if (persistSnapshotSync(snapshot.getUniqueId(), snapshot, signature)) {
-                pendingSaveSnapshots.remove(snapshot.getUniqueId(), snapshot);
-                pendingSaveSignatures.remove(snapshot.getUniqueId(), signature);
+            if (persistSaveSync(save)) {
                 saved++;
             }
         }
@@ -415,7 +394,7 @@ public class PlayerMusicManager {
         if (saved > 0) {
             MusicBox.getInstance().getLogger().info("Flushed " + saved + " pending player music saves");
         }
-        int remaining = pendingSaveSnapshots.size();
+        int remaining = pendingSaves.size();
         if (remaining > 0) {
             MusicBox.getInstance().getLogger().warning(
                     "Still have " + remaining + " pending player music saves after flushing " + attempted + " snapshot(s)"
@@ -423,7 +402,10 @@ public class PlayerMusicManager {
         }
     }
 
-    private boolean saveMusicSyncInternal(PlayerMusic music) {
+    private boolean saveMusicSyncInternal(PlayerMusic music, String notesDigest) {
+        if (persistenceOverride != null) {
+            return persistenceOverride.test(music);
+        }
         if (!DatabaseLoader.isInitialized()) {
             MusicBox.getInstance().getLogger().warning("Database is not initialized, cannot save player music");
             return false;
@@ -435,8 +417,8 @@ public class PlayerMusicManager {
             connection = base.openConnection();
             connection.setAutoCommit(false);
 
-            String upsertSql = base.getUpsertSql("player_music", 
-                new String[]{"id", "name", "author", "author_uuid", "time_signature", "bpm", "beat_subdivision", "created_at", "updated_at", "description"}, 
+            String upsertSql = base.getUpsertSql("player_music",
+                new String[]{"id", "name", "author", "author_uuid", "time_signature", "bpm", "beat_subdivision", "created_at", "updated_at", "description"},
                 new String[]{"id"});
             base.executeUpdate(connection, upsertSql,
                 music.getUniqueId().toString(),
@@ -455,12 +437,11 @@ public class PlayerMusicManager {
             // DELETE-then-re-INSERT on every save, so renaming a 20k-note song re-inserted all 20k
             // rows to change one string in player_music. The fingerprint is a per-process record of
             // what this instance last committed, so a first save after startup still writes in full.
-            int notesSignature = calculateNotesSignature(music);
-            boolean notesRewritten = needsNoteRewrite(music.getUniqueId(), notesSignature);
+            boolean notesRewritten = needsNoteRewrite(music.getUniqueId(), notesDigest);
             if (notesRewritten) {
                 base.executeUpdate(connection, "DELETE FROM player_music_notes WHERE music_id = ?", music.getUniqueId().toString());
 
-                if (!music.getNotes().isEmpty()) {
+                if (music.getNoteCount() > 0) {
                     try (PreparedStatement ps = connection.prepareStatement(
                         base.resolveTableNames(
                             "INSERT INTO player_music_notes (music_id, pitch, tick, instruments) VALUES (?, ?, ?, ?)")
@@ -491,7 +472,7 @@ public class PlayerMusicManager {
             connection.commit();
             if (notesRewritten) {
                 // Only after the commit: a rolled-back transaction must not claim the notes are in.
-                markNotesWritten(music.getUniqueId(), notesSignature);
+                markNotesWritten(music.getUniqueId(), notesDigest);
             }
             return true;
         } catch (SQLException e) {
@@ -529,6 +510,43 @@ public class PlayerMusicManager {
         return future;
     }
 
+    /**
+     * Forgets a song that was never handed to the player.
+     *
+     * <p>Used by the purchase flow: the copy is created and cached before its write is attempted, so
+     * a failed or refunded purchase has to withdraw it from the in-memory library as well. {@link
+     * #deleteMusicAsync} cannot do that job, because it returns early when the database is not
+     * initialised -- which is exactly the failure that leaves the copy behind. A copy that stays
+     * cached is visible in the buyer's library, editable, and is flushed to the database by the
+     * shutdown save of the pending queue, i.e. a refunded purchase would become a free song.
+     *
+     * <p>This deliberately does not touch the database: if a row was written by an earlier attempt,
+     * the caller is expected to also request a delete.
+     */
+    public void discardUnsavedMusic(UUID musicId) {
+        if (musicId == null) {
+            return;
+        }
+        synchronized (this) {
+            PlayerMusic music = musicByIdCache.get(musicId);
+            if (music != null) {
+                removeMusicFromCaches(music.getAuthorUUID(), musicId);
+                return;
+            }
+            // No cached instance to read the author from: clear every per-song record directly and
+            // sweep the author buckets, which are small lists.
+            pendingSaves.drop(musicId);
+            lastSavedDigests.remove(musicId);
+            lastSavedVersions.remove(musicId);
+            lastWrittenNoteDigests.remove(musicId);
+            saveChains.remove(musicId);
+            for (List<PlayerMusic> bucket : playerMusicCache.values()) {
+                bucket.removeIf(existing -> existing.getUniqueId().equals(musicId));
+            }
+            com.huidu.musicboxplus.core.song.MusicBoxSongManager.invalidatePlayerMusicAdapter(musicId);
+        }
+    }
+
     private boolean deleteMusicSync(UUID musicId) {
         PlayerMusic music = musicByIdCache.get(musicId);
         if (music == null) {
@@ -554,10 +572,10 @@ public class PlayerMusicManager {
                 }
                 musicByIdCache.remove(musicId);
                 com.huidu.musicboxplus.core.song.MusicBoxSongManager.invalidatePlayerMusicAdapter(musicId);
-                pendingSaveSnapshots.remove(musicId);
-                pendingSaveSignatures.remove(musicId);
-                lastSavedSignatures.remove(musicId);
-                lastWrittenNoteSignatures.remove(musicId);
+                pendingSaves.drop(musicId);
+                lastSavedDigests.remove(musicId);
+                lastSavedVersions.remove(musicId);
+                lastWrittenNoteDigests.remove(musicId);
                 saveChains.remove(musicId);
             } catch (Exception e) {
                 MusicBox.getInstance().getLogger().log(Level.SEVERE, "Failed to delete player music: " + musicId, e);
@@ -613,6 +631,76 @@ public class PlayerMusicManager {
         }
     }
 
+    /**
+     * Applies {@code mutation} to the live song and persists the result, all under the manager
+     * monitor.
+     *
+     * <p>This is the write path for callers outside the in-game editor (the web editor and its
+     * import endpoint). Routing them through here instead of {@code synchronized (music)} around
+     * {@link #saveMusicSync} fixes two things at once:
+     *
+     * <ul>
+     *   <li><b>Lock order.</b> Rename, delete and create take the manager monitor and then the
+     *       song's; the web write path took them the other way round, which is an ABBA deadlock
+     *       waiting for two concurrent requests (a PUT and a rename).
+     *   <li><b>Lost updates and rollback.</b> The mutation sees the song as it is when the lock was
+     *       acquired, and a failed save restores the in-memory object exactly, so memory and
+     *       database cannot disagree. Previously each caller snapshotted before the lock and rolled
+     *       back with its own copy, which could undo somebody else's successful write.
+     * </ul>
+     *
+     * <p>The mutation may throw to reject the request; it only ever touches the working copy, so the
+     * live song is untouched when that happens.
+     *
+     * @return true when the change was committed; false when the song is gone or the write failed
+     */
+    public boolean updateMusicSync(UUID musicId, UnaryOperator<PlayerMusic> mutation) {
+        if (musicId == null || mutation == null) {
+            return false;
+        }
+        synchronized (this) {
+            PlayerMusic live = musicByIdCache.get(musicId);
+            if (live == null) {
+                return false;
+            }
+            // Keep the model locked in the established manager -> model order. An editor can be
+            // opened after the HTTP precheck; its model mutations must not interleave between the
+            // working-copy capture and successful publication. stageSnapshot never takes manager.
+            synchronized (live) {
+                PlayerMusic replacement = mutation.apply(live.snapshot());
+                if (replacement == null) {
+                    return false;
+                }
+                if (!musicId.equals(replacement.getUniqueId())
+                        || !live.getAuthorUUID().equals(replacement.getAuthorUUID())) {
+                    throw new IllegalArgumentException("An update cannot change the music identity or owner");
+                }
+                // Commit the detached working copy before publishing it. A rejected Web request must
+                // not leave its failed content in pendingSaves to be silently committed at shutdown.
+                PendingSaves.Save previousPending = pendingSaves.peek(musicId);
+                PendingSaves.Save request = pendingSaves.stage(musicId, replacement);
+                boolean committed = false;
+                try {
+                    committed = saveMusicSyncInternal(replacement, request.fingerprint().notes());
+                    if (!committed) {
+                        return false;
+                    }
+                    lastSavedDigests.put(musicId, request.fingerprint().song());
+                    lastSavedVersions.put(musicId, request.version());
+                    live.applySnapshot(replacement);
+                    com.huidu.musicboxplus.core.song.MusicBoxSongManager.invalidatePlayerMusicAdapter(musicId);
+                    return true;
+                } finally {
+                    if (pendingSaves.retire(musicId, request.version()) && !committed && previousPending != null) {
+                        // Restore a pre-existing editor retry, not the rejected request. CAS prevents
+                        // replacing an edit staged while this request was doing I/O.
+                        pendingSaves.restoreIfEmpty(musicId, previousPending);
+                    }
+                }
+            }
+        }
+    }
+
     public CompletableFuture<PlayerMusic> createMusicAsync(String name, String authorName, UUID authorUUID, int musicLimit) {
         String validatedName = validateMusicName(name);
         if (validatedName == null) {
@@ -650,6 +738,21 @@ public class PlayerMusicManager {
         }
     }
 
+    /**
+     * Removes a song that was cached but never written, without touching the database.
+     *
+     * <p>{@link #saveMusicSync} caches before it writes, so a failed write left the song visible in
+     * the player's library with no row behind it. Callers that create a song and then fail to persist
+     * it use this instead of {@link #deleteMusic} (which would also run the published-listing
+     * cleanup for a song that never existed there).
+     */
+    public void discardUnsavedMusic(PlayerMusic music) {
+        if (music == null) {
+            return;
+        }
+        removeMusicFromCaches(music.getAuthorUUID(), music.getUniqueId());
+    }
+
     private void removeMusicFromCaches(UUID authorUUID, UUID musicId) {
         List<PlayerMusic> playerMusicList = playerMusicCache.get(authorUUID);
         if (playerMusicList != null) {
@@ -657,20 +760,20 @@ public class PlayerMusicManager {
         }
         musicByIdCache.remove(musicId);
         com.huidu.musicboxplus.core.song.MusicBoxSongManager.invalidatePlayerMusicAdapter(musicId);
-        pendingSaveSnapshots.remove(musicId);
-        pendingSaveSignatures.remove(musicId);
-        lastSavedSignatures.remove(musicId);
-        lastWrittenNoteSignatures.remove(musicId);
+        pendingSaves.drop(musicId);
+        lastSavedDigests.remove(musicId);
+        lastSavedVersions.remove(musicId);
+        lastWrittenNoteDigests.remove(musicId);
         saveChains.remove(musicId);
     }
-    
+
     public String validateMusicName(String name) {
         if (name == null || name.trim().isEmpty()) {
             return null;
         }
-        
+
         String trimmed = name.trim();
-        
+
         if (trimmed.length() > 100) {
             trimmed = trimmed.substring(0, 100);
         }
@@ -740,7 +843,7 @@ public class PlayerMusicManager {
     public void reload() {
         loadAllMusic();
     }
-    
+
     public CompletableFuture<Void> reloadAsync() {
         if (!MusicBox.getInstance().isEnabled()) {
             flushPendingSavesSync();
@@ -766,10 +869,10 @@ public class PlayerMusicManager {
         playerMusicCache.clear();
         musicByIdCache.clear();
         com.huidu.musicboxplus.core.song.MusicBoxSongManager.clearPlayerMusicAdapters();
-        pendingSaveSnapshots.clear();
-        pendingSaveSignatures.clear();
-        lastSavedSignatures.clear();
-        lastWrittenNoteSignatures.clear();
+        pendingSaves.clear();
+        lastSavedDigests.clear();
+        lastSavedVersions.clear();
+        lastWrittenNoteDigests.clear();
         saveChains.clear();
         synchronized (LOCK) {
             if (instance == this) {

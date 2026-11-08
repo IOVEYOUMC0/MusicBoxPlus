@@ -100,7 +100,7 @@ public class BPMSettingsGUI implements InventoryHolder {
     private ItemStack createBpmStepItem(int step) {
         Material material;
         int absStep = Math.abs(step);
-        
+
         if (absStep >= 50) {
             material = Material.RED_STAINED_GLASS_PANE;
         } else if (absStep >= 20) {
@@ -139,7 +139,7 @@ public class BPMSettingsGUI implements InventoryHolder {
             goBack();
             return;
         }
-        
+
         if (slot == resetSlot) {
             music.setBpm(MusicBox.getInstance().getConfigObject().getEditor().getDefaultBpm());
             saveAndUpdate();

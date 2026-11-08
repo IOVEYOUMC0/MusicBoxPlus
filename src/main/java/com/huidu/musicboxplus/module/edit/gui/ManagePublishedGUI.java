@@ -220,7 +220,7 @@ public class ManagePublishedGUI implements InventoryHolder {
 
         boolean success = PublishedMusicManager.getInstance()
                 .updatePublishedMusic(published.getUniqueId(), music, player.getUniqueId());
-        
+
         if (success) {
             MessageUtils.send(player, Lang.PUBLISH_SYNC_SUCCESS);
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.5f, 1.0f);
@@ -245,7 +245,7 @@ public class ManagePublishedGUI implements InventoryHolder {
                 MessageUtils.send(player, Lang.PUBLISH_REPUBLISHED);
             }
         }
-        
+
         if (success) {
             player.playSound(player.getLocation(), Sound.UI_BUTTON_CLICK, 0.5f, 1.0f);
             updateInventory();

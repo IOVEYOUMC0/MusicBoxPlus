@@ -93,6 +93,9 @@ public class NBSImporter {
                     + music.getNoteCount() + " > " + MusicFileImporter.MAX_IMPORT_NOTES + ")");
         }
         if (!PlayerMusicManager.getInstance().saveMusicSync(music)) {
+            // saveMusicSync caches before writing; without this the failed import stays in the
+            // player's library as a phantom entry with no database row behind it.
+            PlayerMusicManager.getInstance().discardUnsavedMusic(music);
             throw new IllegalStateException("Failed to save imported music");
         }
         DebugLogger.debug("NBS import completed: " + name + ", notes: " + music.getNoteCount()

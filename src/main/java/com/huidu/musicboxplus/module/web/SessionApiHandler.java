@@ -29,6 +29,13 @@ final class SessionApiHandler implements HttpHandler {
             return;
         }
 
+        // Only the read below is defined here; anything else would have been dispatched as if it
+        // were a GET and answered 200/401 instead of 405.
+        if (!"GET".equals(exchange.getRequestMethod())) {
+            support.writeTextResponse(exchange, HttpStatus.METHOD_NOT_ALLOWED, "Method not allowed");
+            return;
+        }
+
         Optional<String> sessionIdOpt = support.extractSessionId(exchange);
         if (sessionIdOpt.isEmpty()) {
             support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Missing or invalid session");

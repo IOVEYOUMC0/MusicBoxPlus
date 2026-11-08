@@ -35,22 +35,22 @@ public abstract class AbstractSelect implements SubCommand {
             handleNoArgs(sender);
             return;
         }
-        
+
         String firstArg = args[0];
-        
+
         if (firstArg.startsWith("-")) {
             handleFlagArg(sender, args);
             return;
         }
-        
+
         if (args.length == 1) {
             handleSingleArg(sender, firstArg);
             return;
         }
-        
+
         handleSongArg(sender, args);
     }
-    
+
     private void handleNoArgs(CommandSender sender) {
         if (sender instanceof Player) {
             this.noArgs(sender, (Player) sender);
@@ -58,66 +58,66 @@ public abstract class AbstractSelect implements SubCommand {
             MessageUtils.send(sender, Lang.SPECIFY_PLAYER);
         }
     }
-    
+
     private void handleFlagArg(CommandSender sender, String[] args) {
         if (!(sender instanceof Player)) {
             MessageUtils.send(sender, Lang.SPECIFY_PLAYER);
             return;
         }
-        
+
         String flag = args[0];
-        
+
         if (args.length == 1) {
             this.noArgsWithFlag(sender, (Player) sender, flag);
             return;
         }
-        
+
         if (checkAdminPermission(sender)) {
             return;
         }
-        
+
         Player target = getOnlinePlayer(sender, args[1]);
         if (target == null) {
             return;
         }
-        
+
         this.noArgsWithFlag(sender, target, flag);
     }
-    
+
     private void handleSingleArg(CommandSender sender, String playerName) {
         if (checkAdminPermission(sender)) {
             return;
         }
-        
+
         Player target = getOnlinePlayer(sender, playerName);
         if (target == null) {
             return;
         }
-        
+
         this.noArgs(sender, target);
     }
-    
+
     private void handleSongArg(CommandSender sender, String[] args) {
         if (checkAdminPermission(sender)) {
             return;
         }
-        
+
         String songName = args[1].replace('_', ' ');
         MusicBoxSong song = MusicBoxSongManager.findByName(songName).orElse(null);
-        
+
         if (song == null) {
             MessageUtils.send(sender, Lang.SONG_NOT_FOUND);
             return;
         }
-        
+
         Player target = getOnlinePlayer(sender, args[0]);
         if (target == null) {
             return;
         }
-        
+
         this.processSong(sender, target, song, args);
     }
-    
+
     private boolean checkAdminPermission(CommandSender sender) {
         if (!sender.hasPermission(ADMIN_PERMISSION)) {
             MessageUtils.send(sender, Lang.NO_PERMISSIONS);
@@ -125,7 +125,7 @@ public abstract class AbstractSelect implements SubCommand {
         }
         return false;
     }
-    
+
     private Player getOnlinePlayer(CommandSender sender, String playerName) {
         Player target = Bukkit.getPlayer(playerName);
         if (target == null) {
@@ -147,10 +147,10 @@ public abstract class AbstractSelect implements SubCommand {
         if (!sender.hasPermission(ADMIN_PERMISSION)) {
             return getBasicTabComplete(sender, args);
         }
-        
+
         return getAdminTabComplete(sender, args);
     }
-    
+
     private List<String> getBasicTabComplete(CommandSender sender, String[] args) {
         if (args.length == 1 && sender instanceof Player) {
             Stream<String> flags = Stream.of("-s", "--single");
@@ -158,14 +158,14 @@ public abstract class AbstractSelect implements SubCommand {
         }
         return Collections.emptyList();
     }
-    
+
     private List<String> getAdminTabComplete(CommandSender sender, String[] args) {
         if (args.length <= 1) {
             Stream<String> players = Bukkit.getOnlinePlayers().stream().map(HumanEntity::getName);
             Stream<String> flags = Stream.of("-s", "--single");
             return StringUtils.tabCompletePrepare(args, Stream.concat(flags, players));
         }
-        
+
         if (args.length == 2) {
             Stream<String> songs = MusicBoxSongManager.getRootContainer()
                     .getAllSongs().stream()
@@ -173,7 +173,7 @@ public abstract class AbstractSelect implements SubCommand {
                     .map(s -> s.replace(' ', '_'));
             return StringUtils.tabCompletePrepare(args, 2, songs);
         }
-        
+
         return Collections.emptyList();
     }
 }

@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.logging.Level;
 import java.util.stream.Collectors;
 
@@ -26,7 +27,8 @@ public class PublishedMusicManager {
     private final File revenueFile;
     private final Map<UUID, PublishedMusic> publishedMusicCache = new ConcurrentHashMap<>();
     private final Map<UUID, List<PublishedMusic>> authorMusicCache = new ConcurrentHashMap<>();
-    private final Map<UUID, Double> pendingRevenue = new ConcurrentHashMap<>();
+    private final ConcurrentMap<UUID, Double> pendingRevenue = new ConcurrentHashMap<>();
+    private final RevenueClaim revenueClaim = new RevenueClaim(pendingRevenue);
 
     public static PublishedMusicManager getInstance() {
         if (instance == null) {
@@ -193,7 +195,7 @@ public class PublishedMusicManager {
 
         double minPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMinPrice();
         double maxPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMaxPrice();
-        
+
         if (price < minPrice || price > maxPrice) {
             return PublishResult.PRICE_OUT_OF_RANGE;
         }
@@ -231,7 +233,7 @@ public class PublishedMusicManager {
             authorList.add(published);
         }
         savePublishedMusic(published);
-        
+
         return PublishResult.SUCCESS;
     }
 
@@ -258,7 +260,7 @@ public class PublishedMusicManager {
 
         published.setAvailable(false);
         savePublishedMusic(published);
-        
+
         return true;
     }
 
@@ -291,7 +293,7 @@ public class PublishedMusicManager {
 
         published.setAvailable(true);
         savePublishedMusic(published);
-        
+
         return true;
     }
 
@@ -307,7 +309,7 @@ public class PublishedMusicManager {
 
         published.updateFromMusic(music);
         savePublishedMusic(published);
-        
+
         return true;
     }
 
@@ -323,14 +325,14 @@ public class PublishedMusicManager {
 
         double minPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMinPrice();
         double maxPrice = MusicBox.getInstance().getConfigObject().getPublishConfig().getMaxPrice();
-        
+
         if (newPrice < minPrice || newPrice > maxPrice) {
             return false;
         }
 
         published.setPrice(newPrice);
         savePublishedMusic(published);
-        
+
         return true;
     }
 
@@ -445,7 +447,7 @@ public class PublishedMusicManager {
         savePublishedMusicSync(published);
         savePendingRevenue();
     }
-    
+
     private void savePublishedMusicSync(PublishedMusic published) {
         invalidateAvailableCache();
         try {
@@ -466,7 +468,7 @@ public class PublishedMusicManager {
                     "保存发布音乐失败: " + published.getName(), e);
         }
     }
-    
+
     // Merges in memory now, writes the file off-thread: callers run on a region thread.
     private void addPendingRevenue(UUID authorUUID, double amount) {
         pendingRevenue.merge(authorUUID, amount, Double::sum);
@@ -475,26 +477,25 @@ public class PublishedMusicManager {
 
     public double claimRevenue(Player player) {
         UUID playerUUID = player.getUniqueId();
-        // Atomically take the pending amount first: a rapid second claim then reads
-        // null and pays nothing (no double-pay), and we never clobber revenue that a
-        // concurrent sale merged in after a stale read.
-        Double amount = pendingRevenue.remove(playerUUID);
-
-        if (amount == null || amount <= 0) {
-            if (amount != null) {
-                savePendingRevenue();
-            }
-            return 0;
+        RevenueClaim.Result result = revenueClaim.claim(playerUUID,
+                amount -> EconomyUtils.depositPlayer(player, amount), this::savePendingRevenue);
+        if (result.status() == RevenueClaim.Status.INVALID) {
+            MusicBox.getInstance().getLogger().severe("拒绝领取无效收入，记录已保留: UUID="
+                    + playerUUID + ", amount=" + result.amount());
+        } else if (result.status() == RevenueClaim.Status.UNCERTAIN) {
+            // The current file format cannot persist the quarantine separately from the balance.
+            // An operator must reconcile this account before restarting the server.
+            MusicBox.getInstance().getLogger().log(Level.SEVERE,
+                    "收入支付结果不确定，余额已保留并冻结此UUID的领取；禁止自动重试，请在重启前人工核账"
+                            + "（冻结状态仅在本次运行有效）: UUID=" + playerUUID + ", amount=" + result.amount(),
+                    result.paymentFailure());
         }
-
-        if (EconomyUtils.depositPlayer(player, amount)) {
-            savePendingRevenue();
-            return amount;
+        if (result.persistenceFailure() != null) {
+            MusicBox.getInstance().getLogger().log(Level.SEVERE,
+                    "收入领取状态保存失败，支付状态=" + result.status() + "；已支付金额不会重新加入待领取余额: UUID="
+                            + playerUUID + ", amount=" + result.amount(), result.persistenceFailure());
         }
-
-        // Deposit failed — put the revenue back (merge in case a sale arrived meanwhile).
-        pendingRevenue.merge(playerUUID, amount, Double::sum);
-        return 0;
+        return result.paidAmount();
     }
 
     public double getPendingRevenue(UUID playerUUID) {
@@ -679,7 +680,7 @@ public class PublishedMusicManager {
         NO_MONEY,
         PAYMENT_FAILED
     }
-    
+
     public void shutdown() {
         savePendingRevenue();
         publishedMusicCache.clear();

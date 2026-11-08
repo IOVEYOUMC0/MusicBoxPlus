@@ -153,6 +153,9 @@ public final class ModuleRuntimeSync {
     private void syncJukeboxRuntimeState() {
         if (plugin.isJukeboxModuleEnabled()) {
             if (jukeboxHopperListener == null) {
+                // Guards left behind by a previous session would make those jukeboxes refuse hopper
+                // inserts forever (see resetPendingInserts).
+                JukeboxHopperListener.resetPendingInserts();
                 jukeboxHopperListener = new JukeboxHopperListener();
                 Bukkit.getPluginManager().registerEvents(jukeboxHopperListener, plugin);
             }

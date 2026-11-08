@@ -121,4 +121,44 @@ class FoliaApiUsageTest {
     void theAuditActuallyScannedTheSources() throws Exception {
         assertTrue(mainSources().size() > 100, "the main source tree moved; this scan checked nothing");
     }
+
+    // Paper's region/entity/async schedulers exist on Folia too, but choosing among them is exactly
+    // the decision this plugin centralises in common/utils/scheduler/Scheduler: the facade is the
+    // only place that should have to know which thread a piece of work belongs on. Anything else
+    // naming the scheduler API directly is a place the Folia audit cannot see.
+    //
+    // common/stats is the vendored bStats implementation, which is not ours.
+    @Test
+    void theRegionSchedulerApiIsOnlyReachedThroughTheSchedulerFacade() throws Exception {
+        List<String> offenders = new ArrayList<>();
+        for (Path path : mainSources()) {
+            String name = path.getFileName().toString();
+            String normalised = path.toString().replace('\\', '/');
+            if (name.equals("Scheduler.java") || normalised.contains("/common/stats/")) {
+                continue;
+            }
+            String code = stripComments(Files.readString(path, StandardCharsets.UTF_8));
+            for (String banned : List.of("getRegionScheduler()", "getGlobalRegionScheduler()",
+                    "getAsyncScheduler()", ".getScheduler()")) {
+                if (code.contains(banned)) {
+                    offenders.add(name + ": " + banned);
+                }
+            }
+        }
+        assertEquals(List.of(), offenders,
+                "route scheduling through Scheduler.global/region/entity/async so the Folia audit "
+                        + "sees every call site");
+    }
+
+    // The plugin.yml flag is what makes Folia load the plugin at all: without it the server refuses
+    // the plugin outright, so the whole Scheduler facade would be unreachable.
+    @Test
+    void thePluginDeclaresFoliaSupport() throws Exception {
+        String pluginYml = Files.readString(
+                Path.of("src", "main", "resources", "plugin.yml"), StandardCharsets.UTF_8);
+
+        assertTrue(pluginYml.contains("folia-supported: true"),
+                "plugin.yml must keep 'folia-supported: true'");
+        assertTrue(pluginYml.contains("api-version:"), "plugin.yml must declare api-version");
+    }
 }

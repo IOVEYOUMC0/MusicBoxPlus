@@ -17,7 +17,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public final class MusicBoxSongManager {
     public static final String MASTER_CONTAINER = "MASTER";
@@ -25,23 +24,16 @@ public final class MusicBoxSongManager {
     private static final SongContainer masterContainer = new MasterContainer();
     // Stable per-music-id adapters so player-music discs resolve to one MusicBoxSong instance.
     private static final Map<java.util.UUID, MusicBoxSong> playerMusicAdapters = new ConcurrentHashMap<>();
-    private static volatile List<MusicBoxSong> allSongs;
-    private static volatile MusicBoxSongContainer rootContainer;
-    private static final AtomicReference<Map<String, MusicBoxSong>> nameToSongRef;
-    private static final AtomicReference<Map<String, MusicBoxSong>> lowerCaseNameToSongRef;
-    private static final AtomicReference<Map<Integer, MusicBoxSong>> hashToSongRef;
-    private static final AtomicReference<Map<String, List<MusicBoxSong>>> searchCacheRef;
-    private static final ReentrantReadWriteLock searchCacheLock = new ReentrantReadWriteLock();
-    private static final AtomicBoolean isLoading;
-    private static final AtomicBoolean isLoaded;
-    private static final AtomicReference<Map<String, Set<MusicBoxSong>>> keywordIndexRef;
-    private static final ReentrantReadWriteLock keywordIndexLock = new ReentrantReadWriteLock();
+    private static final AtomicReference<CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong>> catalogRef =
+            new AtomicReference<>(new CatalogSnapshot<>(null, List.of(), Map.of(), Map.of(), Map.of(), Map.of(), 100));
+    private static final AtomicBoolean isLoading = new AtomicBoolean(false);
+    private static final AtomicBoolean isLoaded = new AtomicBoolean(false);
     private static final int MIN_KEYWORD_LENGTH = 2;
     private static final int MAX_KEYWORDS_PER_SONG = 200;
     // What separates search tokens: anything that is not a letter or a digit.
     private static final java.util.regex.Pattern TOKEN_SEPARATOR =
             java.util.regex.Pattern.compile("[^\\p{IsAlphabetic}\\p{IsDigit}]+");
-    
+
     private static int getMaxKeywordLength() {
         return MusicBox.getInstance().getConfigObject().getSearch().getMaxKeywordLength();
     }
@@ -85,160 +77,88 @@ public final class MusicBoxSongManager {
         }
     }
 
-    public static void reload(File rootFolder) {
-        if (isLoading.get()) {
-            MusicBox.getInstance().getLogger().warning(
-                    com.huidu.musicboxplus.common.utils.LogLocale.text(
-                            MusicBox.getInstance(),
-                            "Songs are still loading, please wait...",
-                            "歌曲仍在加载中，请稍候..."
-                    )
-            );
-            return;
+    // Only the asynchronous reload is reachable: every caller (startup, /musicboxplus reload, the
+    // web editor's reload) needs the work off the tick thread, and this method's synchronous twin
+    // was left behind with no call sites. Loading synchronously would also block a Folia region
+    // thread for the whole library scan, so it is deliberately not kept "just in case".
+    public static CompletableFuture<Void> reloadAsync(File rootFolder) {
+        if (!isLoading.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(new IllegalStateException("Songs are already loading"));
         }
-        isLoading.set(true);
         isLoaded.set(false);
-        // Reload rebuilds every MusicBoxSong from disk, so anything already compiled describes a
-        // file that may since have changed.
-        CompiledSongCache.clear();
         long startTime = System.currentTimeMillis();
-        maybeConvertMidi(rootFolder);
-        rootContainer = new MusicBoxSongContainer(rootFolder, null, false);
-        rootContainer.loadSync(rootFolder);
-        allSongs = Collections.unmodifiableList(new ArrayList<MusicBoxSong>(rootContainer.getAllSongs()));
-        
-        Map<String, MusicBoxSong> newNameToSong = new ConcurrentHashMap<>();
-        Map<String, MusicBoxSong> newLowerCaseNameToSong = new ConcurrentHashMap<>();
-        Map<Integer, MusicBoxSong> newHashToSong = new ConcurrentHashMap<>();
-        
-        for (MusicBoxSong song : allSongs) {
-            newNameToSong.put(song.getName(), song);
-            newLowerCaseNameToSong.put(song.getName().toLowerCase(), song);
-            // 路径 hashCode 碰撞会让歌曲静默丢失（findSongByHash 只能恢复一首），检测并告警
-            MusicBoxSong previous = newHashToSong.put(song.getHash(), song);
+        try {
+            CompiledSongCache.clear();
+            java.util.concurrent.Executor executor =
+                    com.huidu.musicboxplus.common.utils.AsyncTaskManager.getInstance().getAsyncExecutor();
+            // Folder/config IO and MIDI conversion stay off the calling (possibly region) thread.
+            return CompletableFuture.supplyAsync(() -> {
+                if (!rootFolder.exists()) {
+                    rootFolder.mkdirs();
+                    MusicBox.getInstance().getLogger().info(
+                            com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(),
+                                    "Song folder did not exist and was created automatically: " + rootFolder.getPath(),
+                                    "歌曲目录不存在，已自动创建: " + rootFolder.getPath()));
+                }
+                maybeConvertMidi(rootFolder);
+                return new MusicBoxSongContainer(rootFolder, null, false);
+            }, executor)
+                    .thenComposeAsync(newRoot -> newRoot.loadAsync(rootFolder).thenApply(unused -> newRoot), executor)
+                    .thenAcceptAsync(newRoot -> {
+                        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = buildCatalog(newRoot);
+                        publishCatalog(catalog);
+                        isLoaded.set(true);
+                        long elapsed = System.currentTimeMillis() - startTime;
+                        MusicBox.getInstance().getLogger().info(com.huidu.musicboxplus.common.utils.LogLocale.text(
+                                MusicBox.getInstance(), "Loaded " + catalog.songs.size() + " songs asynchronously in " + elapsed + "ms",
+                                "异步加载 " + catalog.songs.size() + " 首歌曲，用时 " + elapsed + "ms"));
+                    }, executor).whenComplete((unused, ex) -> {
+                        try {
+                            if (ex != null) {
+                                isLoaded.set(false);
+                                Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+                                MusicBox.getInstance().getLogger().severe(com.huidu.musicboxplus.common.utils.LogLocale.text(
+                                        MusicBox.getInstance(), "Failed to load songs: " + cause.getMessage(), "加载歌曲失败: " + cause.getMessage()));
+                            }
+                        } finally {
+                            isLoading.set(false);
+                        }
+                    });
+        } catch (RuntimeException | Error ex) {
+            // Executor lookup/submission can throw before a completion stage exists.
+            isLoading.set(false);
+            throw ex;
+        }
+    }
+
+    private static CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> buildCatalog(MusicBoxSongContainer root) {
+        List<MusicBoxSong> songs = new ArrayList<>(root.getAllSongs());
+        Map<String, MusicBoxSong> names = new HashMap<>();
+        Map<String, MusicBoxSong> lowerNames = new HashMap<>();
+        Map<Integer, MusicBoxSong> hashes = new HashMap<>();
+        for (MusicBoxSong song : songs) {
+            names.put(song.getName(), song);
+            lowerNames.put(song.getName().toLowerCase(Locale.ROOT), song);
+            MusicBoxSong previous = hashes.put(song.getHash(), song);
             if (previous != null && previous != song) {
                 MusicBox.getInstance().getLogger().warning(
                         "歌曲哈希碰撞: \"" + previous.getName() + "\" 与 \"" + song.getName()
-                                + "\" 的路径哈希相同 (" + song.getHash() + ")，后者将无法通过唱片恢复"
-                );
+                                + "\" 的路径哈希相同 (" + song.getHash() + ")，前者将无法通过唱片恢复");
             }
         }
-        
-        nameToSongRef.set(Collections.unmodifiableMap(newNameToSong));
-        lowerCaseNameToSongRef.set(Collections.unmodifiableMap(newLowerCaseNameToSong));
-        hashToSongRef.set(Collections.unmodifiableMap(newHashToSong));
-        
-        searchCacheLock.writeLock().lock();
-        try {
-            resetSearchCache();
-        } finally {
-            searchCacheLock.writeLock().unlock();
-        }
-        
-        buildKeywordIndex();
-        isLoading.set(false);
-        isLoaded.set(true);
-        long endTime = System.currentTimeMillis();
-        MusicBox.getInstance().getLogger().info(com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(), "Loaded " + allSongs.size() + " songs in " + (endTime - startTime) + "ms", "已加载 " + allSongs.size() + " 首歌曲，用时 " + (endTime - startTime) + "ms"));
+        return new CatalogSnapshot<>(root, songs, names, lowerNames, hashes,
+                buildKeywordIndex(songs), catalogRef.get().cacheCapacity);
     }
 
-    public static CompletableFuture<Void> reloadAsync(File rootFolder) {
-        if (isLoading.get()) {
-            return CompletableFuture.failedFuture(new IllegalStateException("Songs are already loading"));
-        }
-        isLoading.set(true);
-        isLoaded.set(false);
-        // Same as reload(): the async rebuild reads every song from disk, so any compiled song
-        // describes a file that may since have changed. Clear now so no stale compiled entry is
-        // played while the reload is still in flight.
-        CompiledSongCache.clear();
-        long startTime = System.currentTimeMillis();
-        
-        if (!rootFolder.exists()) {
-            rootFolder.mkdirs();
-            MusicBox.getInstance().getLogger().info(
-                    com.huidu.musicboxplus.common.utils.LogLocale.text(
-                            MusicBox.getInstance(),
-                            "Song folder did not exist and was created automatically: " + rootFolder.getPath(),
-                            "歌曲目录不存在，已自动创建: " + rootFolder.getPath()
-                    )
-            );
-        }
-        
-        // Built into a local and published at the end, like the indexes below it.
-        //
-        // This used to assign the field first and fill it later, so for the whole duration of a
-        // reload -- seconds, with one loader thread per core reading every header -- the main thread
-        // saw an empty container tree next to the *previous* generation's song index. Anything that
-        // browsed in that window got nothing: SongContainerGUI snapshots the sub-containers and songs
-        // when it is built, findContainerById found no CHEST: container so signs, LIST: playlists and
-        // autoplay resolved to empty, while findByName still answered from the old generation.
-        //
-        // Nothing inside the load path reads the manager's tree (the loader works on its own
-        // instance), so holding the previous one until the new one is complete is safe as well as
-        // more useful.
-        final MusicBoxSongContainer newRoot;
-        try {
-            newRoot = new MusicBoxSongContainer(rootFolder, null, false);
-        } catch (RuntimeException e) {
-            // The constructor rejects a non-directory path ("File is not folder"), and that throw
-            // happens BEFORE the future chain below exists -- so the whenComplete that resets these
-            // flags would never run, isLoading would stay true for the rest of the server's life,
-            // and every later reload would be refused with "Songs are still loading" while nothing
-            // ever loads again. Reset here instead; the caller gets the failure.
-            isLoading.set(false);
-            isLoaded.set(false);
-            throw e;
-        }
-        return CompletableFuture.runAsync(() -> maybeConvertMidi(rootFolder),
-                        com.huidu.musicboxplus.common.utils.AsyncTaskManager.getInstance().getAsyncExecutor())
-                .thenCompose(ignored -> newRoot.loadAsync(rootFolder))
-                .thenRun(() -> {
-            allSongs = Collections.unmodifiableList(new ArrayList<MusicBoxSong>(newRoot.getAllSongs()));
-            
-            Map<String, MusicBoxSong> newNameToSong = new ConcurrentHashMap<>();
-            Map<String, MusicBoxSong> newLowerCaseNameToSong = new ConcurrentHashMap<>();
-            Map<Integer, MusicBoxSong> newHashToSong = new ConcurrentHashMap<>();
-            
-            for (MusicBoxSong song : allSongs) {
-                newNameToSong.put(song.getName(), song);
-                newLowerCaseNameToSong.put(song.getName().toLowerCase(), song);
-                // 路径 hashCode 碰撞会让歌曲静默丢失（findSongByHash 只能恢复一首），检测并告警
-                MusicBoxSong previous = newHashToSong.put(song.getHash(), song);
-                if (previous != null && previous != song) {
-                    MusicBox.getInstance().getLogger().warning(
-                            "歌曲哈希碰撞: \"" + previous.getName() + "\" 与 \"" + song.getName()
-                                    + "\" 的路径哈希相同 (" + song.getHash() + ")，后者将无法通过唱片恢复"
-                    );
-                }
+    private static void publishCatalog(CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog) {
+        // Preserve a concurrent cache reconfiguration, without rebuilding the immutable indexes.
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> previous;
+        do {
+            previous = catalogRef.get();
+            if (catalog.cacheCapacity != previous.cacheCapacity) {
+                catalog = catalog.withFreshCache(previous.cacheCapacity);
             }
-            
-            nameToSongRef.set(Collections.unmodifiableMap(newNameToSong));
-            lowerCaseNameToSongRef.set(Collections.unmodifiableMap(newLowerCaseNameToSong));
-            hashToSongRef.set(Collections.unmodifiableMap(newHashToSong));
-
-            searchCacheLock.writeLock().lock();
-            try {
-                resetSearchCache();
-            } finally {
-                searchCacheLock.writeLock().unlock();
-            }
-
-            buildKeywordIndex();
-            // Last, so the tree only becomes visible once everything read behind it is in place.
-            rootContainer = newRoot;
-            isLoading.set(false);
-            isLoaded.set(true);
-            long endTime = System.currentTimeMillis();
-            MusicBox.getInstance().getLogger().info(com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(), "Loaded " + allSongs.size() + " songs asynchronously in " + (endTime - startTime) + "ms", "异步加载 " + allSongs.size() + " 首歌曲，用时 " + (endTime - startTime) + "ms"));
-        }).whenComplete((unused, ex) -> {
-            if (ex != null) {
-                isLoading.set(false);
-                isLoaded.set(false);
-                Throwable cause = ex instanceof java.util.concurrent.CompletionException && ex.getCause() != null ? ex.getCause() : ex;
-                MusicBox.getInstance().getLogger().severe(com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(), "Failed to load songs: " + cause.getMessage(), "加载歌曲失败: " + cause.getMessage()));
-            }
-        });
+        } while (!catalogRef.compareAndSet(previous, catalog));
     }
 
     public static boolean isLoading() {
@@ -253,9 +173,10 @@ public final class MusicBoxSongManager {
         if (name == null || name.isEmpty()) {
             return Optional.empty();
         }
-        Map<String, MusicBoxSong> nameMap = nameToSongRef.get();
-        Map<String, MusicBoxSong> lowerMap = lowerCaseNameToSongRef.get();
-        
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+        Map<String, MusicBoxSong> nameMap = catalog.names;
+        Map<String, MusicBoxSong> lowerMap = catalog.lowerNames;
+
         MusicBoxSong song = nameMap.get(name);
         if (song != null) {
             return Optional.of(song);
@@ -270,16 +191,16 @@ public final class MusicBoxSongManager {
         if (song != null) {
             return Optional.of(song);
         }
-        String lowerName = name.toLowerCase();
+        String lowerName = name.toLowerCase(Locale.ROOT);
         song = lowerMap.get(lowerName);
         if (song != null) {
             return Optional.of(song);
         }
-        song = lowerMap.get(nameWithSpaces.toLowerCase());
+        song = lowerMap.get(nameWithSpaces.toLowerCase(Locale.ROOT));
         if (song != null) {
             return Optional.of(song);
         }
-        song = lowerMap.get(nameWithUnderscores.toLowerCase());
+        song = lowerMap.get(nameWithUnderscores.toLowerCase(Locale.ROOT));
         if (song != null) {
             return Optional.of(song);
         }
@@ -287,7 +208,8 @@ public final class MusicBoxSongManager {
     }
 
     public static Optional<MusicBoxSong> findSongByHash(int hash) {
-        return Optional.ofNullable(hashToSongRef.get().get(hash));
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+        return Optional.ofNullable(catalog.hashes.get(hash));
     }
 
     public static Optional<MusicBoxSong> findByItem(ItemStack stack) {
@@ -302,9 +224,14 @@ public final class MusicBoxSongManager {
         if (meta == null) {
             return Optional.empty();
         }
-        int hash = ItemNbt.get(meta, "song_hash");
-        if (hash != 0) {
-            return MusicBoxSongManager.findSongByHash(hash);
+        // getOptional, not get: a song hash of 0 is a real hash, and the 0 fallback made such a disc
+        // indistinguishable from an untagged one (it fell through to the player-music lookup).
+        Integer hash = ItemNbt.getOptional(meta, "song_hash");
+        if (hash != null) {
+            Optional<MusicBoxSong> song = MusicBoxSongManager.findSongByHash(hash);
+            if (song.isPresent()) {
+                return song;
+            }
         }
         return findPlayerMusicByItem(meta);
     }
@@ -348,83 +275,50 @@ public final class MusicBoxSongManager {
         if (query == null || query.trim().isEmpty()) {
             return Collections.emptyList();
         }
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
         SearchQuery searchQuery = SearchQuery.parse(query);
-        String cacheKey = searchQuery.cacheKey();
-        
-        searchCacheLock.readLock().lock();
-        try {
-            List<MusicBoxSong> cached = searchCacheRef.get().get(cacheKey);
-            if (cached != null) {
-                return cached;
-            }
-        } finally {
-            searchCacheLock.readLock().unlock();
-        }
-        
-        List<MusicBoxSong> results = searchWithIndex(searchQuery);
-        List<MusicBoxSong> immutableResults = Collections.unmodifiableList(results);
-        
-        searchCacheLock.writeLock().lock();
-        try {
-            // Put in place: the backing map is a synchronizedMap(access-order LinkedHashMap) with
-            // removeEldestEntry LRU eviction. Copying it on write would be O(n) per miss and would
-            // swap in a plain, unbounded map, losing the LRU cap.
-            searchCacheRef.get().put(cacheKey, immutableResults);
-        } finally {
-            searchCacheLock.writeLock().unlock();
-        }
-
-        return immutableResults;
+        return catalog.search(searchQuery.cacheKey(), captured -> searchWithIndex(captured, searchQuery));
     }
-    
-    private static List<MusicBoxSong> searchWithIndex(SearchQuery searchQuery) {
+
+    private static List<MusicBoxSong> searchWithIndex(
+            CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog, SearchQuery searchQuery) {
         String lowerQuery = searchQuery.textQuery();
         if (lowerQuery.isEmpty()) {
-            return filterSongs(allSongs, searchQuery);
+            return filterSongs(catalog.songs, searchQuery);
         }
         if (lowerQuery.length() < MIN_KEYWORD_LENGTH) {
-            return searchLinear(searchQuery);
+            return searchLinear(catalog, searchQuery);
         }
 
         List<String> queryTokens = tokenizeSearchText(lowerQuery);
         if (queryTokens.isEmpty()) {
-            return searchLinear(searchQuery);
+            return searchLinear(catalog, searchQuery);
         }
 
         Set<MusicBoxSong> resultSet = null;
-        keywordIndexLock.readLock().lock();
-        try {
-            Map<String, Set<MusicBoxSong>> index = keywordIndexRef.get();
-            for (String token : queryTokens) {
-                Set<MusicBoxSong> tokenMatches = index.get(token);
-                if (tokenMatches == null || tokenMatches.isEmpty()) {
-                    return searchLinear(searchQuery);
-                }
-                if (resultSet == null) {
-                    resultSet = new HashSet<>(tokenMatches);
-                } else {
-                    resultSet.retainAll(tokenMatches);
-                }
-                if (resultSet.isEmpty()) {
-                    return Collections.emptyList();
-                }
+        for (String token : queryTokens) {
+            Set<MusicBoxSong> tokenMatches = catalog.keywords.get(token);
+            if (tokenMatches == null || tokenMatches.isEmpty()) {
+                return searchLinear(catalog, searchQuery);
             }
-        } finally {
-            keywordIndexLock.readLock().unlock();
+            if (resultSet == null) {
+                resultSet = new HashSet<>(tokenMatches);
+            } else {
+                resultSet.retainAll(tokenMatches);
+            }
+            if (resultSet.isEmpty()) {
+                return Collections.emptyList();
+            }
         }
-
         if (resultSet == null || resultSet.isEmpty()) {
-            return searchLinear(searchQuery);
+            return searchLinear(catalog, searchQuery);
         }
-
         return filterSongs(resultSet, searchQuery);
     }
-    
-    private static List<MusicBoxSong> searchLinear(SearchQuery searchQuery) {
-        if (allSongs == null || allSongs.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return filterSongs(allSongs, searchQuery);
+
+    private static List<MusicBoxSong> searchLinear(
+            CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog, SearchQuery searchQuery) {
+        return filterSongs(catalog.songs, searchQuery);
     }
 
     private static List<MusicBoxSong> filterSongs(Iterable<MusicBoxSong> source, SearchQuery searchQuery) {
@@ -468,7 +362,7 @@ public final class MusicBoxSongManager {
         }
         ArrayList<String> normalizedValues = new ArrayList<>();
         for (String value : values) {
-            normalizedValues.add(value == null ? "" : value.toLowerCase());
+            normalizedValues.add(value == null ? "" : value.toLowerCase(Locale.ROOT));
         }
         for (String filter : filters) {
             boolean matched = false;
@@ -484,28 +378,21 @@ public final class MusicBoxSongManager {
         }
         return false;
     }
-    
-    private static void buildKeywordIndex() {
+
+    private static Map<String, Set<MusicBoxSong>> buildKeywordIndex(List<MusicBoxSong> songs) {
         Map<String, Set<MusicBoxSong>> newIndex = new HashMap<>();
-        
-        for (MusicBoxSong song : allSongs) {
-            indexSongKeywords(song, song.getName().toLowerCase(), newIndex);
+        for (MusicBoxSong song : songs) {
+            indexSongKeywords(song, song.getName(), newIndex);
             for (String alias : song.getAliases()) {
-                indexSongKeywords(song, alias.toLowerCase(), newIndex);
+                indexSongKeywords(song, alias, newIndex);
             }
             for (String tag : song.getTags()) {
-                indexSongKeywords(song, tag.toLowerCase(), newIndex);
+                indexSongKeywords(song, tag, newIndex);
             }
         }
-        
-        keywordIndexLock.writeLock().lock();
-        try {
-            keywordIndexRef.set(Collections.unmodifiableMap(newIndex));
-        } finally {
-            keywordIndexLock.writeLock().unlock();
-        }
+        return newIndex;
     }
-    
+
     private static void indexSongKeywords(MusicBoxSong song, String text, Map<String, Set<MusicBoxSong>> index) {
         if (text == null || text.length() < MIN_KEYWORD_LENGTH) {
             return;
@@ -528,7 +415,7 @@ public final class MusicBoxSongManager {
             return Collections.emptyList();
         }
 
-        String normalized = text.toLowerCase().replace('_', ' ').trim();
+        String normalized = text.toLowerCase(Locale.ROOT).replace('_', ' ').trim();
         if (normalized.isEmpty()) {
             return Collections.emptyList();
         }
@@ -556,36 +443,18 @@ public final class MusicBoxSongManager {
     }
 
     public static void clearSearchCache() {
-        searchCacheLock.writeLock().lock();
-        try {
-            resetSearchCache();
-        } finally {
-            searchCacheLock.writeLock().unlock();
-        }
+        // Replacing the snapshot, rather than clearing a shared map, isolates in-flight searches.
+        catalogRef.updateAndGet(catalog -> catalog.withFreshCache(catalog.cacheCapacity));
     }
 
     public static void refreshSearchIndex() {
-        searchCacheLock.writeLock().lock();
-        try {
-            resetSearchCache();
-        } finally {
-            searchCacheLock.writeLock().unlock();
-        }
-        buildKeywordIndex();
-    }
-
-    private static void resetSearchCache() {
-        final int maxSize = getSearchCacheSize();
-        searchCacheRef.set(Collections.synchronizedMap(new LinkedHashMap<String, List<MusicBoxSong>>(16, 0.75f, true) {
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, List<MusicBoxSong>> eldest) {
-                return this.size() > maxSize;
-            }
-        }));
+        CatalogSnapshot.refreshSameRoot(catalogRef,
+                catalog -> catalog.withKeywords(buildKeywordIndex(catalog.songs)));
     }
 
     public static Optional<MusicBoxSongContainer> findContainerById(int id) {
-        return Optional.ofNullable(rootContainer.findById(id));
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+        return catalog.root == null ? Optional.empty() : Optional.ofNullable(catalog.root.findById(id));
     }
 
     private MusicBoxSongManager() {
@@ -597,57 +466,33 @@ public final class MusicBoxSongManager {
     }
 
     public static List<MusicBoxSong> getAllSongs() {
-        return allSongs;
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+        return catalog.songs;
     }
 
     public static MusicBoxSongContainer getRootContainer() {
-        return rootContainer;
+        CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+        return catalog.root;
     }
-    
+
     public static void reconfigureCache(int searchCacheSize) {
-        if (searchCacheSize <= 0) {
-            searchCacheSize = 100;
-        }
-        final int maxSize = searchCacheSize;
-        searchCacheLock.writeLock().lock();
-        try {
-            searchCacheRef.set(Collections.synchronizedMap(new LinkedHashMap<String, List<MusicBoxSong>>(16, 0.75f, true){
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, List<MusicBoxSong>> eldest) {
-                    return this.size() > maxSize;
-                }
-            }));
-        } finally {
-            searchCacheLock.writeLock().unlock();
-        }
+        final int capacity = searchCacheSize > 0 ? searchCacheSize : 100;
+        catalogRef.updateAndGet(catalog -> catalog.withFreshCache(capacity));
     }
 
     static {
-        allSongs = new ArrayList<>();
-        nameToSongRef = new AtomicReference<>(Collections.emptyMap());
-        lowerCaseNameToSongRef = new AtomicReference<>(Collections.emptyMap());
-        hashToSongRef = new AtomicReference<>(Collections.emptyMap());
-        searchCacheRef = new AtomicReference<>(Collections.synchronizedMap(new LinkedHashMap<String, List<MusicBoxSong>>(16, 0.75f, true){
-            @Override
-            protected boolean removeEldestEntry(Map.Entry<String, List<MusicBoxSong>> eldest) {
-                return this.size() > 100;
-            }
-        }));
-        keywordIndexRef = new AtomicReference<>(Collections.emptyMap());
-        isLoading = new AtomicBoolean(false);
-        isLoaded = new AtomicBoolean(false);
         factorySet.add(new FolderContainerFactory());
         factorySet.add(new SingletonContainerFactory());
         factorySet.add(new ListContainerFactory());
     }
-    
+
     public static void initializeCache() {
         CompiledSongCache.setCapacity(getCompiledSongCacheSize());
         int cacheSize = getSearchCacheSize();
         reconfigureCache(cacheSize);
         MusicBox.getInstance().getLogger().info(com.huidu.musicboxplus.common.utils.LogLocale.text(MusicBox.getInstance(), "Search cache initialized with size: " + cacheSize, "搜索缓存已初始化，容量: " + cacheSize));
     }
-    
+
     private static int getCompiledSongCacheSize() {
         try {
             return MusicBox.getInstance().getConfigObject().getCache().getCompiledSongCacheSize();
@@ -707,8 +552,8 @@ public final class MusicBoxSongManager {
                     textTokens.add(token);
                     continue;
                 }
-                String key = token.substring(0, separator).toLowerCase();
-                String value = token.substring(separator + 1).trim().toLowerCase();
+                String key = token.substring(0, separator).toLowerCase(Locale.ROOT);
+                String value = token.substring(separator + 1).trim().toLowerCase(Locale.ROOT);
                 if (value.isEmpty() || !FILTER_KEYS.contains(key)) {
                     textTokens.add(token);
                     continue;
@@ -731,7 +576,7 @@ public final class MusicBoxSongManager {
             }
 
             return new SearchQuery(
-                String.join(" ", textTokens).trim().toLowerCase(),
+                String.join(" ", textTokens).trim().toLowerCase(Locale.ROOT),
                 List.copyOf(tags),
                 List.copyOf(authors),
                 List.copyOf(originalAuthors),
@@ -761,7 +606,8 @@ public final class MusicBoxSongManager {
 
         @Override
         public List<MusicBoxSong> getSongs() {
-            ArrayList<MusicBoxSong> list = new ArrayList<MusicBoxSong>(allSongs);
+            CatalogSnapshot<MusicBoxSongContainer, MusicBoxSong> catalog = catalogRef.get();
+            ArrayList<MusicBoxSong> list = new ArrayList<MusicBoxSong>(catalog.songs);
             Collections.shuffle(list);
             return list;
         }

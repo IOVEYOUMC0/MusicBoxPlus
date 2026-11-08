@@ -31,6 +31,15 @@ public record RawNbsSong(
         List<RawNbsLayer> layers,
         List<RawNbsCustomInstrument> customInstruments) {
 
+    // Defensive copies: a record's lists are otherwise shared with the caller, so a caller that
+    // builds a song from a mutable list and later sorts or clears that list would mutate a song that
+    // is already compiled, cached or being written. The parser already passes immutable lists; this
+    // makes the guarantee hold for every other construction site too.
+    public RawNbsSong {
+        notes = notes == null ? List.of() : List.copyOf(notes);
+        layers = layers == null ? List.of() : List.copyOf(layers);
+        customInstruments = customInstruments == null ? List.of() : List.copyOf(customInstruments);
+    }
     // Ticks per second. The file stores it as an integer scaled by 100.
     public float ticksPerSecond() {
         return tempoRaw / 100f;

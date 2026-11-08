@@ -71,7 +71,7 @@ public final class FaceUtils {
     public static int getPin(BlockFace from, BlockFace to) {
         BlockFace normalizedFrom = normalizeDiagonalFace(from);
         BlockFace normalizedTo = normalizeDiagonalFace(to);
-        
+
         if (normalizedFrom == normalizedTo) {
             return 0;
         }
@@ -86,7 +86,7 @@ public final class FaceUtils {
         }
         return 0;
     }
-    
+
     public static BlockFace normalizeDiagonalFace(BlockFace face) {
         switch (face) {
             case NORTH_EAST:
@@ -98,11 +98,11 @@ public final class FaceUtils {
                 return face;
         }
     }
-    
+
     private static BlockFace getClosestCardinal(BlockFace diagonal) {
         int modX = diagonal.getModX();
         int modZ = diagonal.getModZ();
-        
+
         if (Math.abs(modX) >= Math.abs(modZ)) {
             return modX > 0 ? BlockFace.EAST : BlockFace.WEST;
         } else {
@@ -118,7 +118,7 @@ public final class FaceUtils {
         // 直接用坐标整数相减，避免无意义的 Vector 分配
         int dx = from.getBlockX() - to.getBlockX();
         int dz = from.getBlockZ() - to.getBlockZ();
-        
+
         if (dx > 0 && dz == 0) {
             return BlockFace.WEST;
         }

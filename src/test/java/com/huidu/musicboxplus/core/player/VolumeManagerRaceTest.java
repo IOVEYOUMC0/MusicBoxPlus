@@ -141,8 +141,18 @@ class VolumeManagerRaceTest {
         AtomicInteger dbCalls = new AtomicInteger();
         AtomicInteger onLoadedCalls = new AtomicInteger();
         CountDownLatch loadedSignal = new CountDownLatch(1);
+        // Gate the DB read. Without it the load could complete before the last caller entered and
+        // that caller would legitimately observe the loaded value instead of the placeholder -- the
+        // assertion below was then true only when the machine happened to be slow enough, i.e. the
+        // test was timing-dependent rather than testing the invariant.
+        CountDownLatch dbGate = new CountDownLatch(1);
         Function<UUID, Integer> dbReader = u -> {
             dbCalls.incrementAndGet();
+            try {
+                dbGate.await(5, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             return 80;
         };
         Consumer<Integer> onLoaded = v -> {
@@ -168,15 +178,18 @@ class VolumeManagerRaceTest {
                 assertEquals(DEFAULT_VOLUME, returned,
                         "every concurrent caller must observe the same placeholder default");
             }
+
+            // Every caller is done observing the map; now the single dispatched read may finish.
+            dbGate.countDown();
+            assertTrue(loadedSignal.await(5, TimeUnit.SECONDS), "DB load must run once");
+            assertEquals(1, dbCalls.get(), "putIfAbsent must funnel all callers — only one DB read");
+            assertEquals(1, onLoadedCalls.get(), "onLoaded must fire exactly once");
+            assertEquals(80, playerVolumes.get(uuid));
         } finally {
+            dbGate.countDown();
             callers.shutdownNow();
             assertTrue(callers.awaitTermination(5, TimeUnit.SECONDS));
         }
-
-        assertTrue(loadedSignal.await(5, TimeUnit.SECONDS), "DB load must run once");
-        assertEquals(1, dbCalls.get(), "putIfAbsent must funnel all callers — only one DB read");
-        assertEquals(1, onLoadedCalls.get(), "onLoaded must fire exactly once");
-        assertEquals(80, playerVolumes.get(uuid));
     }
 
     @Test

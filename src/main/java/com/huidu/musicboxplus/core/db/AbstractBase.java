@@ -31,19 +31,21 @@ public abstract class AbstractBase {
     protected AbstractBase(String name) {
         this.name = name;
     }
-    
+
     public abstract boolean isMySQL();
-    
+
     protected String getTablePrefix() {
         return "";
     }
-    
+
     private static final String[] TABLE_NAMES = {
         "block_player_volumes", "player_music_notes", "player_music",
         "playlist_song", "recent_songs", "player_volumes",
-        "sign_songs", "playlists", "signs"
+        "sign_songs", "playlists", "signs",
+        // Bookkeeping for SchemaMigrator, not plugin data; listed so table prefixes reach it too.
+        com.huidu.musicboxplus.core.db.schema.SchemaMigrator.VERSION_TABLE
     };
-    
+
     // Memoised: prepare() resolves every statement, and the SQL strings are a small fixed set,
     // but each resolution ran nine String.replaceAll -- nine Pattern.compile plus nine full scans.
     private final Map<String, String> resolvedSql = new ConcurrentHashMap<>();
@@ -68,14 +70,14 @@ public abstract class AbstractBase {
         }
         return sql;
     }
-    
+
     private static final Set<String> ALLOWED_TABLES = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
-            "playlists", "playlist_song", "signs", "sign_songs", 
+            "playlists", "playlist_song", "signs", "sign_songs",
             "recent_songs", "player_volumes", "block_player_volumes", "player_music", "player_music_notes"
         ))
     );
-    
+
     private static final Set<String> ALLOWED_COLUMNS = Collections.unmodifiableSet(
         new HashSet<>(Arrays.asList(
             "id", "owner", "name", "playlists_id", "song_hash", "pos",
@@ -86,19 +88,19 @@ public abstract class AbstractBase {
             "music_id", "pitch", "tick", "instruments"
         ))
     );
-    
+
     private void validateTableName(String table) {
         if (!ALLOWED_TABLES.contains(table)) {
             throw new IllegalArgumentException("无效的表名: " + table);
         }
     }
-    
+
     private void validateColumnName(String column) {
         if (!ALLOWED_COLUMNS.contains(column)) {
             throw new IllegalArgumentException("无效的列名: " + column);
         }
     }
-    
+
     public String getUpsertSql(String table, String[] columns, String[] primaryKeyColumns) {
         // Validate against the allowlist on the bare (un-prefixed) names, THEN apply the
         // table prefix -- the allowlist holds bare names, so validating after prefixing
@@ -111,35 +113,66 @@ public abstract class AbstractBase {
             validateColumnName(pk);
         }
         table = resolveTableNames(table);
-        
+
+        // Everything except the key columns; an upsert must never rewrite a key.
+        List<String> updates = new ArrayList<>();
+        for (String col : columns) {
+            if (!isPrimaryKey(col, primaryKeyColumns)) {
+                updates.add(col);
+            }
+        }
+        String placeholders = String.join(", ", Collections.nCopies(columns.length, "?"));
+
         if (isMySQL()) {
             StringBuilder sql = new StringBuilder("INSERT INTO ");
             sql.append(table).append(" (");
             sql.append(String.join(", ", columns));
-            sql.append(") VALUES (");
-            sql.append(String.join(", ", Collections.nCopies(columns.length, "?")));
-            sql.append(") ON DUPLICATE KEY UPDATE ");
-            List<String> updates = new ArrayList<>();
-            for (String col : columns) {
-                boolean isPk = false;
-                for (String pk : primaryKeyColumns) {
-                    if (pk.equals(col)) {
-                        isPk = true;
-                        break;
-                    }
-                }
-                if (!isPk) {
-                    updates.add(col + " = VALUES(" + col + ")");
-                }
+            sql.append(") VALUES (").append(placeholders).append(')');
+            sql.append(" ON DUPLICATE KEY UPDATE ");
+            if (updates.isEmpty()) {
+                // Key columns only: the statement is already idempotent, so the duplicate branch
+                // has to be a no-op instead of an empty (and therefore invalid) update list.
+                String pk = primaryKeyColumns[0];
+                sql.append(pk).append(" = ").append(pk);
+            } else {
+                sql.append(updates.stream()
+                        .map(col -> col + " = VALUES(" + col + ")")
+                        .collect(Collectors.joining(", ")));
             }
-            sql.append(String.join(", ", updates));
             return sql.toString();
-        } else {
-            return "INSERT OR REPLACE INTO " + table + " (" + String.join(", ", columns) + ") VALUES (" +
-                    String.join(", ", Collections.nCopies(columns.length, "?")) + ")";
         }
+
+        // SQLite must not use INSERT OR REPLACE here. REPLACE does not update in place: it deletes
+        // the conflicting row and inserts a new one, which fires ON DELETE CASCADE on every child
+        // table. player_music_notes.music_id cascades from player_music and the connection enables
+        // foreign_keys, so "INSERT OR REPLACE INTO player_music" deleted the whole song's notes on
+        // every metadata-only save -- and the note table is deliberately only rewritten when its
+        // fingerprint changes, so nothing put them back. ON CONFLICT ... DO UPDATE updates in place
+        // and leaves the children alone (SQLite 3.24+, far below the driver Paper ships).
+        StringBuilder sql = new StringBuilder("INSERT INTO ");
+        sql.append(table).append(" (");
+        sql.append(String.join(", ", columns));
+        sql.append(") VALUES (").append(placeholders).append(')');
+        sql.append(" ON CONFLICT (").append(String.join(", ", primaryKeyColumns)).append(')');
+        if (updates.isEmpty()) {
+            return sql.append(" DO NOTHING").toString();
+        }
+        sql.append(" DO UPDATE SET ");
+        sql.append(updates.stream()
+                .map(col -> col + " = excluded." + col)
+                .collect(Collectors.joining(", ")));
+        return sql.toString();
     }
-    
+
+    private static boolean isPrimaryKey(String column, String[] primaryKeyColumns) {
+        for (String pk : primaryKeyColumns) {
+            if (pk.equals(column)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Deletes a player_music row together with its player_music_notes rows in a single
     // transaction. Avoids relying on the FK ON DELETE CASCADE (which needs SQLite's
     // foreign_keys pragma to be on) and guarantees we never leave a music row whose notes
@@ -194,10 +227,10 @@ public abstract class AbstractBase {
         String message = e.getMessage();
         return message.contains("no such table") || message.contains("doesn't exist");
     }
-    
+
     public void shutdown() {
     }
-    
+
     public boolean isInitialized() {
         return this.initialized;
     }
@@ -267,6 +300,25 @@ public abstract class AbstractBase {
                     throw e;
                 }
             }
+            // The creation script only ever creates what is missing; it cannot change an existing
+            // table. Everything after the baseline shape goes through the versioned migrations, so a
+            // database from any earlier release is brought forward instead of being silently used
+            // with the wrong layout.
+            com.huidu.musicboxplus.core.db.schema.SchemaMigrator.Result migration =
+                    com.huidu.musicboxplus.core.db.schema.SchemaMigrator.migrate(
+                            connection, this::resolveTableNames, this.isMySQL(), 0);
+            if (migration.adoptedBaseline()) {
+                MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                        "Database schema version recorded: " + migration.finalVersion(),
+                        "已记录数据库结构版本: " + migration.finalVersion()));
+            }
+            if (!migration.applied().isEmpty()) {
+                for (com.huidu.musicboxplus.core.db.schema.Migration applied : migration.applied()) {
+                    MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(),
+                            "Applied database migration v" + applied.version() + ": " + applied.description(),
+                            "已应用数据库迁移 v" + applied.version() + ": " + applied.description()));
+                }
+            }
             this.initialized = true;
             MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(), "Database tables initialized", "数据库表初始化完成"));
         } catch (SQLException e) {
@@ -312,6 +364,32 @@ public abstract class AbstractBase {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Flushes SQLite's write-ahead log into the main database file so a plain file copy is a
+     * complete snapshot.
+     *
+     * <p>A copy of {@code data.db} without this can miss every write still sitting in
+     * {@code data.db-wal}; restoring such a file silently loses recent edits. MySQL has no
+     * equivalent file to copy (its backup needs a dump), so this is a no-op there.
+     *
+     * @return true when the checkpoint succeeded, false when the database is not SQLite or the
+     *         checkpoint failed. Callers must not claim a consistent database copy on false.
+     */
+    public boolean checkpointForBackup() {
+        if (isMySQL()) {
+            return false;
+        }
+        try (Connection connection = this.acquireConnection();
+             Statement statement = connection.createStatement()) {
+            statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+            return true;
+        } catch (SQLException e) {
+            MusicBox.getInstance().getLogger().warning(
+                    "SQLite WAL checkpoint before backup failed: " + e.getMessage());
+            return false;
         }
     }
 
@@ -387,7 +465,7 @@ public abstract class AbstractBase {
             throw new RuntimeException(e);
         }
     }
-    
+
     private void warnIfMainThread(String operation) {
         MusicBox plugin = MusicBox.getInstance();
         // Suppressed during shutdown: onDisable runs its database cleanup synchronously on the
@@ -403,7 +481,7 @@ public abstract class AbstractBase {
         if (Bukkit.isPrimaryThread()) {
             String message = "[数据库警告] 操作 '" + operation + "' 在主线程执行，这可能导致服务器卡顿！请使用异步方法。";
             MusicBox.getInstance().getLogger().warning(message);
-            
+
             MusicBoxConfig config = MusicBox.getInstance().getConfigObject();
             if (config != null) {
                 if (config.isDebug()) {
@@ -461,15 +539,15 @@ public abstract class AbstractBase {
             connection.setAutoCommit(false);
             try {
                 boolean createNew = list.getId() == -1;
-                String query = createNew 
-                    ? "INSERT INTO playlists (owner,name) values (:owner,:name)" 
+                String query = createNew
+                    ? "INSERT INTO playlists (owner,name) values (:owner,:name)"
                     : "UPDATE playlists set name = :name where id = :id";
                 NamedParamStatement statement = new NamedParamStatement(resolveTableNames(query));
                 statement.setValue("id", list.getId());
                 statement.setValue("owner", list.getOwner().toString());
                 statement.setValue("name", list.getName());
                 statement.executeUpdate(connection);
-                
+
                 if (createNew) {
                     int result = getLastInsertId(connection);
                     list.setId(result);
@@ -524,9 +602,15 @@ public abstract class AbstractBase {
         HashMap<Integer, PlayerPlayListModel> modelMap = new HashMap<>();
         for (ResultSetRow row : set) {
             int id = row.getInt("id");
-            PlayerPlayListModel model = modelMap.computeIfAbsent(id, 
+            PlayerPlayListModel model = modelMap.computeIfAbsent(id,
                 k -> new PlayerPlayListModel(id, UUID.fromString(row.getString("owner")), row.getString("name")));
-            int hash = row.getInt("song_hash");
+            // The queries below LEFT JOIN, so a playlist that has no songs yet still produces one row
+            // with no hash. It exists, and it has to stay visible (and findable by name, which is how
+            // creating a second one with the same name is rejected).
+            Integer hash = row.getInt("song_hash");
+            if (hash == null) {
+                continue;
+            }
             Optional<MusicBoxSong> song = MusicBoxSongManager.findSongByHash(hash);
             if (song.isPresent()) {
                 model.getSongs().add(song.get());
@@ -544,7 +628,11 @@ public abstract class AbstractBase {
         // (opening the playlist GUI) silently and irreversibly destroy players' saved playlists.
         // Only hide the currently-unresolvable ones from the returned list; they reappear once
         // their songs load again. (Empty rows are pruned only via an explicit deleteMe path.)
-        list.removeIf(l -> l.getSongs().isEmpty());
+        //
+        // A playlist with NO rows at all is not the same thing: it was just created and has simply
+        // not been given a song yet. It has no unresolved hashes, so it stays in the list instead of
+        // becoming invisible (and duplicate-create-able) until the first song is added.
+        list.removeIf(l -> l.getSongs().isEmpty() && !l.getUnresolvedHashes().isEmpty());
         return list;
     }
 
@@ -574,9 +662,9 @@ public abstract class AbstractBase {
     public List<PlayerPlayListModel> getPlayLists(UUID playerUUID) {
         List<ResultSetRow> result = this.query(
             "SELECT p.id, p.owner, p.name, ps.song_hash\n" +
-            "from playlist_song ps\n" +
-            "join playlists p on ps.playlists_id = p.id\n" +
-            "where p.owner = ? order by pos", 
+            "from playlists p\n" +
+            "left join playlist_song ps on ps.playlists_id = p.id\n" +
+            "where p.owner = ? order by ps.pos",
             playerUUID.toString()
         );
         return this.extractPlayList(result);
@@ -606,9 +694,9 @@ public abstract class AbstractBase {
     public PlayerPlayListModel getPlayListById(int id) {
         List<ResultSetRow> result = this.query(
             "SELECT p.id, p.owner, p.name, ps.song_hash\n" +
-            "from playlist_song ps\n" +
-            "join playlists p on ps.playlists_id = p.id\n" +
-            "where p.id = ? order by pos", 
+            "from playlists p\n" +
+            "left join playlist_song ps on ps.playlists_id = p.id\n" +
+            "where p.id = ? order by ps.pos",
             id
         );
         List<PlayerPlayListModel> list = this.extractPlayList(result);
@@ -642,6 +730,23 @@ public abstract class AbstractBase {
         }
     }
 
+    // Shared by the write paths below: a transaction that failed must not leave the connection
+    // half-way through one, and a rollback failure is worth a log but must not hide the original.
+    private static void rollbackQuietly(Connection connection) {
+        try {
+            connection.rollback();
+        } catch (SQLException rollbackEx) {
+            MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
+        }
+    }
+
+    /**
+     * Replaces the protected-sign list in one transaction.
+     *
+     * <p>Throws when the write failed. Every caller already wraps this in a try/catch and treats
+     * "returned normally" as "committed"; logging the error here and returning made those handlers
+     * dead code and reported a failed save as a successful one.
+     */
     public void savePreventedSigns(Collection<Location> locations) {
         try (Connection connection = this.getConnection()) {
             boolean previousAutoCommit = connection.getAutoCommit();
@@ -655,17 +760,13 @@ public abstract class AbstractBase {
                 this.updateBatch(connection, "INSERT INTO signs (location) VALUES (?)", rows);
                 connection.commit();
             } catch (SQLException e) {
-                try {
-                    connection.rollback();
-                } catch (SQLException rollbackEx) {
-                    MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
-                }
-                MusicBox.getInstance().getLogger().warning("保存告示牌列表失败: " + e.getMessage());
+                rollbackQuietly(connection);
+                throw new RuntimeException("保存告示牌列表失败: " + e.getMessage(), e);
             } finally {
                 restoreAutoCommit(connection, previousAutoCommit);
             }
         } catch (SQLException e) {
-            MusicBox.getInstance().getLogger().warning("保存告示牌列表失败: " + e.getMessage());
+            throw new RuntimeException("保存告示牌列表失败: " + e.getMessage(), e);
         }
     }
 
@@ -682,10 +783,10 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("sign_songs", new String[]{"location", "song_hash"}, new String[]{"location"});
                     this.update(connection, sql, locStr, songHash);
                 } catch (SQLException ex) {
-                    MusicBox.getInstance().getLogger().warning("保存告示牌歌曲失败: " + ex.getMessage());
+                    throw new RuntimeException("保存告示牌歌曲失败: " + ex.getMessage(), ex);
                 }
             } else {
-                MusicBox.getInstance().getLogger().warning("保存告示牌歌曲失败: " + e.getMessage());
+                throw new RuntimeException("保存告示牌歌曲失败: " + e.getMessage(), e);
             }
         }
     }
@@ -716,14 +817,18 @@ public abstract class AbstractBase {
     }
 
 
+    /**
+     * The player's recent-song hashes, newest last.
+     *
+     * <p>A read failure is thrown, not turned into an empty list: the caller clears its in-memory
+     * list and marks it loaded when this returns empty, and the next shutdown save would then write
+     * that empty list back, turning a transient read error into a lost history.
+     */
     public List<Integer> getRecentSongs(UUID playerUuid) {
-        try {
-            List<ResultSetRow> result = this.query("SELECT song_hash FROM recent_songs WHERE player_uuid = ? ORDER BY pos ASC", 
+        List<ResultSetRow> result = this.query(
+                "SELECT song_hash FROM recent_songs WHERE player_uuid = ? ORDER BY pos ASC",
                 playerUuid.toString());
-            return result.stream().map(row -> row.getInt("song_hash")).collect(Collectors.toList());
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
+        return result.stream().map(row -> row.getInt("song_hash")).collect(Collectors.toList());
     }
 
     public void clearRecentSongs(UUID playerUuid) {
@@ -746,10 +851,10 @@ public abstract class AbstractBase {
                 try {
                     saveRecentSongsTransactional(playerUuid, songHashes);
                 } catch (SQLException ex) {
-                    MusicBox.getInstance().getLogger().warning("批量保存最近播放歌曲失败: " + ex.getMessage());
+                    throw new RuntimeException("批量保存最近播放歌曲失败: " + ex.getMessage(), ex);
                 }
             } else {
-                MusicBox.getInstance().getLogger().warning("批量保存最近播放歌曲失败: " + e.getMessage());
+                throw new RuntimeException("批量保存最近播放歌曲失败: " + e.getMessage(), e);
             }
         }
     }
@@ -771,11 +876,7 @@ public abstract class AbstractBase {
                 this.updateBatch(connection, upsertSql, rows);
                 connection.commit();
             } catch (SQLException e) {
-                try {
-                    connection.rollback();
-                } catch (SQLException rollbackEx) {
-                    MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
-                }
+                rollbackQuietly(connection);
                 throw e;
             }
         }
@@ -792,14 +893,20 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("player_volumes", new String[]{"player_uuid", "volume"}, new String[]{"player_uuid"});
                     this.update(connection, sql, playerUuid.toString(), volume);
                 } catch (SQLException ex) {
-                    MusicBox.getInstance().getLogger().warning("保存玩家音量失败: " + ex.getMessage());
+                    throw new RuntimeException("保存玩家音量失败: " + ex.getMessage(), ex);
                 }
             } else {
-                MusicBox.getInstance().getLogger().warning("保存玩家音量失败: " + e.getMessage());
+                throw new RuntimeException("保存玩家音量失败: " + e.getMessage(), e);
             }
         }
     }
 
+    /**
+     * Writes every entry in one transaction.
+     *
+     * <p>Throws when the batch failed; {@code VolumeManager} keeps the map dirty and retries on the
+     * next sweep only because the failure is observable here.
+     */
     public void savePlayerVolumesBatch(Map<UUID, Integer> volumes) {
         if (volumes == null || volumes.isEmpty()) {
             return;
@@ -812,10 +919,10 @@ public abstract class AbstractBase {
                 try {
                     savePlayerVolumesBatchInternal(volumes);
                 } catch (SQLException ex) {
-                    MusicBox.getInstance().getLogger().warning("批量保存玩家音量失败: " + ex.getMessage());
+                    throw new RuntimeException("批量保存玩家音量失败: " + ex.getMessage(), ex);
                 }
             } else {
-                MusicBox.getInstance().getLogger().warning("批量保存玩家音量失败: " + e.getMessage());
+                throw new RuntimeException("批量保存玩家音量失败: " + e.getMessage(), e);
             }
         }
     }
@@ -832,11 +939,7 @@ public abstract class AbstractBase {
                 this.updateBatch(connection, sql, args);
                 connection.commit();
             } catch (SQLException e) {
-                try {
-                    connection.rollback();
-                } catch (SQLException rollbackEx) {
-                    MusicBox.getInstance().getLogger().warning("回滚事务失败: " + rollbackEx.getMessage());
-                }
+                rollbackQuietly(connection);
                 throw e;
             }
         }
@@ -844,16 +947,11 @@ public abstract class AbstractBase {
 
     @Nullable
     public Integer getPlayerVolume(UUID playerUuid) {
-        try {
-            List<ResultSetRow> result = this.query("SELECT volume FROM player_volumes WHERE player_uuid = ?", 
-                playerUuid.toString());
-            if (!result.isEmpty()) {
-                return result.get(0).getInt("volume");
-            }
-            return null;
-        } catch (Exception e) {
-            return null;
-        }
+        // null means "no stored row", not "read failed". VolumeManager must observe a failure
+        // so it never persists its default placeholder over an unread stored value.
+        List<ResultSetRow> result = this.query("SELECT volume FROM player_volumes WHERE player_uuid = ?",
+            playerUuid.toString());
+        return result.isEmpty() ? null : result.get(0).getInt("volume");
     }
 
     public void deletePlayerVolume(UUID playerUuid) {
@@ -877,10 +975,10 @@ public abstract class AbstractBase {
                     String sql = getUpsertSql("block_player_volumes", new String[]{"location", "volume"}, new String[]{"location"});
                     this.update(connection, sql, BukkitUtils.locationToString(location), volume);
                 } catch (SQLException ex) {
-                    MusicBox.getInstance().getLogger().warning("保存方块播放器音量失败: " + ex.getMessage());
+                    throw new RuntimeException("保存方块播放器音量失败: " + ex.getMessage(), ex);
                 }
             } else {
-                MusicBox.getInstance().getLogger().warning("保存方块播放器音量失败: " + e.getMessage());
+                throw new RuntimeException("保存方块播放器音量失败: " + e.getMessage(), e);
             }
         }
     }

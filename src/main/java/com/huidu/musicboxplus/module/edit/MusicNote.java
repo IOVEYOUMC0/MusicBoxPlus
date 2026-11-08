@@ -37,11 +37,11 @@ public class MusicNote {
         private final Instrument bukkitInstrument;
         private final Material material;
         private final Lang langKey;
-        
+
         private static final NoteInstrument[] VALUES = values();
         private static final Map<Instrument, NoteInstrument> BUKKIT_CACHE = new HashMap<>();
         private static final List<NoteInstrument> INSTRUMENT_LIST = new ArrayList<>();
-        
+
         static {
             for (NoteInstrument ni : VALUES) {
                 if (ni.isRuntimeAvailable()) {
@@ -84,7 +84,7 @@ public class MusicNote {
         public String getDisplayName() {
             return langKey.toString();
         }
-        
+
         public Lang getLangKey() {
             return langKey;
         }
@@ -156,11 +156,11 @@ public class MusicNote {
             }
             return isTrumpetEnabled();
         }
-        
+
         public static NoteInstrument[] getAllValues() {
             return VALUES;
         }
-        
+
         public static List<NoteInstrument> getInstrumentList() {
             return INSTRUMENT_LIST;
         }
@@ -176,7 +176,7 @@ public class MusicNote {
                     .filter(NoteInstrument::isInstrumentEnabled)
                     .toList();
         }
-        
+
         public static int getTotalCount() {
             return VALUES.length;
         }
@@ -188,18 +188,20 @@ public class MusicNote {
 
     private final int pitch;
     private final int tick;
-    private final List<NoteInstrument> instruments;
+    // Immutable published snapshots: readers (including asynchronous saves) do not allocate a
+    // defensive ArrayList per note and never observe clear()+addAll() half-completed.
+    private volatile List<NoteInstrument> instruments;
 
     public MusicNote(int pitch, int tick) {
         this.pitch = Math.max(0, pitch);
         this.tick = Math.max(0, tick);
-        this.instruments = new ArrayList<>();
+        this.instruments = List.of();
     }
 
     public MusicNote(int pitch, int tick, List<NoteInstrument> instruments) {
         this.pitch = Math.max(0, pitch);
         this.tick = Math.max(0, tick);
-        this.instruments = new ArrayList<>(instruments);
+        this.instruments = List.copyOf(instruments);
     }
 
     public int getPitch() {
@@ -211,27 +213,40 @@ public class MusicNote {
     }
 
     public List<NoteInstrument> getInstruments() {
-        return new ArrayList<>(instruments);
+        return instruments;
     }
 
     public int getInstrumentCount() {
         return instruments.size();
     }
 
-    public boolean addInstrument(NoteInstrument instrument) {
-        if (!instruments.contains(instrument)) {
-            return instruments.add(instrument);
+    public synchronized boolean addInstrument(NoteInstrument instrument) {
+        if (instruments.contains(instrument)) {
+            return false;
         }
-        return false;
+        List<NoteInstrument> updated = new ArrayList<>(instruments);
+        updated.add(instrument);
+        instruments = List.copyOf(updated);
+        return true;
     }
 
-    public boolean removeInstrument(NoteInstrument instrument) {
-        return instruments.remove(instrument);
+    public synchronized boolean removeInstrument(NoteInstrument instrument) {
+        List<NoteInstrument> updated = new ArrayList<>(instruments);
+        if (!updated.remove(instrument)) {
+            return false;
+        }
+        instruments = List.copyOf(updated);
+        return true;
     }
 
-    public void setInstruments(List<NoteInstrument> instruments) {
-        this.instruments.clear();
-        this.instruments.addAll(instruments);
+    public synchronized void setInstruments(List<NoteInstrument> instruments) {
+        this.instruments = List.copyOf(instruments);
+    }
+
+    // The immutable instrument vector can be shared, but the note wrapper cannot: mutating an editor
+    // note after snapshot() must not mutate a queued durable save.
+    MusicNote snapshot() {
+        return new MusicNote(pitch, tick, instruments);
     }
 
     public static String getNoteName(int pitch) {

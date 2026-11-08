@@ -2,6 +2,7 @@ package com.huidu.musicboxplus.module.web;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.huidu.musicboxplus.common.utils.scheduler.Scheduler;
 import com.huidu.musicboxplus.module.edit.MusicEditListener;
 import com.huidu.musicboxplus.module.edit.MusicNote;
 import com.huidu.musicboxplus.module.edit.PlayerMusic;
@@ -89,39 +90,41 @@ final class ImportApiHandler implements HttpHandler {
                 return;
             }
 
-            PlayerMusic beforeSnapshot = targetMusic.snapshot();
             MusicFileImporter.ImportResult importResult = readImportRequest(exchange, targetMusic);
 
             PlayerMusic importedMusic = importResult.music();
             PlayerMusic importedSnapshot = importedMusic.snapshot();
-            boolean appliedImport = false;
             try {
-                PlayerMusic mergedSnapshot = beforeSnapshot.snapshot();
-                mergedSnapshot.setName(importedSnapshot.getName());
-                mergedSnapshot.setBpm(importedSnapshot.getBpm());
-                mergedSnapshot.setBeatSubdivision(importedSnapshot.getBeatSubdivision());
-                mergedSnapshot.setTimeSignature(importedSnapshot.getTimeSignature());
-                mergedSnapshot.setDescription(importedSnapshot.getDescription());
-                mergedSnapshot.clearNotes();
-                for (MusicNote note : importedSnapshot.getNotes()) {
-                    mergedSnapshot.addNote(new MusicNote(note.getPitch(), note.getTick(), new ArrayList<>(note.getInstruments())));
-                }
-                targetMusic.applySnapshot(mergedSnapshot);
-                appliedImport = true;
-
-                boolean saved = PlayerMusicManager.getInstance().saveMusicSync(targetMusic);
+                // Applied and saved under the manager monitor like every other write path: the
+                // merge used to be a snapshot taken before any lock, so its rollback could overwrite
+                // a change another request had already committed, and the apply/save pair could
+                // interleave with a browser PUT.
+                boolean saved = PlayerMusicManager.getInstance().updateMusicSync(
+                        targetMusic.getUniqueId(), working -> {
+                            working.setName(importedSnapshot.getName());
+                            working.setBpm(importedSnapshot.getBpm());
+                            working.setBeatSubdivision(importedSnapshot.getBeatSubdivision());
+                            working.setTimeSignature(importedSnapshot.getTimeSignature());
+                            working.setDescription(importedSnapshot.getDescription());
+                            working.clearNotes();
+                            for (MusicNote note : importedSnapshot.getNotes()) {
+                                working.addNote(new MusicNote(note.getPitch(), note.getTick(),
+                                        new ArrayList<>(note.getInstruments())));
+                            }
+                            return working;
+                        });
                 if (!saved) {
-                    targetMusic.applySnapshot(beforeSnapshot);
-                    appliedImport = false;
                     support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Import save failed");
                     return;
                 }
-                MusicEditListener.notifyMusicUpdated(targetMusic.getUniqueId());
-            } catch (RuntimeException e) {
-                if (appliedImport) {
-                    targetMusic.applySnapshot(beforeSnapshot);
+                // Bukkit player lookups belong on the server thread; the HTTP worker only hands the id
+                // over. The import is already committed, so a scheduling failure must not turn the
+                // response into a 500.
+                try {
+                    Scheduler.global(() -> MusicEditListener.notifyMusicUpdated(targetMusic.getUniqueId()));
+                } catch (RuntimeException failure) {
+                    support.logServerError("Notifying in-game editors failed after import", failure);
                 }
-                throw e;
             } finally {
                 PlayerMusicManager.getInstance().deleteMusic(importedMusic.getUniqueId());
             }
@@ -136,7 +139,10 @@ final class ImportApiHandler implements HttpHandler {
         } catch (IllegalArgumentException e) {
             support.writeTextResponse(exchange, HttpStatus.BAD_REQUEST, e.getMessage());
         } catch (Exception e) {
-            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Import failed: " + e.getMessage());
+            // Logged in full, answered generically: the exception text used to be echoed to the
+            // client, which leaks internals to anyone who can reach the editor.
+            support.logServerError("Import request failed", e);
+            support.writeTextResponse(exchange, HttpStatus.INTERNAL_SERVER_ERROR, "Import failed");
         } finally {
             if (importPermit) {
                 importPermits.release();
@@ -217,6 +223,7 @@ final class ImportApiHandler implements HttpHandler {
                     throw new IllegalArgumentException("Uploaded file is empty");
                 }
                 String safeFileName = validateImportFileName(fileName);
+                validateUploadFormat(safeFileName, fileBytes);
                 return new UploadedImportFile(safeFileName, fileBytes);
             }
 
@@ -343,8 +350,16 @@ final class ImportApiHandler implements HttpHandler {
         if (normalizedName.isBlank()) {
             throw new IllegalArgumentException("Invalid upload file name");
         }
-        MusicFileImporter.getInstance().detectFormat(normalizedName);
         return normalizedName;
+    }
+
+    static void validateUploadFormat(String name, byte[] bytes) {
+        try {
+            MusicFileImporter.getInstance().detectFormat(bytes, name);
+        } catch (IOException unsupported) {
+            // A client choosing an unsupported format is a 400, not a server/import failure.
+            throw new IllegalArgumentException("Unsupported import format", unsupported);
+        }
     }
 
     private MusicFileImporter.ImportResult importUploadedFile(UploadedImportFile upload, PlayerMusic targetMusic) throws IOException {

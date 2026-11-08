@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.huidu.musicboxplus.core.nbs.NbsCorpus;
 import com.huidu.musicboxplus.core.nbs.NbsReader;
 import com.huidu.musicboxplus.core.nbs.RawNbsCustomInstrument;
 import com.huidu.musicboxplus.core.nbs.RawNbsNote;
@@ -18,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 class SongInstrumentsTest {
 
-    private static final Path CORPUS = Path.of("Reference", "boombox", "decompiled", "resources", "songs");
+    
 
     private static RawNbsCustomInstrument custom(String soundFile) {
         return new RawNbsCustomInstrument("n", soundFile, 45, false);
@@ -111,12 +112,12 @@ class SongInstrumentsTest {
     // Every note in the corpus must resolve to either a non-empty sound name or a silent instrument.
     @Test
     void everyCorpusNoteResolvesToASoundName() throws Exception {
-        assertTrue(Files.isDirectory(CORPUS), "缺少语料目录 " + CORPUS);
+        assertTrue(Files.isDirectory(NbsCorpus.bundled()), "缺少语料目录 " + NbsCorpus.bundled());
         List<String> failures = new ArrayList<>();
         int noteCount = 0;
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(CORPUS)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             files = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().toList();
         }
 

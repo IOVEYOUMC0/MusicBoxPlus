@@ -74,6 +74,10 @@ public final class AsyncTaskManager {
 
     public void executeAsync(Runnable task, Runnable onFailure) {
         if (shutdown) {
+            // The task will never run, so the failure path has to run now: callers complete their
+            // CompletableFuture in onFailure, and returning silently left those futures pending
+            // forever (the callback chain, and every step queued behind it, never resumed).
+            runFailureCallback(onFailure);
             return;
         }
         Runnable wrapped = () -> {
@@ -81,26 +85,25 @@ public final class AsyncTaskManager {
                 task.run();
             } catch (Exception e) {
                 MusicBox.getInstance().getLogger().log(Level.WARNING, "Async task execution failed", e);
-                if (onFailure != null) {
-                    try {
-                        onFailure.run();
-                    } catch (Exception ex) {
-                        MusicBox.getInstance().getLogger().log(Level.WARNING, "Failure callback execution failed", ex);
-                    }
-                }
+                runFailureCallback(onFailure);
             }
         };
         try {
             asyncExecutor.execute(wrapped);
         } catch (RejectedExecutionException e) {
             MusicBox.getInstance().getLogger().warning("Async task queue is full; task was rejected");
-            if (onFailure != null) {
-                try {
-                    onFailure.run();
-                } catch (Exception callbackError) {
-                    MusicBox.getInstance().getLogger().log(Level.WARNING, "Failure callback execution failed", callbackError);
-                }
-            }
+            runFailureCallback(onFailure);
+        }
+    }
+
+    private static void runFailureCallback(Runnable onFailure) {
+        if (onFailure == null) {
+            return;
+        }
+        try {
+            onFailure.run();
+        } catch (Exception callbackError) {
+            MusicBox.getInstance().getLogger().log(Level.WARNING, "Failure callback execution failed", callbackError);
         }
     }
 
@@ -108,26 +111,36 @@ public final class AsyncTaskManager {
         if (shutdown) {
             return null;
         }
-        return scheduledExecutor.scheduleAtFixedRate(() -> {
-            try {
-                task.run();
-            } catch (Exception e) {
-                MusicBox.getInstance().getLogger().log(Level.WARNING, "Scheduled task execution failed", e);
-            }
-        }, initialDelay, period, unit);
+        try {
+            return scheduledExecutor.scheduleAtFixedRate(() -> {
+                try {
+                    task.run();
+                } catch (Exception e) {
+                    MusicBox.getInstance().getLogger().log(Level.WARNING, "Scheduled task execution failed", e);
+                }
+            }, initialDelay, period, unit);
+        } catch (RejectedExecutionException e) {
+            // Lost a race with shutdown() between the check above and the submit; the task is
+            // simply not wanted any more.
+            return null;
+        }
     }
 
     public void schedule(Runnable task, long delay, TimeUnit unit) {
         if (shutdown) {
             return;
         }
-        scheduledExecutor.schedule(() -> {
-            try {
-                task.run();
-            } catch (Exception e) {
-                MusicBox.getInstance().getLogger().log(Level.WARNING, "Delayed task execution failed", e);
-            }
-        }, delay, unit);
+        try {
+            scheduledExecutor.schedule(() -> {
+                try {
+                    task.run();
+                } catch (Exception e) {
+                    MusicBox.getInstance().getLogger().log(Level.WARNING, "Delayed task execution failed", e);
+                }
+            }, delay, unit);
+        } catch (RejectedExecutionException e) {
+            // Same shutdown race as scheduleAtFixedRate: dropping the task is the correct outcome.
+        }
     }
 
     public ExecutorService getAsyncExecutor() {
@@ -204,6 +217,10 @@ public final class AsyncTaskManager {
         AsyncTaskManager mgr = getInstance();
         if (mgr != null) {
             mgr.executeAsync(task, onFailure);
+        } else {
+            // terminated and no instance left (a disable in progress): nothing will ever run the
+            // task, so the caller's failure path has to run here instead of leaving it hanging.
+            runFailureCallback(onFailure);
         }
     }
 }

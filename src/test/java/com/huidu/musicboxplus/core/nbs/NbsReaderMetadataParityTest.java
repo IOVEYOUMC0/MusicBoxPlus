@@ -22,7 +22,7 @@ class NbsReaderMetadataParityTest {
 
     @Test
     void bothPathsAgreeOnEveryHeaderFieldAcrossTheCorpus() throws IOException {
-        List<Path> files = corpus(NbsCorpus.BUNDLED);
+        List<Path> files = corpus(NbsCorpus.bundled());
         assertTrue(!files.isEmpty(), "bundled corpus is missing");
         for (Path file : files) {
             assertHeadersMatch(NbsReader.read(file), NbsReader.readMetadata(file),

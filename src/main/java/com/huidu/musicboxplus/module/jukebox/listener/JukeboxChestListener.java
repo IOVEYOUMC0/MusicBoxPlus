@@ -38,11 +38,11 @@ public class JukeboxChestListener implements Listener {
         }
         Inventory inventory = event.getInventory();
         InventoryHolder holder = inventory.getHolder();
-        
+
         if (holder == null) {
             return;
         }
-        
+
         // A large chest's holder is a DoubleChest, not a Chest, so testing only for Chest
         // would miss that entire case.
         List<Block> chestBlocks = new ArrayList<>(2);

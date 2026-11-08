@@ -23,17 +23,17 @@ public class VolumeExecutor implements SubCommand {
             MessageUtils.send(sender, Lang.ONLY_PLAYERS);
             return;
         }
-        
+
         Player player = (Player) sender;
         VolumeManager vm = VolumeManager.getInstance();
-        
+
         if (args.length == 0) {
             vm.sendVolumeMessage(player);
             return;
         }
-        
+
         String action = args[0].toLowerCase();
-        
+
         switch (action) {
             case "up":
             case "+":
@@ -42,7 +42,7 @@ public class VolumeExecutor implements SubCommand {
                 MessageUtils.send(player, Lang.VOLUME_INCREASED, "{volume}", String.valueOf(newVolUp));
                 vm.sendVolumeMessage(player);
                 break;
-                
+
             case "down":
             case "-":
             case "decrease":
@@ -50,14 +50,14 @@ public class VolumeExecutor implements SubCommand {
                 MessageUtils.send(player, Lang.VOLUME_DECREASED, "{volume}", String.valueOf(newVolDown));
                 vm.sendVolumeMessage(player);
                 break;
-                
+
             case "reset":
             case "default":
                 vm.resetVolume(player);
                 MessageUtils.send(player, Lang.VOLUME_RESET);
                 vm.sendVolumeMessage(player);
                 break;
-                
+
             default:
                 try {
                     int amount = Integer.parseInt(action);

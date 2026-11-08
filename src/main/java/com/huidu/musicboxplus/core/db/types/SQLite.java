@@ -13,12 +13,12 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 public class SQLite extends AbstractBase {
-    
+
     @Override
     public boolean isMySQL() {
         return false;
     }
-    
+
     private final HikariDataSource dataSource;
     private volatile boolean shutdown = false;
 
@@ -39,18 +39,18 @@ public class SQLite extends AbstractBase {
                     "无法创建 SQLite 数据库文件: " + file.getAbsolutePath()), e);
             }
         }
-        
+
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException ex) {
             throw new IllegalArgumentException("SQLite JDBC 驱动不可用!");
         }
-        
+
         this.dataSource = createDataSource(file);
         MusicBox.getInstance().getLogger().info(LogLocale.text(MusicBox.getInstance(), "SQLite connection pool initialized (HikariCP)", "SQLite连接池已初始化 (HikariCP)"));
         this.afterInit();
     }
-    
+
     private HikariDataSource createDataSource(File file) {
         HikariLogConfigurator.configure(MusicBox.getInstance());
         HikariConfig config = new HikariConfig();
@@ -94,11 +94,11 @@ public class SQLite extends AbstractBase {
         config.addDataSourceProperty("synchronous", "NORMAL");
         config.addDataSourceProperty("foreign_keys", "true");
         config.addDataSourceProperty("busy_timeout", "10000");
-        
+
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-        
+
         return new HikariDataSource(config);
     }
 
@@ -109,7 +109,7 @@ public class SQLite extends AbstractBase {
         }
         return dataSource.getConnection();
     }
-    
+
     @Override
     public void shutdown() {
         shutdown = true;

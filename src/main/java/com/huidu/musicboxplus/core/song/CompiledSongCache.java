@@ -32,12 +32,26 @@ public final class CompiledSongCache {
         }
     };
 
-    // The resource-pack substitutions an arrangement was built with are part of its identity: the
-    // same song compiled under different overrides is a different arrangement.
-    private record Key(int songHash, Map<Integer, String> overrides) {
+    // The identity of the ARRANGEMENT, not of the song's path. Two MusicBoxSong instances built for
+    // the same file are different generations: a reload rebuilds every instance from the file it
+    // reads at that moment. Keying on the song hash let an instance that started reading before the
+    // reload finish afterwards and store its now-stale arrangement under the shared key, where the
+    // new instance would pick it up. The instance token is fixed at construction, so an old
+    // generation can only ever write to its own keys.
+    //
+    // The resource-pack substitutions an arrangement was built with are part of its identity too:
+    // the same song compiled under different overrides is a different arrangement.
+    private record Key(long songIdentity, Map<Integer, String> overrides) {
     }
 
     private static volatile int capacity = DEFAULT_CAPACITY;
+    private static final java.util.concurrent.atomic.AtomicLong IDENTITIES =
+            new java.util.concurrent.atomic.AtomicLong();
+
+    // Captured once by each MusicBoxSong, not at compilation time or from a mutable reload epoch.
+    static long newIdentity() {
+        return IDENTITIES.incrementAndGet();
+    }
 
     private CompiledSongCache() {
     }
@@ -51,18 +65,18 @@ public final class CompiledSongCache {
         }
     }
 
-    public static CompiledSong get(int songHash, Map<Integer, String> overrides) {
+    public static CompiledSong get(long songIdentity, Map<Integer, String> overrides) {
         synchronized (CACHE) {
-            return CACHE.get(new Key(songHash, overrides));
+            return CACHE.get(new Key(songIdentity, overrides));
         }
     }
 
-    public static void put(int songHash, Map<Integer, String> overrides, CompiledSong compiled) {
+    public static void put(long songIdentity, Map<Integer, String> overrides, CompiledSong compiled) {
         if (compiled == null || capacity == 0) {
             return;
         }
         synchronized (CACHE) {
-            CACHE.put(new Key(songHash, Map.copyOf(overrides)), compiled);
+            CACHE.put(new Key(songIdentity, Map.copyOf(overrides)), compiled);
         }
     }
 

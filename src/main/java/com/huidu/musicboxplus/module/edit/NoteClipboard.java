@@ -11,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class NoteClipboard {
 
     private static final Map<UUID, NoteClipboard> playerClipboards = new ConcurrentHashMap<>();
-    
+
     private List<EditAction.NoteData> copiedNotes = new ArrayList<>();
     private int minTick = 0;
     private int minPitch = 0;
@@ -22,7 +22,7 @@ public class NoteClipboard {
     public static NoteClipboard getInstance(UUID playerUUID) {
         return playerClipboards.computeIfAbsent(playerUUID, k -> new NoteClipboard());
     }
-    
+
     public static NoteClipboard getInstance() {
         return getInstance(UUID.randomUUID());
     }
@@ -32,10 +32,10 @@ public class NoteClipboard {
         if (notes.isEmpty()) {
             return;
         }
-        
+
         minTick = Integer.MAX_VALUE;
         minPitch = Integer.MAX_VALUE;
-        
+
         for (MusicNote note : notes) {
             copiedNotes.add(new EditAction.NoteData(note));
             minTick = Math.min(minTick, note.getTick());
@@ -52,24 +52,24 @@ public class NoteClipboard {
 
     public List<EditAction.NoteData> getPastedNotes(int targetTick, int targetPitch) {
         List<EditAction.NoteData> result = new ArrayList<>();
-        
+
         int tickOffset = targetTick - minTick;
         int pitchOffset = targetPitch - minPitch;
-        
+
         int maxPitch = getMaxPitch();
-        
+
         for (EditAction.NoteData data : copiedNotes) {
             int newTick = data.getTick() + tickOffset;
             int newPitch = data.getPitch() + pitchOffset;
-            
+
             if (newPitch >= 0 && newPitch <= maxPitch) {
                 result.add(new EditAction.NoteData(newPitch, newTick, data.getInstruments()));
             }
         }
-        
+
         return result;
     }
-    
+
     private int getMaxPitch() {
         try {
             if (MusicBox.getInstance().getConfigObject().isEnable10octave()) {
@@ -98,7 +98,7 @@ public class NoteClipboard {
         minTick = 0;
         minPitch = 0;
     }
-    
+
     public static void cleanup(UUID playerUUID) {
         playerClipboards.remove(playerUUID);
     }

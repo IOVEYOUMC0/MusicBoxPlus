@@ -243,25 +243,25 @@ public class PublishedMusic {
 
     public static PublishedMusic fromConfig(YamlConfiguration config) {
         PublishedMusic published = new PublishedMusic();
-        
+
         String idStr = config.getString("id");
         if (idStr != null) {
             published.uniqueId = UUID.fromString(idStr);
         }
-        
+
         String originalIdStr = config.getString("originalMusicId");
         if (originalIdStr != null) {
             published.originalMusicId = UUID.fromString(originalIdStr);
         }
-        
+
         published.name = config.getString("name", "Untitled");
         published.author = config.getString("author", "Unknown");
-        
+
         String authorUUIDStr = config.getString("authorUUID");
         if (authorUUIDStr != null) {
             published.authorUUID = UUID.fromString(authorUUIDStr);
         }
-        
+
         published.description = config.getString("description", "");
         published.price = config.getDouble("price", 0);
         published.salesCount = config.getInt("salesCount", 0);
@@ -294,7 +294,7 @@ public class PublishedMusic {
             } catch (IllegalArgumentException ignored) {
             }
         }
-        
+
         published.notes = new ArrayList<>();
         ConfigurationSection notesSection = config.getConfigurationSection("notes");
         if (notesSection != null) {
@@ -317,13 +317,13 @@ public class PublishedMusic {
                 }
             }
         }
-        
+
         return published;
     }
 
     public YamlConfiguration toConfig() {
         YamlConfiguration config = new YamlConfiguration();
-        
+
         config.set("id", uniqueId.toString());
         config.set("originalMusicId", originalMusicId != null ? originalMusicId.toString() : null);
         config.set("name", name);
@@ -347,7 +347,7 @@ public class PublishedMusic {
             }
         }
         config.set("authorClaims", claimList);
-        
+
         int noteIndex = 0;
         for (MusicNote note : notes) {
             String path = "notes.note" + noteIndex;
@@ -360,7 +360,7 @@ public class PublishedMusic {
             config.set(path + ".instruments", instrumentNames);
             noteIndex++;
         }
-        
+
         return config;
     }
 }

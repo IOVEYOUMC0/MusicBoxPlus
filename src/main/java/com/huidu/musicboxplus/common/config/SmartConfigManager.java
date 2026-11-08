@@ -50,6 +50,10 @@ implements ExpiringCacheCleaner {
     // A cache hit skips the validation but still re-reads the file: the alternative (caching the
     // bytes) would hand back stale content for up to the 5-minute TTL whenever a file's mtime does
     // not change when its content does.
+    // A user config this large is a mistake (pasted blob, runaway generator), not corruption. Falling
+    // back to the bundled defaults in memory keeps it intact for the operator to inspect.
+    private static final long MAX_CONFIG_BYTES = 0xA00000L; // 10 MB
+
     public byte[] loadConfig() throws IOException {
         File configFile = new File(this.plugin.getDataFolder(), this.configName);
         if (!configFile.exists()) {
@@ -57,6 +61,28 @@ implements ExpiringCacheCleaner {
                 "Config file " + this.configName + " not found, loading bundled defaults",
                 "未找到配置文件 " + this.configName + "，将加载内置默认配置"));
             return this.createDefaultConfig();
+        }
+        // Integrity is split by cause, because the three causes must not have the same remedy:
+        // an empty file has nothing to preserve and is regenerated, while an unreadable or oversized
+        // file is loaded from the bundled defaults WITH the user's file left alone. Both used to route
+        // into handleCorruptedConfig, which backs up and then DELETES the file -- so a 10 MB config or
+        // a permission problem destroyed content that a human could still have fixed.
+        if (configFile.length() == 0L) {
+            this.plugin.getLogger().warning("Config file " + this.configName
+                    + " is empty, creating backup and regenerating");
+            return this.handleCorruptedConfig(configFile);
+        }
+        if (!configFile.canRead()) {
+            this.plugin.getLogger().warning(LogLocale.text(this.plugin,
+                "Config file " + this.configName + " is not readable; using bundled defaults without touching it",
+                "配置文件 " + this.configName + " 不可读，将仅使用内置默认值且不改动该文件"));
+            return this.readBundledDefaultConfig();
+        }
+        if (configFile.length() > MAX_CONFIG_BYTES) {
+            this.plugin.getLogger().warning(LogLocale.text(this.plugin,
+                "Config file " + this.configName + " is larger than 10 MB; using bundled defaults without touching it",
+                "配置文件 " + this.configName + " 超过 10 MB，将仅使用内置默认值且不改动该文件"));
+            return this.readBundledDefaultConfig();
         }
         String cacheKey = this.configName + "_" + configFile.lastModified();
         ConfigCache cached = this.cache.get(cacheKey);
@@ -69,10 +95,6 @@ implements ExpiringCacheCleaner {
                 this.cache.remove(cacheKey);
             }
         }
-        if (!this.validateFileIntegrity(configFile)) {
-            this.plugin.getLogger().warning("Config file " + this.configName + " corrupted or invalid, creating backup and regenerating...");
-            return this.handleCorruptedConfig(configFile);
-        }
         if (!this.validateConfigFormat(configFile)) {
             this.plugin.getLogger().warning("Config file " + this.configName + " has format issues, attempting repair...");
             return this.attemptConfigRepair(configFile);
@@ -81,28 +103,6 @@ implements ExpiringCacheCleaner {
         this.cleanupExpiredCache();
         return Files.readAllBytes(configFile.toPath());
     }
-
-    private boolean validateFileIntegrity(File configFile) {
-        try {
-            if (!configFile.exists() || configFile.length() == 0L) {
-                return false;
-            }
-            if (!configFile.canRead()) {
-                this.plugin.getLogger().warning("Config file " + this.configName + " is not readable");
-                return false;
-            }
-            if (configFile.length() > 0xA00000L) {
-                this.plugin.getLogger().warning("Config file " + this.configName + " is too large (>10MB)");
-                return false;
-            }
-            return true;
-        }
-        catch (Exception e) {
-            this.plugin.getLogger().log(Level.WARNING, "Error validating file integrity for " + this.configName, e);
-            return false;
-        }
-    }
-
 
     private byte[] handleCorruptedConfig(File configFile) throws IOException {
         try {
@@ -217,6 +217,15 @@ implements ExpiringCacheCleaner {
         return StorageAccess.readBundledResource(this.plugin, this.resourcePath);
     }
 
+    /**
+     * True when the file has no issue this class can repair.
+     *
+     * <p>The only unambiguous repair is tab indentation (see {@link #repairConfigLine}), so that is
+     * the only thing checked here. The key-value check that used to sit next to it could never fire:
+     * {@code line.split(":", 2)} returns exactly two elements for any line containing a colon, so its
+     * {@code length != 2} guard was dead -- a malformed mapping only surfaced later as a SnakeYAML
+     * parse failure, where this pipeline cannot repair it either.
+     */
     public boolean validateConfigFormat(File configFile) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(configFile), StandardCharsets.UTF_8));){
             String line;
@@ -224,11 +233,8 @@ implements ExpiringCacheCleaner {
             int errors = 0;
             while ((line = reader.readLine()) != null) {
                 ++lineCount;
-                if (line.trim().isEmpty() || line.trim().startsWith("#")) continue;
-                if (line.contains(":") && !line.trim().startsWith("-") && !line.trim().startsWith("#") && line.split(":", 2).length != 2) {
-                    this.plugin.getLogger().warning("Invalid key-value format at line " + lineCount + ": " + line);
-                    ++errors;
-                }
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
                 if (!line.contains("\t")) continue;
                 this.plugin.getLogger().warning("Tab character found at line " + lineCount + ", should use spaces");
                 ++errors;

@@ -10,7 +10,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     private static int getDefaultBpm() {
         return MusicBox.getInstance().getConfigObject().getEditor().getDefaultBpm();
     }
-    
+
     private static int getDefaultBeatSubdivision() {
         return MusicBox.getInstance().getConfigObject().getEditor().getDefaultBeatSubdivision();
     }
@@ -31,7 +31,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         private final int beatUnit;
         private static final TimeSignature[] VALUES = values();
         private static final Map<String, TimeSignature> STRING_CACHE = new HashMap<>();
-        
+
         static {
             for (TimeSignature ts : VALUES) {
                 STRING_CACHE.put(ts.toString(), ts);
@@ -59,7 +59,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         public static TimeSignature fromString(String value) {
             return STRING_CACHE.getOrDefault(value, FOUR_FOUR);
         }
-        
+
         public static TimeSignature[] getAllValues() {
             return VALUES;
         }
@@ -267,13 +267,27 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     public synchronized List<MusicNote> getNotes() {
         return new ArrayList<>(notes);
     }
-    
+
+    /**
+     * Folds every note under the model's own lock, without copying the list.
+     *
+     * <p>Same view as {@link #getNotes()} for a caller that only reads, but for a song with 10k-100k
+     * notes the copy is a fresh array of that many references per call, and the save path calls this
+     * once per editor action. Every mutator is synchronized on this instance, so iterating here sees
+     * a consistent list without the copy.
+     */
+    public synchronized void forEachNote(java.util.function.Consumer<MusicNote> action) {
+        for (MusicNote note : notes) {
+            action.accept(note);
+        }
+    }
+
     public synchronized List<MusicNote> getNotesSortedByTick() {
         List<MusicNote> sorted = new ArrayList<>(notes);
         sorted.sort((n1, n2) -> Integer.compare(n1.getTick(), n2.getTick()));
         return sorted;
     }
-    
+
     public synchronized NavigableMap<Integer, List<MusicNote>> getTickIndexMap() {
         ensureIndexes();
         return new TreeMap<>(tickIndexMap);
@@ -348,7 +362,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
             beatSubdivision,
             createdAt,
             updatedAt,
-            new ArrayList<>(notes),
+            notes.stream().map(MusicNote::snapshot).toList(),
             description
         );
     }
@@ -365,13 +379,12 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
         this.noteIndexMap.clear();
         this.tickIndexMap.clear();
         for (MusicNote note : snapshot.getNotes()) {
-            this.notes.add(note);
-            String key = createNoteKey(note.getPitch(), note.getTick());
-            this.noteIndexMap.put(key, note);
-            this.tickIndexMap.computeIfAbsent(note.getTick(), k -> new CopyOnWriteArrayList<>()).add(note);
+            this.notes.add(note.snapshot());
         }
-        // Rebuilt in full above, so it is in sync whatever the flag said before.
-        this.indexesBuilt = true;
+        // Applying a Web/import snapshot is often followed only by persistence or listing. Do not
+        // eagerly allocate both indexes (String+HashMap node per note, TreeMap/tick lists) for that
+        // case. The editor/playback builds them on first actual indexed access.
+        this.indexesBuilt = false;
         this.cachedMaxTick = -1;
     }
 

@@ -275,6 +275,12 @@ public class LanguageConfig {
     }
 
     private void copyConfigurationValues(Configuration source, Map<String, String> target) {
+        copyValues(source, target);
+    }
+
+    // Package-private static so the layering (bundled defaults first, user file second) can be tested
+    // without a running plugin.
+    static void copyValues(Configuration source, Map<String, String> target) {
         for (String key : source.getKeys(true)) {
             if (source.isConfigurationSection(key)) {
                 continue;
@@ -282,9 +288,10 @@ public class LanguageConfig {
 
             if (source.isList(key)) {
                 List<String> list = source.getStringList(key);
-                if (!list.isEmpty()) {
-                    target.put(key, String.join("\n", list));
-                }
+                // An EMPTY list is a value, not an absence: a language file that sets a multi-line
+                // message to [] means "render nothing". Skipping it left the English default that was
+                // copied in a moment earlier in place, so the override silently did nothing.
+                target.put(key, String.join("\n", list));
                 continue;
             }
 
@@ -340,6 +347,14 @@ public class LanguageConfig {
     //
     // Placeholders are matched longest-first: Java alternation takes the first branch that matches at
     // a position rather than the longest one, so "{song}" would otherwise shadow "{song_name}".
+    // Compiled placeholder alternations, keyed by the (sorted) placeholder names. The regex is a
+    // pure function of those names, and this runs on refresh paths that repeat the same names tens
+    // of times a second (the control-panel progress renderer formats two time strings plus one per
+    // slot), so compiling it per call was 3-10 us of overhead followed by identical matcher work.
+    private static final Map<List<String>, Pattern> PLACEHOLDER_PATTERNS =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final int PLACEHOLDER_PATTERN_CACHE_MAX = 64;
+
     static String substitute(String message, String... replacements) {
         if (message == null || message.isEmpty() || replacements.length == 0
                 || replacements.length % 2 != 0) {
@@ -359,14 +374,26 @@ public class LanguageConfig {
         List<String> ordered = new ArrayList<>(values.keySet());
         ordered.sort(Comparator.comparingInt(String::length).reversed());
 
-        StringBuilder alternation = new StringBuilder();
-        for (String placeholder : ordered) {
-            if (alternation.length() > 0) {
-                alternation.append('|');
+        // The alternation depends only on the placeholder names, so it is compiled once per shape
+        // and reused. A shipped language entry has at most a handful of placeholders, which is why
+        // a flat clear() at the cap is enough eviction for this cache.
+        List<String> patternKey = List.copyOf(ordered);
+        Pattern pattern = PLACEHOLDER_PATTERNS.get(patternKey);
+        if (pattern == null) {
+            StringBuilder alternation = new StringBuilder();
+            for (String placeholder : ordered) {
+                if (alternation.length() > 0) {
+                    alternation.append('|');
+                }
+                alternation.append(Pattern.quote(placeholder));
             }
-            alternation.append(Pattern.quote(placeholder));
+            pattern = Pattern.compile(alternation.toString());
+            if (PLACEHOLDER_PATTERNS.size() >= PLACEHOLDER_PATTERN_CACHE_MAX) {
+                PLACEHOLDER_PATTERNS.clear();
+            }
+            PLACEHOLDER_PATTERNS.put(patternKey, pattern);
         }
-        Matcher matcher = Pattern.compile(alternation.toString()).matcher(message);
+        Matcher matcher = pattern.matcher(message);
         StringBuilder resolved = new StringBuilder(message.length() + 16);
         while (matcher.find()) {
             matcher.appendReplacement(resolved,

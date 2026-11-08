@@ -17,12 +17,18 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class LayoutParser {
+    // A GUI is at most 6 rows of 9 slots; anything beyond that has nowhere to go and used to be
+    // dropped without a word, which looked like "my button disappeared".
+    private static final int MAX_ROWS = 6;
+    private static final int INVENTORY_COLS = 9;
+
     private final GUI gui;
     private final String guiName;
     private final GUIConfigManager configManager;
     private final Map<Character, ButtonDefinition> buttonDefinitions;
     private final Map<Character, Integer> slotCache;
     private final Map<Character, List<Integer>> slotsForCharCache;
+    private boolean layoutWarned;
 
     public LayoutParser(GUI gui, String guiName) {
         this.gui = gui;
@@ -62,16 +68,34 @@ public class LayoutParser {
             return;
         }
         String[] lines = layoutPattern.split("\n");
-        for (int row = 0; row < lines.length; ++row) {
+        if (lines.length > MAX_ROWS) {
+            warnLayout("declares " + lines.length + " rows; only the first " + MAX_ROWS + " are shown");
+        }
+        for (int row = 0; row < Math.min(lines.length, MAX_ROWS); ++row) {
             String line = lines[row];
-            for (int col = 0; col < Math.min(line.length(), 9); ++col) {
+            if (line.length() > INVENTORY_COLS) {
+                warnLayout("row " + (row + 1) + " is " + line.length() + " characters wide; only the first "
+                        + INVENTORY_COLS + " are used");
+            }
+            for (int col = 0; col < Math.min(line.length(), INVENTORY_COLS); ++col) {
                 char character = line.charAt(col);
-                int slot = row * 9 + col;
+                int slot = row * INVENTORY_COLS + col;
                 if (!this.slotCache.containsKey(Character.valueOf(character)) || character != 'X') {
                     this.slotCache.put(Character.valueOf(character), slot);
                 }
                 this.applyButton(character, slot);
             }
+        }
+    }
+
+    private void warnLayout(String detail) {
+        if (layoutWarned) {
+            return;
+        }
+        layoutWarned = true;
+        com.huidu.musicboxplus.MusicBox plugin = com.huidu.musicboxplus.MusicBox.getInstance();
+        if (plugin != null) {
+            plugin.getLogger().warning("gui-config.yml: layout for '" + guiName + "' " + detail);
         }
     }
 
@@ -145,7 +169,10 @@ public class LayoutParser {
     }
 
     public void clearSlot(int slot) {
-        this.gui.addItem(slot, null, null);
+        // removeItem, not addItem(slot, null, null): the latter clears the slot but leaves a null
+        // action registered, so hasItem() reported the empty slot as occupied and callers re-rendered
+        // over it forever.
+        this.gui.removeItem(slot);
     }
 
     private static class ButtonDefinition {

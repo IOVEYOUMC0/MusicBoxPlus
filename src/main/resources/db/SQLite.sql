@@ -20,11 +20,10 @@ CREATE TABLE IF NOT EXISTS "playlist_song"
     "song_hash"    INTEGER NOT NULL,
     "pos"          INTEGER NOT NULL,
     PRIMARY KEY ("playlists_id", "song_hash"),
-    CONSTRAINT "fk_playlist_song_playlists1"
-        FOREIGN KEY ("playlists_id")
-            REFERENCES "playlists" ("id")
-            ON DELETE CASCADE
-            ON UPDATE CASCADE
+    FOREIGN KEY ("playlists_id")
+        REFERENCES "playlists" ("id")
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );
 CREATE TABLE IF NOT EXISTS "sign_songs"
 (
@@ -68,11 +67,10 @@ CREATE TABLE IF NOT EXISTS "player_music_notes"
     "pitch"      INTEGER NOT NULL,
     "tick"       INTEGER NOT NULL,
     "instruments" TEXT NOT NULL,
-    CONSTRAINT "fk_player_music_notes_music"
-        FOREIGN KEY ("music_id")
-            REFERENCES "player_music" ("id")
-            ON DELETE CASCADE
-            ON UPDATE CASCADE
+    FOREIGN KEY ("music_id")
+        REFERENCES "player_music" ("id")
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 );
 -- playlists.owner is the only non-key column any query filters on (getPlayLists:
 -- "where p.owner = ?"); MySQL.sql already had this index and SQLite did not.

@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class CompiledSongCacheTest {
 
     private static CompiledSong someSong() throws Exception {
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             Path file = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().findFirst().orElseThrow();
             return CompiledSong.compile(NbsReader.read(file));
         }
@@ -70,6 +70,53 @@ class CompiledSongCacheTest {
 
         assertSame(plain, CompiledSongCache.get(7, Map.of()));
         assertSame(overridden, CompiledSongCache.get(7, overrides));
+    }
+
+    @Test
+    void oldCompilationFinishingAfterReloadCannotPopulateTheNewGeneration() throws Exception {
+        long oldIdentity = CompiledSongCache.newIdentity();
+        long newIdentity = CompiledSongCache.newIdentity();
+        CompiledSong oldArrangement = someSong();
+        CompiledSong newArrangement = someSong();
+        var readFinished = new java.util.concurrent.CountDownLatch(1);
+        var mayPublish = new java.util.concurrent.CountDownLatch(1);
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        try {
+            var oldCompile = executor.submit(() -> {
+                readFinished.countDown();
+                try {
+                    if (!mayPublish.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        throw new AssertionError("old compilation was not released");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(e);
+                }
+                CompiledSongCache.put(oldIdentity, Map.of(), oldArrangement);
+            });
+            org.junit.jupiter.api.Assertions.assertTrue(readFinished.await(5, java.util.concurrent.TimeUnit.SECONDS));
+            CompiledSongCache.clear();
+            CompiledSongCache.put(newIdentity, Map.of(), newArrangement);
+            mayPublish.countDown();
+            oldCompile.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            assertSame(newArrangement, CompiledSongCache.get(newIdentity, Map.of()));
+            assertSame(oldArrangement, CompiledSongCache.get(oldIdentity, Map.of()));
+        } finally {
+            mayPublish.countDown();
+            executor.shutdownNow();
+            org.junit.jupiter.api.Assertions.assertTrue(executor.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void identitiesRemainDistinctWhenTheCacheIsCleared() throws Exception {
+        long oldIdentity = CompiledSongCache.newIdentity();
+        CompiledSongCache.clear();
+        long newIdentity = CompiledSongCache.newIdentity();
+        org.junit.jupiter.api.Assertions.assertNotEquals(oldIdentity, newIdentity);
+        CompiledSongCache.put(oldIdentity, Map.of(), someSong());
+        assertNull(CompiledSongCache.get(newIdentity, Map.of()),
+                "an old playlist compiling for the first time after reload must remain isolated");
     }
 
     @Test

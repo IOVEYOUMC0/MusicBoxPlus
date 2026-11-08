@@ -91,7 +91,6 @@ public final class ShutdownSteps {
         // the song-less IdleTextDisplay handles and their floating entities, which are not block
         // players; without this they and the HANDLES/INTERACTIONS maps survive a hot reload.
         safeDisable("shutdown text display manager", com.huidu.musicboxplus.module.textdisplay.TextDisplayPlayerManager::shutdown);
-        safeDisable("shutdown async task manager", () -> AsyncTaskManager.getInstance().shutdown());
         safeDisable("shutdown player manager", PlayerManager::shutdown);
 
         safeDisable("shutdown player music manager", () -> {
@@ -125,6 +124,11 @@ public final class ShutdownSteps {
         safeDisable("destroy player wrappers", plugin::destroyAllPlayers);
         safeDisable("shutdown volume manager", VolumeManager::shutdown);
         safeDisable("shutdown bstats", plugin::shutdownBStats);
+        // After every manager that queues work on it and before the database they write to. It used
+        // to run before PlayerMusicManager/PublishedMusicManager/destroyAllPlayers, so the saves those
+        // teardowns queue were rejected by a shut-down executor; it now drains them (bounded by its
+        // own 15s timeout) and only then is the database closed under it.
+        safeDisable("shutdown async task manager", () -> AsyncTaskManager.getInstance().shutdown());
         safeDisable("shutdown database", DatabaseLoader::shutdown);
     }
 

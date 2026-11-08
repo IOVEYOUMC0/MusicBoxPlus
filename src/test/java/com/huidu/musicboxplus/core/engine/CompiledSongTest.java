@@ -24,7 +24,7 @@ class CompiledSongTest {
     private static final int DEFAULT_LAYER_PANNING = 100;
 
     private static List<Path> bundled() throws Exception {
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             return stream.filter(p -> p.toString().endsWith(".nbs")).sorted().toList();
         }
     }

@@ -1,5 +1,5 @@
 name: MusicBoxPlus
-version: 1.0.0
+version: '${version}'
 main: com.huidu.musicboxplus.MusicBox
 # The plugin was called MusicBox up to 3.2. Without this alias, getPlugin("MusicBox") and every
 # downstream depend/softdepend on the old name resolve to nothing.

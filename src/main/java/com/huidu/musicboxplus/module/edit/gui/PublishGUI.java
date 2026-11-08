@@ -62,14 +62,14 @@ public class PublishGUI implements InventoryHolder {
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= musicSlots.size()) break;
-            
+
             int slot = musicSlots.get(slotIndex);
             PlayerMusic music = musicList.get(i);
-            
+
             PublishedMusic publishedMusic = publishedByMusic.get(music.getUniqueId());
             boolean hasPublishedListing = publishedMusic != null;
             boolean isPublished = publishedMusic != null && publishedMusic.isAvailable();
-            
+
             GUIConfigManager.HotbarButtonConfig musicConfig = config.getButton("music-item");
             Material material = musicConfig.getMaterial();
             if (hasPublishedListing) {
@@ -78,7 +78,7 @@ public class PublishGUI implements InventoryHolder {
                     material = publishedConfig.getMaterial();
                 }
             }
-            
+
             String status;
             if (publishedMusic != null && publishedMusic.isPending()) {
                 status = Lang.PUBLISH_STATUS_PENDING.toString();
@@ -88,7 +88,7 @@ public class PublishGUI implements InventoryHolder {
                 status = isPublished ? Lang.PUBLISH_STATUS_PUBLISHED.toString() : Lang.PUBLISH_STATUS_UNPUBLISHED.toString();
             }
             String action = hasPublishedListing ? Lang.PUBLISH_ACTION_MANAGE.toString() : Lang.PUBLISH_ACTION_PUBLISH.toString();
-            
+
             List<String> lore = new ArrayList<>();
             for (String line : musicConfig.getLore()) {
                 lore.add(line.replace("{notes}", String.valueOf(music.getNoteCount()))
@@ -96,17 +96,17 @@ public class PublishGUI implements InventoryHolder {
                         .replace("{status}", status)
                         .replace("{action}", action));
             }
-            
+
             String name = musicConfig.getName().replace("{name}", music.getName());
             ItemStack item = ItemUtils.createStack(material, name, lore, musicConfig.getCustomModelData());
-            
+
             if (isPublished) {
                 GUIConfigManager.HotbarButtonConfig publishedConfig = config.getButton("music-item-published");
                 if (publishedConfig != null && publishedConfig.isGlow()) {
                     item = ItemUtils.glow(item);
                 }
             }
-            
+
             inventory.setItem(slot, item);
             slotMusicMap.put(slot, music);
         }

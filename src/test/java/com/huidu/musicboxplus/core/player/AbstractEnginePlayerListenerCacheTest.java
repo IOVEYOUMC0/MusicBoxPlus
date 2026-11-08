@@ -111,7 +111,7 @@ class AbstractEnginePlayerListenerCacheTest {
     }
 
     private static TestEnginePlayer newPlayer() throws Exception {
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             Path file = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().findFirst().orElseThrow();
             TestEnginePlayer player = new TestEnginePlayer(CompiledSong.compile(NbsReader.read(file)));
             CREATED.add(player);

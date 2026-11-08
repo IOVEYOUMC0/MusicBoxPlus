@@ -48,12 +48,19 @@ final class GUIButtonRegistry {
             return parentButton;
         }
 
+        // Last resort for a caller that passes a name without hyphens ("nextpage" for "next-page"):
+        // compare the button NAME part of the key, not the whole "global.xxx" key -- the old comparison
+        // could never match, so this fallback was dead code.
         if (!buttonName.contains("-")) {
-            for (String key : this.buttonConfigs.keySet()) {
-                if (!key.startsWith("global.") || !key.replace("-", "").equalsIgnoreCase(altName)) {
+            for (Map.Entry<String, GUIConfigManager.ButtonConfig> entry : this.buttonConfigs.entrySet()) {
+                String key = entry.getKey();
+                if (!key.startsWith("global.")) {
                     continue;
                 }
-                return this.buttonConfigs.get(key);
+                String name = key.substring("global.".length());
+                if (name.replace("-", "").equalsIgnoreCase(altName)) {
+                    return entry.getValue();
+                }
             }
         }
 

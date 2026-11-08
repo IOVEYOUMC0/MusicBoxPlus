@@ -41,10 +41,18 @@ public final class StereoPan {
     // averaged, so a layer's panning pulls its notes toward one side rather than
     // displacing them wholesale.
     public static float leftOffset(int fileLayerPanning, int fileNotePanning, float maxDistance) {
-        if (isCentered(fileLayerPanning)) {
-            return (CENTER - fileNotePanning) / 100f * maxDistance;
+        int layerPanning = clampPanning(fileLayerPanning);
+        int notePanning = clampPanning(fileNotePanning);
+        if (isCentered(layerPanning)) {
+            return (CENTER - notePanning) / 100f * maxDistance;
         }
-        return ((CENTER - fileLayerPanning) + (CENTER - fileNotePanning)) / 200f * maxDistance;
+        return ((CENTER - layerPanning) + (CENTER - notePanning)) / 200f * maxDistance;
+    }
+
+    // The format stores panning as 0..200 around 100. Anything outside that can only come from a
+    // corrupt file, and letting it through pushed the source further than DEFAULT_MAX_DISTANCE.
+    private static int clampPanning(int panning) {
+        return Math.max(0, Math.min(2 * CENTER, panning));
     }
 
     public static float leftOffset(int fileLayerPanning, int fileNotePanning) {

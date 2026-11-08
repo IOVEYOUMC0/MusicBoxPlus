@@ -19,11 +19,14 @@ CREATE TABLE IF NOT EXISTS playlist_song
     song_hash    INT NOT NULL,
     pos          INT NOT NULL,
     PRIMARY KEY (playlists_id, song_hash),
-    CONSTRAINT fk_playlist_song_playlists
-        FOREIGN KEY (playlists_id)
-            REFERENCES playlists (id)
-            ON DELETE CASCADE
-            ON UPDATE CASCADE
+    -- No explicit constraint name: MySQL requires one name per schema, and the plugin supports running
+    -- several instances with different table prefixes in ONE schema. A shared literal name made the
+    -- second instance fail to create its tables. MySQL generates a table-scoped name (unique because
+    -- the table name is prefixed) when none is given.
+    FOREIGN KEY (playlists_id)
+        REFERENCES playlists (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sign_songs
@@ -73,11 +76,10 @@ CREATE TABLE IF NOT EXISTS player_music_notes
     pitch      INT NOT NULL,
     tick       INT NOT NULL,
     instruments TEXT NOT NULL,
-    CONSTRAINT fk_player_music_notes_music
-        FOREIGN KEY (music_id)
-            REFERENCES player_music (id)
-            ON DELETE CASCADE
-            ON UPDATE CASCADE
+    FOREIGN KEY (music_id)
+        REFERENCES player_music (id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 创建索引以提高查询性能

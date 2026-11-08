@@ -134,8 +134,10 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         // Folia 上仍然按玩家逐实体调度到各自区域线程。
         if (!Scheduler.isFolia()) {
             if (!Bukkit.isPrimaryThread()) {
-                // 时钟线程 -> 主线程，一次投递处理全部玩家
-                Bukkit.getGlobalRegionScheduler().execute(musicBox, () -> dispatchTicksInline(firstTick, count));
+                // Clock thread -> main thread, one dispatch for every listener. Routed through the
+                // Scheduler facade like every other scheduling call (the facade is the one place
+                // allowed to name Paper's scheduler API, which keeps the Folia audit a single scan).
+                Scheduler.global(() -> dispatchTicksInline(firstTick, count));
             } else {
                 dispatchTicksInline(firstTick, count);
             }

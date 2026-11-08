@@ -30,22 +30,21 @@ import java.util.logging.Level;
 
 public class MusicEditListener implements Listener {
 
-    private static final Map<UUID, MusicEditGUI> openGUIs = new ConcurrentHashMap<>();
+    private static final MusicEditSessionRegistry<MusicEditGUI> sessions = new MusicEditSessionRegistry<>();
     private static final Set<UUID> warnedPlayers = ConcurrentHashMap.newKeySet();
-    private static final Map<UUID, UUID> musicLocks = new ConcurrentHashMap<>();
     private static MusicEditListener listener;
     private static MbTask cleanupTask;
-    
+
     private interface GUIHandler {
         void handleClick(InventoryHolder holder, int rawSlot, boolean isRightClick, boolean isShiftClick);
     }
-    
+
     // Populated once, from the static initialiser below. Deliberately never cleared: the initialiser
     // does not run again when the plugin is re-enabled on the same classloader (PlugMan-style), so
     // emptying it here would leave every GUI click unhandled for the rest of the JVM's life -- the
     // same failure mode the GUIInputManager registration bug had.
     private static final Map<Class<? extends InventoryHolder>, GUIHandler> GUI_HANDLERS = new ConcurrentHashMap<>();
-    
+
     static {
         GUI_HANDLERS.put(MusicSelectGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             MusicSelectGUI gui = (MusicSelectGUI) holder;
@@ -53,42 +52,42 @@ public class MusicEditListener implements Listener {
                 gui.handleClick(rawSlot);
             }
         });
-        
+
         GUI_HANDLERS.put(PlayerMusicShopGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PlayerMusicShopGUI gui = (PlayerMusicShopGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot, isShiftClick);
             }
         });
-        
+
         GUI_HANDLERS.put(PublishGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PublishGUI gui = (PublishGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot);
             }
         });
-        
+
         GUI_HANDLERS.put(PublishConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PublishConfirmGUI gui = (PublishConfirmGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot, isRightClick, isShiftClick);
             }
         });
-        
+
         GUI_HANDLERS.put(ManagePublishedGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             ManagePublishedGUI gui = (ManagePublishedGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot, isShiftClick);
             }
         });
-        
+
         GUI_HANDLERS.put(PublishReviewGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PublishReviewGUI gui = (PublishReviewGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot, isRightClick);
             }
         });
-        
+
         GUI_HANDLERS.put(PurchaseConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PurchaseConfirmGUI gui = (PurchaseConfirmGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
@@ -102,14 +101,14 @@ public class MusicEditListener implements Listener {
                 gui.handleClick(rawSlot);
             }
         });
-        
+
         GUI_HANDLERS.put(ExitConfirmGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             ExitConfirmGUI gui = (ExitConfirmGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
                 gui.handleClick(rawSlot);
             }
         });
-        
+
         GUI_HANDLERS.put(PastePreviewGUI.class, (holder, rawSlot, isRightClick, isShiftClick) -> {
             PastePreviewGUI gui = (PastePreviewGUI) holder;
             if (rawSlot >= 0 && rawSlot < gui.getInventory().getSize()) {
@@ -121,52 +120,65 @@ public class MusicEditListener implements Listener {
     public static boolean enterEditMode(Player player, PlayerMusic music) {
         UUID musicId = music.getUniqueId();
         UUID playerId = player.getUniqueId();
-        UUID currentEditor = musicLocks.get(musicId);
-        
-        if (currentEditor != null && !currentEditor.equals(playerId)) {
-            Player editor = Bukkit.getPlayer(currentEditor);
+
+        // Construction may fail (invalid layout/items). Do it before acquiring a lease or
+        // disturbing the previous session; the registry atomically rechecks admission afterwards.
+        MusicEditGUI gui = new MusicEditGUI(music, player);
+        MusicEditSessionRegistry.Admission<MusicEditGUI> admission = sessions.admit(playerId, musicId, gui);
+        if (!admission.admitted()) {
+            Player editor = Bukkit.getPlayer(admission.blockingOwner());
             String editorName = editor != null ? editor.getName() : "another player";
             MessageUtils.send(player, Lang.EDIT_LOCKED, "{player}", editorName);
             MessageUtils.send(player, Lang.EDIT_LOCKED_HINT);
             MessageUtils.send(player, Lang.EDIT_LOCKED_OFFLINE_HINT);
             return false;
         }
-
-        MusicEditGUI previousGui = openGUIs.remove(playerId);
+        MusicEditGUI previousGui = admission.previous();
         if (previousGui != null) {
-            previousGui.stopAutoSaveTask();
-            if (previousGui.isPlaying()) {
-                previousGui.stopMusic();
-            }
-            musicLocks.remove(previousGui.getMusic().getUniqueId());
+            MusicEditGUI.cleanupSession(playerId);
+            previousGui.retireSession();
         }
-
-        musicLocks.put(musicId, playerId);
-
-        MusicEditGUI gui = new MusicEditGUI(music, player);
-        openGUIs.put(playerId, gui);
-        gui.open();
-        return true;
+        try {
+            gui.open();
+            return true;
+        } catch (RuntimeException exception) {
+            gui.abortFailedOpen();
+            throw exception;
+        }
     }
-    
+
+    /** @deprecated Legacy integration only; asynchronous close paths must supply the session. */
+    @Deprecated
     public static void exitEditMode(UUID musicId) {
-        musicLocks.remove(musicId);
+        sessions.legacyReleaseMusic(musicId);
     }
-    
+
+    public static boolean exitEditMode(UUID owner, UUID musicId, MusicEditGUI expectedGui) {
+        return sessions.release(owner, musicId, expectedGui);
+    }
+
+    static boolean isCurrentSession(UUID owner, MusicEditGUI expectedGui) {
+        return sessions.isCurrent(owner, expectedGui);
+    }
+
     public static boolean isInEditMode(UUID playerUUID) {
-        return openGUIs.containsKey(playerUUID);
+        return sessions.get(playerUUID) != null;
     }
-    
+
     public static MusicEditGUI getOpenGUI(UUID playerUUID) {
-        return openGUIs.get(playerUUID);
+        return sessions.get(playerUUID);
     }
-    
+
+    /** @deprecated Use enterEditMode so the GUI and its lock are installed together. */
+    @Deprecated
     public static void setOpenGUI(UUID playerUUID, MusicEditGUI gui) {
-        openGUIs.put(playerUUID, gui);
+        sessions.legacySet(playerUUID, gui);
     }
-    
+
+    /** @deprecated Use owner + expectedGui conditional release. */
+    @Deprecated
     public static void removeOpenGUI(UUID playerUUID) {
-        openGUIs.remove(playerUUID);
+        sessions.legacyRemove(playerUUID);
     }
 
     public static void notifyMusicUpdated(UUID musicId) {
@@ -179,13 +191,13 @@ public class MusicEditListener implements Listener {
         // refreshFromExternalUpdate() writes each owner's live inventory, so it must run on
         // that player's own region (Folia). openGUIs is keyed by the owner's UUID, so dispatch
         // per owner rather than iterating on a single (global) thread.
-        for (Map.Entry<UUID, MusicEditGUI> entry : openGUIs.entrySet()) {
+        for (Map.Entry<UUID, MusicEditGUI> entry : sessions.snapshot().entrySet()) {
             MusicEditGUI gui = entry.getValue();
             if (gui != null && musicId.equals(gui.getMusic().getUniqueId())) {
                 Player owner = Bukkit.getPlayer(entry.getKey());
                 if (owner != null) {
                     Scheduler.entity(owner, () -> {
-                        if (owner.isOnline()) {
+                        if (owner.isOnline() && isCurrentSession(entry.getKey(), gui)) {
                             gui.refreshFromExternalUpdate();
                         }
                     });
@@ -249,7 +261,7 @@ public class MusicEditListener implements Listener {
                     if (playerSlot >= 0 && playerSlot < 36) {
                         gui.handleInventoryClick(playerSlot, isRightClick, isShiftClick);
                     }
-                } else if (event.getClickedInventory() != null && 
+                } else if (event.getClickedInventory() != null &&
                            event.getClickedInventory().equals(player.getInventory())) {
                     int playerSlot = event.getSlot();
                     if (playerSlot >= 0 && playerSlot < 36) {
@@ -278,6 +290,14 @@ public class MusicEditListener implements Listener {
             return;
         }
 
+        // A saved inventory state means the editor swapped the player's real items out for the
+        // editor hotbar, so no drag may move them. This has to be checked before the module state:
+        // the old order returned early when the module was disabled mid-session and let plugin
+        // items be dragged out into the real inventory.
+        if (PlayerInventoryState.hasSavedState(playerUUID)) {
+            event.setCancelled(true);
+            return;
+        }
         if (!MusicBox.getInstance().isEditorModuleEnabled()) {
             return;
         }
@@ -330,9 +350,10 @@ public class MusicEditListener implements Listener {
             MusicEditGUI gui = getOpenGUI(playerUUID);
             if (gui != null && event.getInventory().equals(gui.getInventory())) {
                 if (!gui.isForceClose()) {
+                    Runnable request = gui.queuedExternalCloseRequest();
                     Scheduler.entityLater(player, () -> {
-                        if (player.isOnline() && isInEditMode(playerUUID)) {
-                            gui.handleExternalCloseRequest();
+                        if (player.isOnline() && isCurrentSession(playerUUID, gui) && !gui.isForceClose()) {
+                            request.run();
                         }
                     }, 1L);
                 }
@@ -389,7 +410,6 @@ public class MusicEditListener implements Listener {
         MusicEditGUI.cleanupSession(playerUUID);
         NoteClipboard.cleanup(playerUUID);
         GUIInputManager.getInstance().cleanup(playerUUID);
-        musicLocks.entrySet().removeIf(entry -> playerUUID.equals(entry.getValue()));
         warnedPlayers.remove(playerUUID);
         // These static maps retain the GUI (and its Player reference) until explicitly
         // removed; nothing else clears them on logout.
@@ -397,11 +417,9 @@ public class MusicEditListener implements Listener {
         PlayerMusicShopGUI.removeOpenGUI(playerUUID);
 
         if (isInEditMode(playerUUID)) {
-            MusicEditGUI gui = openGUIs.remove(playerUUID);
-            if (gui != null) {
-                gui.stopMusic();
-                gui.stopAutoSaveTask();
-                musicLocks.remove(gui.getMusic().getUniqueId());
+            MusicEditGUI gui = getOpenGUI(playerUUID);
+            if (gui != null && exitEditMode(playerUUID, gui.getMusic().getUniqueId(), gui)) {
+                gui.retireSession();
                 PlayerMusicManager.getInstance().saveMusicAsync(gui.getMusic(), success -> {
                     if (!success) {
                         MusicBox.getInstance().getLogger().log(
@@ -441,33 +459,23 @@ public class MusicEditListener implements Listener {
         // delivered into a GUI that belongs to the old classloader. musicLocks and warnedPlayers are
         // bounded but equally session-scoped.
         MusicEditTextInputManager.cleanupAllSessions();
-        musicLocks.clear();
+        sessions.clear();
         warnedPlayers.clear();
     }
-    
+
     private static void startCleanupTask() {
         if (cleanupTask != null) {
             return;
         }
-        cleanupTask = Scheduler.globalTimer(() -> {
-            musicLocks.entrySet().removeIf(entry -> {
-                UUID editorId = entry.getValue();
-                Player editor = Bukkit.getPlayer(editorId);
-                return editor == null;
-            });
-        }, 6000L, 6000L);
+        cleanupTask = Scheduler.globalTimer(MusicEditListener::cleanupOfflinePlayers, 6000L, 6000L);
     }
-    
+
     public static void cleanupOfflinePlayers() {
-        musicLocks.entrySet().removeIf(entry -> {
-            UUID editorId = entry.getValue();
-            Player editor = Bukkit.getPlayer(editorId);
-            return editor == null;
-        });
+        sessions.removeOfflineLocks(owner -> Bukkit.getPlayer(owner) == null);
     }
 
     public static void saveAllActive() {
-        for (MusicEditGUI gui : openGUIs.values()) {
+        for (MusicEditGUI gui : sessions.snapshot().values()) {
             if (gui.hasUnsavedChanges()) {
                 PlayerMusicManager.getInstance().stagePendingSave(gui.getMusic());
             }
@@ -475,30 +483,14 @@ public class MusicEditListener implements Listener {
     }
 
     public static void restoreAllPending() {
+        Map<UUID, MusicEditGUI> retiring = sessions.snapshot();
+        sessions.clear(); // Invalidate queued save/confirm callbacks before restoring any later session.
         PlayerInventoryState.restoreAllPending();
-        for (MusicEditGUI gui : openGUIs.values()) {
-            // The same teardown the quit path does. The auto-save timer is not one of the GUI's
-            // scheduled tasks, so stopMusic() leaves it running -- and once openGUIs is cleared
-            // below, every remaining cancel path is gated on isInEditMode() and can no longer
-            // reach this GUI. The timer would then hold the player, the music and the inventory
-            // for the rest of the server's life.
+        for (MusicEditGUI gui : retiring.values()) {
             gui.stopAutoSaveTask();
-            if (!gui.isPlaying()) {
-                continue;
-            }
-            Player owner = gui.getPlayer();
-            if (owner == null) {
-                continue;
-            }
-            // On the player's own region: stopMusic() rewrites the editor's toolbar into their
-            // hotbar, and this method is reached from the shutdown/reload chain, which on Folia runs
-            // on the global region thread and owns nobody. Scheduler.entity runs it inline when the
-            // caller does own the region (Paper's main thread, and the quit path) and skips it when
-            // the plugin is already disabled, which is why the backup -- not this repaint -- is what
-            // gives the player their inventory back.
-            Scheduler.entity(owner, gui::stopMusic);
+            // Teardown must not repaint the hotbar after restoreAllPending restored the real items.
+            Scheduler.entityNow(gui.getPlayer(), gui::retireSession);
         }
-        openGUIs.clear();
     }
 
     @EventHandler(priority = EventPriority.LOWEST)
@@ -539,7 +531,11 @@ public class MusicEditListener implements Listener {
 
         cancelAction.accept(true);
 
-        Scheduler.entity(player, () -> processTextInput(player, data, rawMessage));
+        MusicEditGUI expected = getOpenGUI(playerUUID);
+        Scheduler.entity(player, () -> {
+            if (expected != null && !isCurrentSession(playerUUID, expected)) return;
+            processTextInput(player, data, rawMessage);
+        });
     }
 
     private boolean canHandleModuleGui(InventoryHolder holder) {
@@ -656,7 +652,7 @@ public class MusicEditListener implements Listener {
         MusicEditGUI.restoreTextInputSession(player.getUniqueId(), data);
         MessageUtils.send(player, message);
     }
-    
+
     private String sanitizeInput(String input, int maxLength) {
         if (input == null) return "";
         String sanitized = input.replaceAll("[<>\"'&\\x00-\\x1f\\x7f-\\x9f\\u00a7\\r\\n]", "");

@@ -21,7 +21,7 @@ class NbsReaderReferenceTest {
     @Test
     void referenceAndCorpusArePresent() throws Exception {
         assertTrue(Files.exists(REFERENCE), "missing baseline " + REFERENCE);
-        assertTrue(Files.isDirectory(NbsCorpus.BUNDLED), "missing corpus " + NbsCorpus.BUNDLED);
+        assertTrue(Files.isDirectory(NbsCorpus.bundled()), "missing corpus " + NbsCorpus.bundled());
         assertFalse(NbsReference.load(REFERENCE).isEmpty(), "baseline has no entries");
     }
 
@@ -36,7 +36,7 @@ class NbsReaderReferenceTest {
                 mismatches.add(name + ": reference reader failed to parse it");
                 continue;
             }
-            Path file = NbsCorpus.BUNDLED.resolve(name);
+            Path file = NbsCorpus.bundled().resolve(name);
             if (!Files.exists(file)) {
                 mismatches.add(name + ": missing from corpus");
                 continue;

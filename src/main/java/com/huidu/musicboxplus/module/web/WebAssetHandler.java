@@ -6,6 +6,8 @@ import com.sun.net.httpserver.HttpHandler;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -26,24 +28,106 @@ final class WebAssetHandler implements HttpHandler {
     private final Consumer<HttpExchange> corsHeaderSetter;
     private final WebRateLimiter rateLimiter;
     private final WebConfig config;
-    private final Map<String, byte[]> resourceCache = Collections.synchronizedMap(
-            new LinkedHashMap<String, byte[]>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
-                    return size() > MAX_CACHE_SIZE;
-                }
+    private final AssetStore assets;
+
+    enum AssetSource { BUILTIN, CUSTOM }
+
+    record AssetKey(AssetSource source, String path, String etag) { }
+
+    record CachedAsset(byte[] bytes, AssetKey key) {
+        String etag() {
+            return key.etag();
+        }
+    }
+
+    @FunctionalInterface
+    interface ResourceLoader {
+        InputStream open(String path) throws IOException;
+    }
+
+    // Pure filesystem/resource cache: production and tests use the same lookup and gzip paths,
+    // without needing to construct a Bukkit plugin. Only immutable bundled assets are read-cached.
+    static final class AssetStore {
+        private final Path webRoot;
+        private final ResourceLoader resources;
+        private final Map<String, CachedAsset> resourceCache = boundedCache();
+        private final Map<AssetKey, byte[]> gzipCache = boundedCache();
+
+        AssetStore(Path webRoot, ResourceLoader resources) {
+            this.webRoot = webRoot;
+            this.resources = resources;
+        }
+
+        CachedAsset load(String path) throws IOException {
+            Path custom = resolveCustomFile(webRoot, path);
+            if (custom != null) {
+                // Read before evaluating validators: mtime and length alone cannot detect edits.
+                return asset(AssetSource.CUSTOM, path, Files.readAllBytes(custom));
             }
-    );
-    // gzip variants of cached resources, keyed by the same path. Built lazily and only for
-    // clients that accept gzip, so a client that never asks never pays the compression cost.
-    private final Map<String, byte[]> gzipCache = Collections.synchronizedMap(
-            new LinkedHashMap<String, byte[]>(16, 0.75f, true) {
-                @Override
-                protected boolean removeEldestEntry(Map.Entry<String, byte[]> eldest) {
-                    return size() > MAX_CACHE_SIZE;
-                }
+            CachedAsset cached = resourceCache.get(path);
+            if (cached != null) {
+                return cached;
             }
-    );
+            InputStream resource = resources.open(ASSET_PREFIX + path);
+            if (resource == null) {
+                return null;
+            }
+            CachedAsset loaded = asset(AssetSource.BUILTIN, path, readAll(resource));
+            resourceCache.put(path, loaded);
+            return loaded;
+        }
+
+        byte[] compressed(CachedAsset asset) {
+            return gzipCache.computeIfAbsent(asset.key(), ignored -> gzip(asset.bytes()));
+        }
+
+        private static CachedAsset asset(AssetSource source, String path, byte[] bytes) {
+            String etag = weakEtag(source.name() + "-" + hashOf(bytes));
+            return new CachedAsset(bytes, new AssetKey(source, path, etag));
+        }
+    }
+
+    private static <K, V> Map<K, V> boundedCache() {
+        return Collections.synchronizedMap(new LinkedHashMap<K, V>(16, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<K, V> eldest) {
+                return size() > MAX_CACHE_SIZE;
+            }
+        });
+    }
+
+    static Path resolveCustomFile(Path webRoot, String requestPath) throws IOException {
+        if (requestPath == null || !requestPath.startsWith("/") || requestPath.startsWith("//")
+                || requestPath.contains("..") || requestPath.contains("\\") || requestPath.contains("\0")) {
+            throw new IllegalArgumentException("Invalid asset path");
+        }
+        Path base = webRoot.toAbsolutePath().normalize();
+        Path target = base.resolve(requestPath.substring(1)).normalize();
+        if (!target.startsWith(base)) {
+            throw new SecurityException("Asset path outside web root");
+        }
+        Path realBase;
+        try {
+            realBase = base.toRealPath();
+        } catch (NoSuchFileException absent) {
+            return null;
+        }
+        // Check the nearest existing ancestor too: a missing file under an escaping directory
+        // symlink/junction must not silently fall back to a bundled resource.
+        Path existing = target;
+        while (existing != null) {
+            try {
+                Path realTarget = existing.toRealPath();
+                if (!realTarget.startsWith(realBase)) {
+                    throw new SecurityException("Asset real path outside web root");
+                }
+                return existing.equals(target) && Files.isRegularFile(realTarget) ? realTarget : null;
+            } catch (NoSuchFileException absent) {
+                existing = existing.getParent();
+            }
+        }
+        return null;
+    }
 
     WebAssetHandler(MusicBox plugin, Consumer<HttpExchange> corsHeaderSetter,
                     WebRateLimiter rateLimiter, WebConfig config) {
@@ -51,6 +135,7 @@ final class WebAssetHandler implements HttpHandler {
         this.corsHeaderSetter = corsHeaderSetter;
         this.rateLimiter = rateLimiter;
         this.config = config;
+        this.assets = new AssetStore(plugin.getDataFolder().toPath().resolve(ASSET_PREFIX), plugin::getResource);
     }
 
     // Same proxy-aware client resolution the API routes use, so a client cannot dodge its quota
@@ -73,84 +158,46 @@ final class WebAssetHandler implements HttpHandler {
             path = "/index.html";
         }
 
-        if (path.contains("..") || path.contains("\0")) {
+        CachedAsset asset;
+        try {
+            asset = assets.load(path);
+        } catch (IllegalArgumentException invalid) {
             writeTextResponse(exchange, HttpStatus.BAD_REQUEST, "Invalid path");
             return;
-        }
-
-        Path basePath = plugin.getDataFolder().toPath().resolve(ASSET_PREFIX).normalize();
-        Path targetPath = basePath.resolve(path.substring(1)).normalize();
-
-        if (!targetPath.startsWith(basePath)) {
+        } catch (SecurityException forbidden) {
             writeTextResponse(exchange, HttpStatus.FORBIDDEN, "Access denied");
             return;
         }
-
-        File customFile = targetPath.toFile();
-        if (customFile.exists() && customFile.isFile()) {
-            serveFile(exchange, customFile, path);
+        if (asset == null) {
+            writeTextResponse(exchange, HttpStatus.NOT_FOUND, "Asset not found");
             return;
         }
-
-        byte[] cached = resourceCache.get(path);
-        if (cached != null) {
-            serveCachedResource(exchange, cached, path);
-            return;
-        }
-
-        InputStream resource = plugin.getResource(ASSET_PREFIX + path);
-        if (resource != null) {
-            serveResource(exchange, resource, path);
-            return;
-        }
-
-        writeTextResponse(exchange, HttpStatus.NOT_FOUND, "Asset not found");
+        serveAsset(exchange, asset, path, assets, corsHeaderSetter);
     }
 
-    private void serveFile(HttpExchange exchange, File file, String path) throws IOException {
+    static void serveAsset(HttpExchange exchange, CachedAsset asset, String path, AssetStore assets,
+                           Consumer<HttpExchange> corsHeaderSetter) throws IOException {
         String mime = detectMimeType(path);
-        // Weak ETag from file identity, so a touched-but-unchanged file still round-trips a 304.
-        String etag = weakEtag("f-" + file.lastModified() + "-" + file.length());
+        String etag = asset.etag();
+        corsHeaderSetter.accept(exchange);
+        exchange.getResponseHeaders().add("Vary", "Accept-Encoding");
+        exchange.getResponseHeaders().set("Cache-Control", asset.key().source() == AssetSource.CUSTOM
+                ? "public, max-age=3600" : "public, max-age=86400");
+        exchange.getResponseHeaders().set("ETag", etag);
         if (sendNotModified(exchange, etag)) {
             return;
         }
-        corsHeaderSetter.accept(exchange);
         exchange.getResponseHeaders().set("Content-Type", mime);
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=3600");
-        exchange.getResponseHeaders().set("ETag", etag);
-        byte[] bytes = readAll(new FileInputStream(file));
-        writeBody(exchange, bytes, mime, etag);
+        writeBody(exchange, asset, assets);
     }
 
-    private void serveResource(HttpExchange exchange, InputStream resource, String path) throws IOException {
-        byte[] bytes;
-        try (InputStream res = resource) {
-            bytes = readAll(res);
-        }
-        resourceCache.put(path, bytes);
-        serveCachedResource(exchange, bytes, path);
-    }
-
-    private void serveCachedResource(HttpExchange exchange, byte[] bytes, String path) throws IOException {
-        String mime = detectMimeType(path);
-        String etag = weakEtag("c-" + bytes.length + "-" + hashOf(bytes));
-        if (sendNotModified(exchange, etag)) {
-            return;
-        }
-        corsHeaderSetter.accept(exchange);
-        exchange.getResponseHeaders().set("Content-Type", mime);
-        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=86400");
-        exchange.getResponseHeaders().set("ETag", etag);
-        writeBody(exchange, bytes, mime, etag);
-    }
-
-    // Compresses body bytes when the client accepts gzip and the payload is large enough to be
-    // worth it. Compressed copies are cached per path so a burst of requests pays once.
-    private void writeBody(HttpExchange exchange, byte[] bytes, String mime, String etag) throws IOException {
+    // Variant keys include source, request path and a digest of the bytes actually being served.
+    private static void writeBody(HttpExchange exchange, CachedAsset asset, AssetStore assets) throws IOException {
+        byte[] bytes = asset.bytes();
         byte[] body = bytes;
         String encoding = null;
-        if (bytes.length >= GZIP_MIN_SIZE && acceptsGzip(exchange)) {
-            body = gzipCache.computeIfAbsent(etag, ignored -> gzip(bytes));
+        if (bytes.length >= GZIP_MIN_SIZE && WebApiSupport.acceptsGzip(exchange)) {
+            body = assets.compressed(asset);
             if (body.length < bytes.length) {
                 encoding = "gzip";
             } else {
@@ -167,29 +214,13 @@ final class WebAssetHandler implements HttpHandler {
         }
     }
 
-    private boolean sendNotModified(HttpExchange exchange, String etag) throws IOException {
+    private static boolean sendNotModified(HttpExchange exchange, String etag) throws IOException {
         String ifNoneMatch = exchange.getRequestHeaders().getFirst("If-None-Match");
         if (ifNoneMatch != null && ifNoneMatch.equals(etag)) {
-            corsHeaderSetter.accept(exchange);
-            exchange.getResponseHeaders().set("ETag", etag);
             WebApiSupport.applySecurityHeaders(exchange);
             exchange.sendResponseHeaders(HttpStatus.NOT_MODIFIED, -1L);
             exchange.close();
             return true;
-        }
-        return false;
-    }
-
-    private boolean acceptsGzip(HttpExchange exchange) {
-        String acceptEncoding = exchange.getRequestHeaders().getFirst("Accept-Encoding");
-        if (acceptEncoding == null) {
-            return false;
-        }
-        for (String part : acceptEncoding.split(",")) {
-            String trimmed = part.trim().toLowerCase(java.util.Locale.ROOT);
-            if (trimmed.equals("gzip") || trimmed.startsWith("gzip;")) {
-                return true;
-            }
         }
         return false;
     }
@@ -212,7 +243,7 @@ final class WebAssetHandler implements HttpHandler {
 
     private static String hashOf(byte[] bytes) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-1");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(bytes);
             StringBuilder hex = new StringBuilder(hash.length * 2);
             for (byte b : hash) {
@@ -220,7 +251,7 @@ final class WebAssetHandler implements HttpHandler {
             }
             return hex.toString();
         } catch (NoSuchAlgorithmException e) {
-            return Integer.toHexString(bytes.length);
+            throw new IllegalStateException("SHA-256 is required by the Java runtime", e);
         }
     }
 
@@ -265,7 +296,7 @@ final class WebAssetHandler implements HttpHandler {
         return Collections.unmodifiableMap(map);
     }
 
-    private String detectMimeType(String path) {
+    private static String detectMimeType(String path) {
         for (Map.Entry<String, String> entry : MIME_TYPES.entrySet()) {
             if (path.endsWith(entry.getKey())) {
                 return entry.getValue();

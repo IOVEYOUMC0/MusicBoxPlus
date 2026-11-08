@@ -17,11 +17,57 @@ public class MusicFileImporter {
 
     private static final MusicFileImporter INSTANCE = new MusicFileImporter();
 
+    // MIDI files open with the ASCII chunk id "MThd"; NBS (v1+) opens with a zero short followed by
+    // the format version byte. Sniffing the content lets a renamed or extension-less file reach the
+    // right parser: keying on the name alone sent an NBS file named "x.mid" into the MIDI parser and
+    // produced a misleading error about the wrong format.
+    private static final byte[] MIDI_MAGIC = {'M', 'T', 'h', 'd'};
+    private static final int NBS_MIN_VERSION = 1;
+    private static final int NBS_MAX_VERSION = 6;
+
     public static MusicFileImporter getInstance() {
         return INSTANCE;
     }
 
     private MusicFileImporter() {
+    }
+
+    /** The format the content itself declares, or null when the first bytes match neither. */
+    static ImportFormat sniffFormat(byte[] head) {
+        if (head == null) {
+            return null;
+        }
+        if (head.length >= MIDI_MAGIC.length) {
+            boolean midi = true;
+            for (int i = 0; i < MIDI_MAGIC.length; i++) {
+                if (head[i] != MIDI_MAGIC[i]) {
+                    midi = false;
+                    break;
+                }
+            }
+            if (midi) {
+                return ImportFormat.MIDI;
+            }
+        }
+        if (head.length >= 4 && head[0] == 0 && head[1] == 0) {
+            int version = head[2] & 0xFF;
+            if (version >= NBS_MIN_VERSION && version <= NBS_MAX_VERSION) {
+                return ImportFormat.NBS;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Content first, file name second. The name is only a fallback for content the sniffer does not
+     * recognise (a v0 NBS file, or a MIDI with a non-standard chunk layout).
+     */
+    public ImportFormat detectFormat(byte[] head, String fileName) throws IOException {
+        ImportFormat sniffed = sniffFormat(head);
+        if (sniffed != null) {
+            return sniffed;
+        }
+        return detectFormat(fileName);
     }
 
     public ImportResult importByName(String requestedName, String author, UUID authorUUID) throws IOException {
@@ -36,7 +82,11 @@ public class MusicFileImporter {
         if (file.length() > MAX_IMPORT_FILE_BYTES) {
             throw new IOException("Import file too large (max " + (MAX_IMPORT_FILE_BYTES / (1024 * 1024)) + " MB)");
         }
-        ImportFormat format = detectFormat(file.getName());
+        byte[] head;
+        try (java.io.InputStream in = java.nio.file.Files.newInputStream(file.toPath())) {
+            head = in.readNBytes(8);
+        }
+        ImportFormat format = detectFormat(head, file.getName());
         return switch (format) {
             case NBS -> new ImportResult(NBSImporter.getInstance().importFromFile(file, author, authorUUID), format, java.util.List.of());
             case MIDI -> {
@@ -53,13 +103,15 @@ public class MusicFileImporter {
         if (bytes.length > MAX_IMPORT_FILE_BYTES) {
             throw new IOException("Import file too large (max " + (MAX_IMPORT_FILE_BYTES / (1024 * 1024)) + " MB)");
         }
-        ImportFormat format = detectFormat(fileName);
+        ImportFormat format = detectFormat(bytes, fileName);
         return switch (format) {
             case NBS -> {
                 yield new ImportResult(NBSImporter.getInstance().importFromBytes(bytes, fileName, author, authorUUID), format, java.util.List.of());
             }
             case MIDI -> {
-                File tempFile = File.createTempFile("musicboxplus-midi-import-", getTempSuffix(fileName));
+                // The suffix follows the detected format, not the file name: a MIDI file called
+                // "song.nbs" still needs the MIDI temp suffix for the parser's diagnostics.
+                File tempFile = File.createTempFile("musicboxplus-midi-import-", ".mid");
                 try {
                     java.nio.file.Files.write(tempFile.toPath(), bytes);
                     MidiImporter.ImportResult result = MidiImporter.getInstance().importFromFile(tempFile, author, authorUUID);
@@ -73,17 +125,6 @@ public class MusicFileImporter {
                 }
             }
         };
-    }
-
-    private String getTempSuffix(String fileName) {
-        String lower = fileName.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".midi")) {
-            return ".midi";
-        }
-        if (lower.endsWith(".mid")) {
-            return ".mid";
-        }
-        return ".tmp";
     }
 
     public File resolveImportFile(String requestedName) throws IOException {

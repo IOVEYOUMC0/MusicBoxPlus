@@ -3,8 +3,10 @@ package com.huidu.musicboxplus.core.nbs;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -29,65 +31,136 @@ public final class NbsWriter {
     private static final int NBS_VERSION = 4;
     private static final int DEFAULT_LAYER_VOLUME = 100;
     private static final int CENTERED_PANNING = 100;
-    private static final int DEFAULT_CUSTOM_INSTRUMENT_PITCH = 45;
 
     private NbsWriter() {
     }
 
     public static void write(RawNbsSong song, Path out) throws IOException {
-        Path parent = out.getParent();
+        if (out == null) {
+            throw new IOException("NBS output path is null");
+        }
+        PreparedSong prepared = prepare(song);
+        Path parent = out.toAbsolutePath().getParent();
         if (parent != null) {
             Files.createDirectories(parent);
         }
-        try (OutputStream os = new BufferedOutputStream(Files.newOutputStream(out))) {
-            write(song, os);
+        // Validate before touching the filesystem, then write to a sibling temp file and replace
+        // the target only after a successful close. I/O failures must not truncate the old export.
+        Path temp = Files.createTempFile(parent, ".nbs-", ".tmp");
+        try {
+            try (OutputStream os = new BufferedOutputStream(Files.newOutputStream(temp))) {
+                writePrepared(song, prepared, os);
+            }
+            replace(temp, out);
+        } catch (IOException | RuntimeException failure) {
+            try {
+                Files.deleteIfExists(temp);
+            } catch (IOException cleanupFailure) {
+                failure.addSuppressed(cleanupFailure);
+            }
+            throw failure;
+        }
+    }
+
+    private static void replace(Path temp, Path target) throws IOException {
+        try {
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (AtomicMoveNotSupportedException e) {
+            Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
     public static void write(RawNbsSong song, OutputStream os) throws IOException {
+        if (os == null) {
+            throw new IOException("NBS output stream is null");
+        }
+        writePrepared(song, prepare(song), os);
+    }
+
+    private record PreparedSong(List<RawNbsNote> notes, RawNbsLayer[] layers, int lengthTicks) {
+    }
+
+    // All model validation precedes the first output byte, including fields in trailing sections.
+    // RawNbsSong already snapshots its lists (and normalizes null lists to empty); nullable strings
+    // retain the existing empty-string encoding. Validate the raw u8 range, not playback limits:
+    // NbsReader supports unsigned keys above 87 and preserves all byte-valued volume/pan fields.
+    private static PreparedSong prepare(RawNbsSong song) throws IOException {
+        if (song == null) {
+            throw new IOException("NBS song is null");
+        }
+        requireRange("vanilla instrument count", song.vanillaInstrumentCount(), 0, 255);
+        requireRange("song length", song.lengthTicks(), 0, 0xFFFF);
+        requireRange("song height", song.songHeight(), 0, 0xFFFF);
+        requireRange("tempo", song.tempoRaw(), 0, 0xFFFF);
+        requireRange("time signature", song.timeSignature(), 0, 255);
+        requireRange("max loop count", song.maxLoopCount(), 0, 255);
+        requireRange("loop start tick", song.loopStartTick(), 0, 0xFFFF);
+        requireRange("custom instrument count", song.customInstruments().size(), 0, 255);
+
         List<RawNbsNote> notes = new ArrayList<>(song.notes());
-        notes.sort(Comparator.comparingInt(RawNbsNote::tick).thenComparingInt(RawNbsNote::layer));
-
-        int maxLayer = -1;
-        int maxTick = 0;
+        int songHeight = Math.max(1, song.songHeight());
+        int lengthTicks = song.lengthTicks();
         for (RawNbsNote note : notes) {
-            if (note.tick() < 0 || note.tick() > 0xFFFF) {
-                throw new IOException("NBS note tick out of range: " + note.tick());
+            requireRange("note tick", note.tick(), 0, 0xFFFF);
+            // Height is a count, not an index: index 65535 would need height 65536 in v4.
+            requireRange("note layer", note.layer(), 0, 0xFFFE);
+            requireRange("note instrument", note.instrument(), 0, 255);
+            requireRange("note key", note.key(), 0, 255);
+            requireRange("note velocity", note.velocity(), 0, 255);
+            requireRange("note panning", note.panning(), 0, 255);
+            requireRange("note fine pitch", note.finePitch(), Short.MIN_VALUE, Short.MAX_VALUE);
+            songHeight = Math.max(songHeight, note.layer() + 1);
+            lengthTicks = Math.max(lengthTicks, note.tick());
+        }
+        notes.sort(Comparator.comparingInt(RawNbsNote::tick).thenComparingInt(RawNbsNote::layer));
+        for (int i = 1; i < notes.size(); i++) {
+            RawNbsNote previous = notes.get(i - 1);
+            RawNbsNote note = notes.get(i);
+            if (note.tick() == previous.tick() && note.layer() == previous.layer()) {
+                throw new IOException("NBS duplicate note at tick " + note.tick() + ", layer " + note.layer());
             }
-            if (note.layer() < 0 || note.layer() > 0xFFFF) {
-                throw new IOException("NBS note layer out of range: " + note.layer());
+        }
+        for (RawNbsLayer layer : song.layers()) {
+            requireRange("layer index", layer.index(), 0, 0xFFFE);
+            requireRange("layer volume", layer.volume(), 0, 255);
+            requireRange("layer panning", layer.panning(), 0, 255);
+            songHeight = Math.max(songHeight, layer.index() + 1);
+        }
+        RawNbsLayer[] layers = new RawNbsLayer[songHeight];
+        for (RawNbsLayer layer : song.layers()) {
+            if (layers[layer.index()] != null) {
+                throw new IOException("NBS duplicate layer index: " + layer.index());
             }
-            maxLayer = Math.max(maxLayer, note.layer());
-            maxTick = Math.max(maxTick, note.tick());
+            layers[layer.index()] = layer;
         }
-        int songHeight = Math.max(1, Math.max(song.songHeight(), maxLayer + 1));
-        int lengthTicks = Math.max(song.lengthTicks(), maxTick);
-        if (lengthTicks > 0xFFFF) {
-            throw new IOException("NBS song length exceeds 65535 ticks: " + lengthTicks);
+        for (RawNbsCustomInstrument instrument : song.customInstruments()) {
+            requireRange("custom instrument pitch", instrument.pitch(), 0, 255);
         }
-        if (songHeight > 0xFFFF) {
-            throw new IOException("NBS song height exceeds 65535 layers: " + songHeight);
-        }
-        if (song.loopStartTick() < 0 || song.loopStartTick() > 0xFFFF) {
-            throw new IOException("NBS loop start tick out of range: " + song.loopStartTick());
-        }
-        if (song.customInstruments().size() > 255) {
-            throw new IOException("NBS custom instrument count exceeds 255: " + song.customInstruments().size());
-        }
+        // Deliberately keep v4's existing u16 capacity. A v5/v6 capacity/version strategy remains
+        // unresolved; accepting a newer source version does not justify inventing its wire format.
+        return new PreparedSong(notes, layers, lengthTicks);
+    }
 
+    private static void requireRange(String field, int value, int min, int max) throws IOException {
+        if (value < min || value > max) {
+            throw new IOException("NBS " + field + " out of range [" + min + ", " + max + "]: " + value);
+        }
+    }
+
+    private static void writePrepared(RawNbsSong song, PreparedSong prepared, OutputStream os) throws IOException {
         writeShortLE(os, 0);
         os.write(NBS_VERSION);
-        os.write(clampByte(song.vanillaInstrumentCount()));
-        writeShortLE(os, lengthTicks);
-        writeShortLE(os, songHeight);
+        os.write(song.vanillaInstrumentCount());
+        writeShortLE(os, prepared.lengthTicks());
+        writeShortLE(os, prepared.layers().length);
         writeString(os, song.title());
         writeString(os, song.author());
         writeString(os, song.originalAuthor());
         writeString(os, song.description());
-        writeShortLE(os, clampTempo(song.tempoRaw()));
+        writeShortLE(os, song.tempoRaw());
         os.write(0);
         os.write(0);
-        os.write(clampByte(song.timeSignature()));
+        os.write(song.timeSignature());
         writeIntLE(os, 0);
         writeIntLE(os, 0);
         writeIntLE(os, 0);
@@ -95,11 +168,11 @@ public final class NbsWriter {
         writeIntLE(os, 0);
         writeString(os, "");
         os.write(song.loopEnabled() ? 1 : 0);
-        os.write(clampByte(song.maxLoopCount()));
+        os.write(song.maxLoopCount());
         writeShortLE(os, song.loopStartTick());
 
-        writeNotes(os, notes);
-        writeLayers(os, song.layers(), songHeight);
+        writeNotes(os, prepared.notes());
+        writeLayers(os, prepared.layers());
         writeCustomInstruments(os, song.customInstruments());
     }
 
@@ -111,8 +184,17 @@ public final class NbsWriter {
         while (index < sortedNotes.size()) {
             int tick = sortedNotes.get(index).tick();
             int tickJump = tick - previousTick;
-            if (tickJump <= 0 || tickJump > 0xFFFF) {
+            if (tickJump <= 0) {
                 throw new IOException("NBS tick jump out of range: " + tickJump);
+            }
+            // A jump is a 16-bit value, but the gap to the next run can be larger: the first note at
+            // tick 65535 is a jump of 65536 from -1. Emit empty runs in 0xFFFF-tick steps -- each is a
+            // jump plus its terminator, i.e. "no notes in this span" -- and the remainder after them.
+            while (tickJump > 0xFFFF) {
+                writeShortLE(os, 0xFFFF);
+                writeShortLE(os, 0);
+                previousTick += 0xFFFF;
+                tickJump -= 0xFFFF;
             }
             writeShortLE(os, tickJump);
             previousTick = tick;
@@ -120,24 +202,16 @@ public final class NbsWriter {
             int previousLayer = -1;
             while (index < sortedNotes.size() && sortedNotes.get(index).tick() == tick) {
                 RawNbsNote note = sortedNotes.get(index);
-                // Two notes on the same layer at the same tick cannot both be written: the layer
-                // jump would be zero, which the format reads as end-of-tick. Dropping the later
-                // one keeps the file readable; keeping it would truncate every remaining note of
-                // that tick instead.
-                if (note.layer() == previousLayer) {
-                    index++;
-                    continue;
-                }
                 int layerJump = note.layer() - previousLayer;
                 if (layerJump <= 0 || layerJump > 0xFFFF) {
                     throw new IOException("NBS layer jump out of range: " + layerJump);
                 }
                 writeShortLE(os, layerJump);
                 previousLayer = note.layer();
-                os.write(clampByte(note.instrument()));
-                os.write(clampByte(note.key()));
-                os.write(clampByte(note.velocity()));
-                os.write(clampByte(note.panning()));
+                os.write(note.instrument());
+                os.write(note.key());
+                os.write(note.velocity());
+                os.write(note.panning());
                 writeShortLE(os, note.finePitch());
                 index++;
             }
@@ -149,19 +223,12 @@ public final class NbsWriter {
     // Exactly songHeight fixed-length records in index order: no jump prefix and no terminator.
     // Layers the song does not declare are written as defaults, because a short section would
     // leave the reader taking the custom instrument count out of the middle of a name.
-    private static void writeLayers(OutputStream os, List<RawNbsLayer> layers, int songHeight) throws IOException {
-        RawNbsLayer[] byIndex = new RawNbsLayer[songHeight];
+    private static void writeLayers(OutputStream os, RawNbsLayer[] layers) throws IOException {
         for (RawNbsLayer layer : layers) {
-            if (layer != null && layer.index() >= 0 && layer.index() < songHeight) {
-                byIndex[layer.index()] = layer;
-            }
-        }
-        for (int i = 0; i < songHeight; i++) {
-            RawNbsLayer layer = byIndex[i];
             writeString(os, layer == null ? "" : layer.name());
             os.write(layer != null && layer.locked() ? 1 : 0);
-            os.write(layer == null ? DEFAULT_LAYER_VOLUME : clampByte(layer.volume()));
-            os.write(layer == null ? CENTERED_PANNING : clampByte(layer.panning()));
+            os.write(layer == null ? DEFAULT_LAYER_VOLUME : layer.volume());
+            os.write(layer == null ? CENTERED_PANNING : layer.panning());
         }
     }
 
@@ -174,17 +241,9 @@ public final class NbsWriter {
             RawNbsCustomInstrument instrument = instruments.get(i);
             writeString(os, instrument.name());
             writeString(os, instrument.soundFile());
-            os.write(instrument.pitch() <= 0 ? DEFAULT_CUSTOM_INSTRUMENT_PITCH : clampByte(instrument.pitch()));
+            os.write(instrument.pitch());
             os.write(instrument.pressKey() ? 1 : 0);
         }
-    }
-
-    private static int clampByte(int value) {
-        return Math.max(0, Math.min(255, value));
-    }
-
-    private static int clampTempo(int tempoRaw) {
-        return Math.max(1, Math.min(65535, tempoRaw));
     }
 
     private static void writeShortLE(OutputStream os, int value) throws IOException {

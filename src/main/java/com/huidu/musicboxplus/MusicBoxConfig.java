@@ -6,6 +6,7 @@ import org.yaml.snakeyaml.constructor.BaseConstructor;
 import org.yaml.snakeyaml.introspector.BeanAccess;
 import org.yaml.snakeyaml.introspector.PropertyUtils;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -84,7 +85,7 @@ public static class ConfigParseException extends RuntimeException {
     public ConfigParseException(String message) {
         super(message);
     }
-    
+
     public ConfigParseException(String message, Throwable cause) {
         super(message, cause);
     }
@@ -110,7 +111,56 @@ public static MusicBoxConfig parseConfig(InputStream yamlStream) {
         throw new ConfigParseException("配置解析失败: " + e.getMessage(), e);
     }
 }
-    
+
+    /**
+     * Reports keys in the user's config.yml that the bundled default does not contain.
+     *
+     * <p>{@link #parseConfig} runs with {@code skipMissingProperties(true)}, so a misspelled key is
+     * silently ignored: an admin edits the file, restarts, sees no change and no line in the log
+     * explaining why. This only warns -- it never rejects or rewrites the file.
+     */
+    public static void warnUnknownKeys(byte[] userConfig, InputStream bundledDefaults, java.util.logging.Logger logger) {
+        if (userConfig == null || userConfig.length == 0 || bundledDefaults == null || logger == null) {
+            return;
+        }
+        try (InputStream defaultsStream = bundledDefaults) {
+            Yaml yaml = new Yaml();
+            Object loadedUser = yaml.load(new java.io.ByteArrayInputStream(userConfig));
+            Object loadedDefaults = yaml.load(defaultsStream);
+            if (!(loadedUser instanceof Map<?, ?> user) || !(loadedDefaults instanceof Map<?, ?> defaultMap)) {
+                return;
+            }
+            List<String> unknown = new ArrayList<>();
+            collectUnknownKeys(user, defaultMap, "", unknown);
+            if (!unknown.isEmpty()) {
+                logger.warning("config.yml has " + unknown.size()
+                        + " key(s) that do not exist in the bundled default and are ignored: "
+                        + String.join(", ", unknown));
+            }
+        } catch (IOException | RuntimeException e) {
+            logger.fine("Could not check config.yml for unknown keys: " + e.getMessage());
+        }
+    }
+
+    private static void collectUnknownKeys(Map<?, ?> user, Map<?, ?> defaults, String prefix, List<String> unknown) {
+        for (Map.Entry<?, ?> entry : user.entrySet()) {
+            String key = String.valueOf(entry.getKey());
+            String path = prefix.isEmpty() ? key : prefix + "." + key;
+            if (!defaults.containsKey(entry.getKey())) {
+                unknown.add(path);
+                continue;
+            }
+            Object userValue = entry.getValue();
+            Object defaultValue = defaults.get(entry.getKey());
+            if (userValue instanceof Map<?, ?> userChild && defaultValue instanceof Map<?, ?> defaultChild
+                    && !defaultChild.isEmpty()) {
+                // Empty mappings such as resourcePackInstruments.soundKeys are extension points,
+                // not objects with zero permitted properties. User-defined instrument keys are valid.
+                collectUnknownKeys(userChild, defaultChild, path, unknown);
+            }
+        }
+    }
+
     private void applyDefaults() {
         if (economy == null) economy = new EconomySetting();
         if (bossbar == null) bossbar = new BossBarSetting();
@@ -131,7 +181,7 @@ public static MusicBoxConfig parseConfig(InputStream yamlStream) {
         if (performance == null) performance = new PerformanceConfig();
         if (autoPlay == null) autoPlay = new AutoPlayConfig();
     }
-    
+
     // Out-of-range values are clamped rather than rejected, so a bad config never bricks startup.
     private void validate() {
         if (speakerRadius <= 0) speakerRadius = 16;

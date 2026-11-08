@@ -17,7 +17,8 @@ import java.util.stream.Stream;
 // instead of failing.
 public final class NbsCorpus {
 
-    // Bundled corpus; always present, so tests may rely on it.
+    // Bundled corpus. It lives under Reference/, which is git-ignored, so it exists on a developer
+    // machine but not in a fresh clone; use bundled() rather than this field when a test needs it.
     public static final Path BUNDLED =
             Path.of("Reference", "boombox", "decompiled", "resources", "songs");
 
@@ -38,6 +39,18 @@ public final class NbsCorpus {
             }
         }
         return null;
+    }
+
+    // The corpus is a local asset: Reference/ is git-ignored, so a fresh clone (and therefore CI)
+    // does not have it. Tests that need real files must call this instead of reading BUNDLED
+    // directly; it skips the test with an explanation rather than failing on a missing directory.
+    // Skipping is a real loss of coverage, not a pass: run the suite locally with the corpus present
+    // before trusting format-related changes.
+    public static Path bundled() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(Files.isDirectory(BUNDLED),
+                "Bundled NBS corpus is absent (Reference/ is not in the repository); "
+                        + "set it up locally to run this test: " + BUNDLED.toAbsolutePath());
+        return BUNDLED;
     }
 
     // Collects .nbs files recursively as root-relative paths, in a stable order.

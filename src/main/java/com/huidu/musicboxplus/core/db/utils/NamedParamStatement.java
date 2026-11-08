@@ -8,17 +8,13 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
-// Builds a PreparedStatement from a query that uses :named placeholders instead of
-// positional '?'. A name bound to a collection expands into one placeholder per
-// element, which is how IN (...) clauses are expressed without string concatenation.
+/**
+ * Builds a PreparedStatement from :named placeholders. Collections expand in iteration order;
+ * an empty collection binds one SQL NULL. Quoted strings/identifiers and comments are left intact.
+ * This mutable builder is not thread-safe: do not share it between concurrent operations.
+ */
 public class NamedParamStatement {
-
-    // Matches a :name token, but not one that sits inside a single-quoted literal.
-    private static final Pattern PLACEHOLDER = Pattern.compile("(?<![:'\\\\]):([A-Za-z_][A-Za-z0-9_]*)");
 
     private final String query;
     private final Map<String, Collection<?>> boundValues = new HashMap<>();
@@ -28,54 +24,125 @@ public class NamedParamStatement {
     }
 
     private PreparedStatement grownStatement(Connection connection) throws SQLException {
-        Matcher matcher = PLACEHOLDER.matcher(query);
         StringBuilder sql = new StringBuilder(query.length());
-        Deque<Object> positional = new ArrayDeque<>();
-        int cursor = 0;
+        List<Object> positional = new ArrayList<>();
+        char quote = 0;
+        boolean lineComment = false;
+        boolean blockComment = false;
 
-        while (matcher.find()) {
-            sql.append(query, cursor, matcher.start());
-            cursor = matcher.end();
-
-            String key = matcher.group(1);
-            Collection<?> values = boundValues.get(key);
-            if (values == null || values.isEmpty()) {
-                sql.append('?');
-                positional.addLast(null);
-                continue;
-            }
-            for (int i = 0; i < values.size(); i++) {
-                if (i > 0) {
-                    sql.append(',');
+        // Each input character is visited once. Expansion is linear in the number of bound values.
+        for (int cursor = 0; cursor < query.length();) {
+            char current = query.charAt(cursor);
+            char next = cursor + 1 < query.length() ? query.charAt(cursor + 1) : 0;
+            if (lineComment) {
+                sql.append(current);
+                cursor++;
+                if (current == '\n' || current == '\r') {
+                    lineComment = false;
                 }
-                sql.append('?');
+            } else if (blockComment) {
+                sql.append(current);
+                cursor++;
+                if (current == '*' && next == '/') {
+                    sql.append(next);
+                    cursor++;
+                    blockComment = false;
+                }
+            } else if (quote != 0) {
+                sql.append(current);
+                cursor++;
+                if (current == '\\' && cursor < query.length()) {
+                    // MySQL backslash escaping (including escaped backslashes).
+                    sql.append(query.charAt(cursor++));
+                } else if (current == quote) {
+                    if (next == quote) {
+                        // SQL doubled delimiters: '', "", and ``.
+                        sql.append(next);
+                        cursor++;
+                    } else {
+                        quote = 0;
+                    }
+                }
+            } else if (current == '\'' || current == '"' || current == '`') {
+                quote = current;
+                sql.append(current);
+                cursor++;
+            } else if (current == '#' || (current == '-' && next == '-')) {
+                lineComment = true;
+                sql.append(current);
+                cursor++;
+            } else if (current == '/' && next == '*') {
+                blockComment = true;
+                sql.append(current).append(next);
+                cursor += 2;
+            } else if (current == ':' && (cursor == 0 || query.charAt(cursor - 1) != ':')
+                    && isNameStart(next)) {
+                int end = cursor + 2;
+                while (end < query.length() && isNamePart(query.charAt(end))) {
+                    end++;
+                }
+                String key = query.substring(cursor + 1, end);
+                if (!boundValues.containsKey(key)) {
+                    throw new IllegalArgumentException("Unbound named SQL parameter: :" + key);
+                }
+                Collection<?> values = boundValues.get(key);
+                if (values == null || values.isEmpty()) {
+                    sql.append('?');
+                    positional.add(null);
+                } else {
+                    boolean first = true;
+                    for (Object value : values) {
+                        if (!first) {
+                            sql.append(',');
+                        }
+                        first = false;
+                        sql.append('?');
+                        positional.add(value);
+                    }
+                }
+                cursor = end;
+            } else {
+                sql.append(current);
+                cursor++;
             }
-            positional.addAll(values);
         }
-        sql.append(query, cursor, query.length());
 
         PreparedStatement statement = connection.prepareStatement(sql.toString());
-        int index = 0;
-        for (Object value : positional) {
-            AbstractBase.setValue(statement, index, value);
-            index++;
+        try {
+            for (int index = 0; index < positional.size(); index++) {
+                AbstractBase.setValue(statement, index, positional.get(index));
+            }
+            boundValues.clear();
+            return statement;
+        } catch (SQLException | RuntimeException | Error failure) {
+            // The caller's try-with-resources has not acquired this statement yet.
+            try {
+                statement.close();
+            } catch (SQLException | RuntimeException | Error closeFailure) {
+                if (closeFailure != failure) {
+                    failure.addSuppressed(closeFailure);
+                }
+            }
+            throw failure;
         }
-        boundValues.clear();
-        return statement;
     }
 
-    public ResultSet executeQuery(Connection connection) throws SQLException {
-        return grownStatement(connection).executeQuery();
+    private static boolean isNameStart(char character) {
+        return character >= 'A' && character <= 'Z'
+                || character >= 'a' && character <= 'z' || character == '_';
     }
 
+    private static boolean isNamePart(char character) {
+        return isNameStart(character) || character >= '0' && character <= '9';
+    }
+
+    // The two ownership-taking forms below were removed: they returned a ResultSet or a
+    // PreparedStatement that the caller had to remember to close, and closing only the ResultSet
+    // does not close its Statement. Callers use executeQueryAndClose, which owns both.
     public int executeUpdate(Connection connection) throws SQLException {
         try (PreparedStatement statement = grownStatement(connection)) {
             return statement.executeUpdate();
         }
-    }
-
-    public PreparedStatement createPreparedStatement(Connection connection) throws SQLException {
-        return grownStatement(connection);
     }
 
     public void executeQueryAndClose(Connection connection, ResultSetHandler handler) throws SQLException {
@@ -103,7 +170,6 @@ public class NamedParamStatement {
     }
 
     public <T> void setValues(String key, T[] values) {
-        Set<T> set = Arrays.stream(values).collect(Collectors.toSet());
-        boundValues.put(key, set);
+        boundValues.put(key, Arrays.asList(values));
     }
 }

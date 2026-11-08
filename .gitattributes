@@ -1,0 +1,22 @@
+# Keep the repository text-normalised: git stores LF and checks out per platform policy.
+# Without this, a contributor with core.autocrlf=true re-writes every line of every file they
+# touch, which turns one-line changes into whole-file diffs.
+* text=auto
+
+# Wrapper and Windows scripts: keep the line endings the shells expect.
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Archives and media are binary; never diff or merge them as text.
+*.jar binary
+*.zip binary
+*.nbs binary
+*.ogg binary
+*.png binary
+*.ico binary
+*.gif binary
+
+# Generated or machine-owned files.
+*.min.js linguist-generated=true

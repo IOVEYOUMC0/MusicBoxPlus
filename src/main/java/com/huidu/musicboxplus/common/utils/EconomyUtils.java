@@ -36,7 +36,7 @@ public final class EconomyUtils {
             initialized = true;
         }
     }
-    
+
     public static void reload() {
         synchronized (initLock) {
             initialized = false;
@@ -46,24 +46,38 @@ public final class EconomyUtils {
     }
 
     // Economy is actually usable only when the config switch is on and a Vault economy service
-    // resolved. Every money-touching method below asks this first; keeping the check in one place
-    // instead of at each purchase entry point means a newly added purchase path cannot miss it.
-    // True when there is no economy to move money through: either the feature is off or no Vault
-    // provider registered. Named for what it returns -- the old isEnable() meant the opposite of
-    // how it reads, and depositPlayer's `if (isDisabled()) return true` silently reported success
-    // for a deposit that never happened.
-    public static boolean isDisabled() {
+    // resolved. Every money-touching method below asks the mode first; keeping the decision in one
+    // place means a newly added purchase path cannot miss it.
+    //
+    // The three modes are deliberately not collapsed into a boolean: "the admin turned prices off"
+    // and "prices are on but no provider loaded" look identical to a nullable Economy field, and
+    // treating the second as the first hands out priced goods for free.
+    public static EconomyGate.Mode mode() {
         ensureInitialized();
-        return !MusicBox.getInstance().getConfigObject().getEconomy().isEnable() || eco == null;
+        boolean enabled = MusicBox.getInstance().getConfigObject().getEconomy().isEnable();
+        return EconomyGate.mode(enabled, eco != null);
     }
 
-    // With economy off the price is always 0, i.e. discs are handed out for free
+    // True only when the server deliberately turned money off, so purchases really are free.
+    public static boolean isDisabled() {
+        return mode() == EconomyGate.Mode.FREE;
+    }
+
+    // Economy is configured on but cannot charge anyone: purchases must fail closed.
+    public static boolean isUnavailable() {
+        return mode() == EconomyGate.Mode.UNAVAILABLE;
+    }
+
+    // With economy off the price is always 0, i.e. discs are handed out for free. With the economy
+    // enabled-but-unavailable the real price is still shown, so the buyer gets an explicit refusal
+    // instead of a purchase that silently costs nothing.
     public static double getDiscPrice() {
-        if (isDisabled()) {
+        EconomyGate.Mode mode = mode();
+        if (mode == EconomyGate.Mode.FREE) {
             return 0.0;
         }
         // Never allow a negative price, which would credit the buyer on withdraw.
-        return Math.max(0, MusicBox.getInstance().getConfigObject().getEconomy().getPrice());
+        return EconomyGate.price(mode, MusicBox.getInstance().getConfigObject().getEconomy().getPrice());
     }
 
     public static double getBalance(Player player) {
@@ -76,54 +90,57 @@ public final class EconomyUtils {
 
     // With economy off everyone is treated as able to afford anything
     public static boolean hasMoney(Player player, double money) {
-        if (isDisabled()) {
+        EconomyGate.Mode mode = mode();
+        if (mode == EconomyGate.Mode.FREE) {
             return true;
         }
-        ensureInitialized();
-        if (eco == null) {
+        if (mode == EconomyGate.Mode.UNAVAILABLE) {
             return false;
         }
-        double currentMoney = EconomyUtils.getBalance(player);
-        return currentMoney - money >= 0.0;
+        return EconomyGate.canAfford(mode, getBalance(player), money);
     }
 
-    // With economy off nothing is withdrawn and the purchase counts as successful (free)
+    // With economy off nothing is withdrawn and the purchase counts as successful (free).
+    // An enabled-but-unavailable economy charges nothing, so it must NOT report success.
     public static boolean buyNoMessage(Player player, double price) {
-        if (isDisabled()) {
+        EconomyGate.Mode mode = mode();
+        if (mode == EconomyGate.Mode.FREE) {
             return true;
         }
-        ensureInitialized();
-        if (eco != null) {
-            EconomyResponse response = eco.withdrawPlayer(player, price);
-            if (!response.transactionSuccess()) {
-                MusicBox.getInstance().getLogger().warning("从玩家 " + player.getName() + " 扣款 " + price + " 失败: " + response.errorMessage);
-                return false;
-            }
-            return true;
+        if (mode == EconomyGate.Mode.UNAVAILABLE) {
+            MusicBox.getInstance().getLogger().warning(
+                    "Economy is enabled but no Vault provider is available; purchase refused");
+            return false;
         }
-        return false;
+        EconomyResponse response = eco.withdrawPlayer(player, price);
+        if (!response.transactionSuccess()) {
+            MusicBox.getInstance().getLogger().warning("从玩家 " + player.getName() + " 扣款 " + price + " 失败: " + response.errorMessage);
+            return false;
+        }
+        return true;
     }
 
-    // Returns true when the player must be refused (balance too low, or no economy backing).
+    // Returns true when the player must be refused (balance too low, no economy backing, or the
+    // economy is enabled without a provider).
     // The inverted reading of this name is the entire point: every call site is a rejection
     // branch like "if (cannotBuy(...)) refuse", so a future caller cannot flip the logic by
     // accident. With economy off this always passes and stays silent about the economy being
     // unavailable.
     public static boolean cannotBuy(Player player, double price) {
-        if (isDisabled()) {
+        EconomyGate.Mode mode = mode();
+        if (mode == EconomyGate.Mode.FREE) {
             return false;
         }
-        ensureInitialized();
-        if (eco == null) {
+        if (mode == EconomyGate.Mode.UNAVAILABLE) {
             MessageUtils.send(player, Lang.ERROR, "{message}", "Economy system not available");
             return true;
         }
-        double currentMoney = EconomyUtils.getBalance(player);
-        double moneyLeft = currentMoney - price;
-        if (moneyLeft >= 0.0) {
+        double currentMoney = getBalance(player);
+        if (EconomyGate.canAfford(mode, currentMoney, price)) {
             return false;
         }
-        MessageUtils.send(player, Lang.NO_HAS_MONEY, "{amount}", String.valueOf(moneyLeft *= -1.0));
+        MessageUtils.send(player, Lang.NO_HAS_MONEY, "{amount}",
+                String.valueOf(EconomyGate.shortfall(currentMoney, price)));
         return true;
     }
 
@@ -132,11 +149,8 @@ public final class EconomyUtils {
     public static boolean depositPlayer(Player player, double amount) {
         // false, not true: the caller deletes the pending revenue on success, and with no economy
         // the money was never paid out.
-        if (isDisabled()) {
-            return false;
-        }
-        ensureInitialized();
-        if (eco == null) {
+        EconomyGate.Mode mode = mode();
+        if (mode != EconomyGate.Mode.ACTIVE) {
             return false;
         }
         EconomyResponse response = eco.depositPlayer(player, amount);
@@ -146,7 +160,7 @@ public final class EconomyUtils {
         }
         return true;
     }
-    
+
     private static void ensureInitialized() {
         if (!initialized) {
             synchronized (initLock) {

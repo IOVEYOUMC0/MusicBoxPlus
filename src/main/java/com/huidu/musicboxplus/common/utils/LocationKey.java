@@ -13,7 +13,7 @@ public final class LocationKey {
     private final int y;
     private final int z;
     private int cachedHashCode;
-    
+
     public LocationKey(Location location) {
         World world = location.getWorld();
         this.worldName = world != null ? world.getName() : null;
@@ -36,27 +36,27 @@ public final class LocationKey {
     public static LocationKey of(Location location) {
         return new LocationKey(location);
     }
-    
+
     public Location toLocation(World world) {
         return new Location(world, x, y, z);
     }
-    
+
     public String getWorldName() {
         return worldName;
     }
-    
+
     public int getX() {
         return x;
     }
-    
+
     public int getY() {
         return y;
     }
-    
+
     public int getZ() {
         return z;
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -64,7 +64,7 @@ public final class LocationKey {
         LocationKey that = (LocationKey) o;
         return x == that.x && y == that.y && z == that.z && Objects.equals(worldName, that.worldName);
     }
-    
+
     @Override
     public int hashCode() {
         if (cachedHashCode == 0) {
@@ -72,7 +72,7 @@ public final class LocationKey {
         }
         return cachedHashCode;
     }
-    
+
     @Override
     public String toString() {
         return "LocationKey{" + worldName + ", " + x + ", " + y + ", " + z + '}';

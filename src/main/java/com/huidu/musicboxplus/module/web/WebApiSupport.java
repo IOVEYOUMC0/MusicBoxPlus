@@ -78,8 +78,11 @@ final class WebApiSupport {
         writeBody(exchange, code, bytes);
     }
 
-    private void writeBody(HttpExchange exchange, int code, byte[] bytes) throws IOException {
+    static void writeBody(HttpExchange exchange, int code, byte[] bytes) throws IOException {
         byte[] body = bytes;
+        // The body depends on Accept-Encoding, so caches in front of the editor have to key on it;
+        // without Vary a shared cache may hand the compressed body to a client that cannot read it.
+        exchange.getResponseHeaders().add("Vary", "Accept-Encoding");
         if (bytes.length >= GZIP_MIN_SIZE && acceptsGzip(exchange)) {
             byte[] compressed = gzip(bytes);
             if (compressed.length < bytes.length) {
@@ -93,18 +96,59 @@ final class WebApiSupport {
         }
     }
 
-    private boolean acceptsGzip(HttpExchange exchange) {
-        String acceptEncoding = exchange.getRequestHeaders().getFirst("Accept-Encoding");
+    static boolean acceptsGzip(HttpExchange exchange) {
+        List<String> values = exchange.getRequestHeaders().get("Accept-Encoding");
+        return acceptsGzip(values == null ? null : String.join(",", values));
+    }
+
+    // One parser for API responses and static assets. An explicit gzip entry overrides '*',
+    // including an explicit refusal; malformed qualities fail closed instead of enabling gzip.
+    static boolean acceptsGzip(String acceptEncoding) {
         if (acceptEncoding == null) {
             return false;
         }
+        Double gzipQuality = null;
+        double wildcardQuality = 0;
         for (String part : acceptEncoding.split(",")) {
-            String trimmed = part.trim().toLowerCase(Locale.ROOT);
-            if (trimmed.equals("gzip") || trimmed.startsWith("gzip;")) {
-                return true;
+            String[] fields = part.trim().split(";", -1);
+            String coding = fields[0].trim().toLowerCase(Locale.ROOT);
+            if (!coding.equals("gzip") && !coding.equals("*")) {
+                continue;
+            }
+            double quality = 1;
+            boolean hasQuality = false;
+            for (int i = 1; i < fields.length; i++) {
+                String[] parameter = fields[i].trim().split("=", 2);
+                if (!parameter[0].trim().equalsIgnoreCase("q")) {
+                    continue;
+                }
+                if (hasQuality || parameter.length != 2
+                        || !parameter[1].trim().matches("(?:0(?:\\.[0-9]{0,3})?|1(?:\\.0{0,3})?)")) {
+                    quality = 0;
+                    break;
+                }
+                hasQuality = true;
+                quality = Double.parseDouble(parameter[1].trim());
+            }
+            if (coding.equals("gzip")) {
+                // In conflicting duplicate entries, a refusal wins.
+                gzipQuality = gzipQuality == null ? quality : Math.min(gzipQuality, quality);
+            } else {
+                wildcardQuality = quality;
             }
         }
-        return false;
+        return (gzipQuality == null ? wildcardQuality : gzipQuality) > 0;
+    }
+
+    /**
+     * Logs a server-side failure in full.
+     *
+     * <p>Callers answer the client with a plain message instead of {@code e.getMessage()}: the
+     * exception text used to be echoed into the HTTP response, which reaches anyone who can open the
+     * editor and leaks driver/stack/internal-path details.
+     */
+    void logServerError(String operation, Throwable failure) {
+        plugin.getLogger().log(java.util.logging.Level.WARNING, operation, failure);
     }
 
     private static byte[] gzip(byte[] data) {

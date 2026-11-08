@@ -3,6 +3,7 @@ package com.huidu.musicboxplus.core.sound;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.huidu.musicboxplus.core.nbs.NbsCorpus;
 import com.huidu.musicboxplus.core.nbs.NbsReader;
 import com.huidu.musicboxplus.core.nbs.RawNbsNote;
 import com.huidu.musicboxplus.core.nbs.RawNbsSong;
@@ -27,7 +28,7 @@ import org.junit.jupiter.api.Test;
 // reproduced exactly, wrap-around included, since that is what produces the edge cases below.
 class NotePitchTest {
 
-    private static final Path CORPUS = Path.of("Reference", "boombox", "decompiled", "resources", "songs");
+    
 
     // Range playSound accepts.
     private static final float MIN_PITCH = 0.5f;
@@ -120,12 +121,12 @@ class NotePitchTest {
     // throw. This is the criterion for whether this layer can replace the old implementation.
     @Test
     void everyCorpusNoteProducesAPlayablePitch() throws Exception {
-        assertTrue(Files.isDirectory(CORPUS), "缺少语料目录 " + CORPUS);
+        assertTrue(Files.isDirectory(NbsCorpus.bundled()), "缺少语料目录 " + NbsCorpus.bundled());
         List<String> failures = new ArrayList<>();
         int noteCount = 0;
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(CORPUS)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             files = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().toList();
         }
 

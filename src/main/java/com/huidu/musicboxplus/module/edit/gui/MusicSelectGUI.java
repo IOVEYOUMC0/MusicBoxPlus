@@ -73,14 +73,14 @@ public class MusicSelectGUI implements InventoryHolder {
         int itemsPerPage = musicSlots.isEmpty() ? 45 : musicSlots.size();
         int startIndex = page * itemsPerPage;
         int endIndex = Math.min(startIndex + itemsPerPage, musicList.size());
-        
+
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= musicSlots.size()) break;
-            
+
             int slot = musicSlots.get(slotIndex);
             PlayerMusic music = musicList.get(i);
-            
+
             GUIConfigManager.HotbarButtonConfig musicConfig = config.getButton("music-item");
             List<String> lore = new ArrayList<>();
             for (String line : musicConfig.getLore()) {
@@ -183,7 +183,7 @@ public class MusicSelectGUI implements InventoryHolder {
             int index = page * itemsPerPage + musicIndex;
             if (index < musicList.size()) {
                 PlayerMusic selectedMusic = musicList.get(index);
-                
+
                 player.closeInventory();
                 handleSelectedMusic(selectedMusic);
             }

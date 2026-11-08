@@ -81,7 +81,7 @@ implements Listener {
 
     public void requestInput(Player player, InputType type, String promptMessage, InputCallback callback, String cancelKeyword) {
         UUID playerId = player.getUniqueId();
-        this.pendingInputs.remove(playerId);
+        cancelPendingFor(playerId, player);
         InputRequest request = new InputRequest(playerId, type, promptMessage, callback, cancelKeyword);
         this.pendingInputs.put(playerId, request);
         player.sendMessage(MiniMessageUtils.processComponent(promptMessage));
@@ -91,12 +91,28 @@ implements Listener {
 
     public void requestInput(Player player, InputType type, Component promptMessage, InputCallback callback, String cancelKeyword) {
         UUID playerId = player.getUniqueId();
-        this.pendingInputs.remove(playerId);
+        cancelPendingFor(playerId, player);
         InputRequest request = new InputRequest(playerId, type, PlainTextComponentSerializer.plainText().serialize(promptMessage), callback, cancelKeyword);
         this.pendingInputs.put(playerId, request);
         player.sendMessage(promptMessage);
         player.sendMessage(Lang.GUI_INPUT_PROMPT.toComponent());
         player.sendMessage(Lang.GUI_INPUT_CANCEL.toComponent("{keyword}", cancelKeyword));
+    }
+
+    // Replacing a pending prompt has to tell the callback it replaced: those callbacks restore
+    // inventories and re-open GUIs, so dropping one silently leaves the UI half-open. The new prompt
+    // is still stored right after, so a failing callback cannot prevent it.
+    private void cancelPendingFor(UUID playerId, Player player) {
+        InputRequest previous = this.pendingInputs.remove(playerId);
+        if (previous == null) {
+            return;
+        }
+        try {
+            previous.getCallback().onInputCancelled(player);
+        } catch (RuntimeException failure) {
+            logger.warn("Input cancel callback failed for player " + player.getName()
+                    + ": " + failure.getMessage());
+        }
     }
 
     public void requestInput(Player player, Consumer<String> callback) {
@@ -121,7 +137,7 @@ implements Listener {
             player.sendMessage(Lang.GUI_INPUT_CANCELLED.toComponent());
         }
     }
-    
+
     public void cleanup(UUID playerId) {
         this.pendingInputs.remove(playerId);
     }
@@ -201,11 +217,28 @@ implements Listener {
     }
 
     public boolean hasPendingInput(Player player) {
-        return this.pendingInputs.containsKey(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        InputRequest request = this.pendingInputs.get(playerId);
+        if (request == null) {
+            return false;
+        }
+        if (request.hasExpired()) {
+            // An abandoned prompt -- the player closed the GUI instead of answering -- would
+            // otherwise keep the chat listener swallowing their next ordinary chat message, however
+            // long later. Dropping it here is where the answer would have been consumed.
+            this.pendingInputs.remove(playerId, request);
+            return false;
+        }
+        return true;
     }
 
     public InputRequest getPendingInput(Player player) {
-        return this.pendingInputs.get(player.getUniqueId());
+        InputRequest request = this.pendingInputs.get(player.getUniqueId());
+        if (request != null && request.hasExpired()) {
+            this.pendingInputs.remove(player.getUniqueId(), request);
+            return null;
+        }
+        return request;
     }
 
     public void requestSearchInput(final PlayerWrapper wrapper) {
@@ -309,11 +342,16 @@ implements Listener {
     }
 
     public static class InputRequest {
+        // A prompt nobody answers must not stay armed forever. The GUI it belonged to can be closed
+        // without any callback firing, and an armed request captures the player's next chat message.
+        private static final long TIMEOUT_NANOS = java.util.concurrent.TimeUnit.MINUTES.toNanos(2);
+
         private final UUID playerId;
         private final InputType type;
         private final String promptMessage;
         private final InputCallback callback;
         private final String cancelKeyword;
+        private final long createdAtNanos;
 
         public InputRequest(UUID playerId, InputType type, String promptMessage, InputCallback callback, String cancelKeyword) {
             this.playerId = playerId;
@@ -321,6 +359,11 @@ implements Listener {
             this.promptMessage = promptMessage;
             this.callback = callback;
             this.cancelKeyword = cancelKeyword != null ? cancelKeyword : "cancel";
+            this.createdAtNanos = System.nanoTime();
+        }
+
+        boolean hasExpired() {
+            return System.nanoTime() - createdAtNanos > TIMEOUT_NANOS;
         }
 
         public UUID getPlayerId() {

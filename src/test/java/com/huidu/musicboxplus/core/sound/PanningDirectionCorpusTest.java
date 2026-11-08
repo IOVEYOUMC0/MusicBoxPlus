@@ -25,8 +25,9 @@ import org.junit.jupiter.api.Test;
 // the high side. If someone flips the direction, this fails.
 class PanningDirectionCorpusTest {
 
-    private static final Path SONG = Path.of("Reference", "boombox", "decompiled",
-            "resources", "songs", "Tokyo_Teddy_Bear.nbs");
+    private static Path song() {
+        return com.huidu.musicboxplus.core.nbs.NbsCorpus.bundled().resolve("Tokyo_Teddy_Bear.nbs");
+    }
 
     private static boolean startsWithChannel(String name, char channel) {
         String trimmed = name == null ? "" : name.trim().toUpperCase(Locale.ROOT);
@@ -37,8 +38,8 @@ class PanningDirectionCorpusTest {
 
     @Test
     void layersNamedByChannelAgreeThatZeroIsLeft() throws Exception {
-        assertTrue(Files.exists(SONG), "missing corpus file " + SONG);
-        RawNbsSong song = NbsReader.read(SONG);
+        assertTrue(Files.exists(song()), "missing corpus file " + song());
+        RawNbsSong song = NbsReader.read(song());
 
         List<String> wrong = new ArrayList<>();
         int left = 0;

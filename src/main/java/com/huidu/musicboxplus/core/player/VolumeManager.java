@@ -18,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -27,7 +28,7 @@ public class VolumeManager {
     private static final Object LOCK = new Object();
     private static final long CLEANUP_INTERVAL_TICKS = 12000L;
 
-    private final Map<UUID, Integer> playerVolumes = new ConcurrentHashMap<>();
+    private final DeferredVolumeCache playerVolumes = new DeferredVolumeCache();
     private volatile boolean dirty = false;
     private final AtomicLong volumeVersion = new AtomicLong();
     private volatile long persistedVersion = 0L;
@@ -67,7 +68,7 @@ public class VolumeManager {
         }
         return s;
     }
-    
+
     public static VolumeManager getInstance() {
         if (instance == null) {
             synchronized (LOCK) {
@@ -78,18 +79,25 @@ public class VolumeManager {
         }
         return instance;
     }
-    
+
     private VolumeManager() {
-        CacheUtils.registerCacheCleaner(new SettingsCleaner());
-        startAutoSave();
-        startCleanupTask();
+        this(true);
+    }
+
+    // Allows deterministic persistence tests without starting Bukkit scheduler tasks.
+    VolumeManager(boolean startTasks) {
+        if (startTasks) {
+            CacheUtils.registerCacheCleaner(new SettingsCleaner());
+            startAutoSave();
+            startCleanupTask();
+        }
     }
 
     private final class SettingsCleaner implements CacheCleaner {
         @Override public void clearCache() { settings = null; }
         @Override public String getCacheName() { return "VolumeManager.settings"; }
     }
-    
+
     private void startAutoSave() {
         synchronized (this) {
             if (autoSaveTask != null) {
@@ -114,7 +122,7 @@ public class VolumeManager {
             }, intervalMs, intervalMs, TimeUnit.MILLISECONDS);
         }
     }
-    
+
     private void startCleanupTask() {
         synchronized (this) {
             if (cleanupTask != null) {
@@ -130,8 +138,13 @@ public class VolumeManager {
                     this::cleanupOfflinePlayers, CLEANUP_INTERVAL_TICKS, CLEANUP_INTERVAL_TICKS);
         }
     }
-    
+
     private void saveDirtyVolumes() {
+        saveDirtyVolumes(com.huidu.musicboxplus.common.utils.AsyncTaskManager::runAsync,
+                volumes -> DatabaseLoader.getBase().savePlayerVolumesBatch(volumes));
+    }
+
+    void saveDirtyVolumes(BiConsumer<Runnable, Runnable> dispatcher, Consumer<Map<UUID, Integer>> writer) {
         if (saveInProgress) {
             return;
         }
@@ -140,14 +153,14 @@ public class VolumeManager {
             dirty = false;
             return;
         }
-        final Map<UUID, Integer> toSave = new HashMap<>(playerVolumes);
+        final Map<UUID, Integer> toSave = snapshotForSave();
         saveInProgress = true;
-        com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(() -> {
+        dispatcher.accept(() -> {
             boolean success = false;
             try {
                 // Single transactional batch instead of N individual upserts — one prepare,
                 // one round-trip, one commit even when many players are dirty at once.
-                DatabaseLoader.getBase().savePlayerVolumesBatch(toSave);
+                writer.accept(toSave);
                 success = true;
             } catch (Exception e) {
                 RuntimeDatabaseUtils.logFailure("save player volumes", e);
@@ -162,6 +175,10 @@ public class VolumeManager {
                 }
                 saveInProgress = false;
             }
+        }, () -> {
+            // Rejection/shutdown means the task's finally block will never run.
+            dirty = true;
+            saveInProgress = false;
         });
     }
 
@@ -172,7 +189,7 @@ public class VolumeManager {
             return;
         }
         try {
-            DatabaseLoader.getBase().savePlayerVolumesBatch(new HashMap<>(playerVolumes));
+            DatabaseLoader.getBase().savePlayerVolumesBatch(snapshotForSave());
             persistedVersion = snapshotVersion;
             dirty = false;
         } catch (Exception e) {
@@ -180,7 +197,11 @@ public class VolumeManager {
             dirty = true;
         }
     }
-    
+
+    private Map<UUID, Integer> snapshotForSave() {
+        return playerVolumes.snapshotForSave();
+    }
+
     private int getDefaultVolume() {
         return settings().defaultVolume;
     }
@@ -196,38 +217,124 @@ public class VolumeManager {
     private int getMaxVolume() {
         return settings().maxVolume;
     }
-    
+
     public int getVolume(Player player) {
         return getVolume(player.getUniqueId());
     }
-    
+
     public int getVolume(UUID uuid) {
         // Fast path for the hot playback loop: getVolume runs ~20Hz per in-range listener. The common
         // case is a cache hit, so return it BEFORE building the reader lambda below and before the
         // getDefaultVolume() read -- otherwise a lambda was allocated on every note dispatch only to
-        // be discarded by resolveVolumeWithDeferredLoad's own cache-hit return. The full race-safe
+        // be discarded by DeferredVolumeCache's own cache-hit return. The full race-safe
         // deferred-load path still runs on an actual miss.
         Integer cached = playerVolumes.get(uuid);
         if (cached != null) {
             return cached;
         }
-        return resolveVolumeWithDeferredLoad(
-                uuid,
-                getDefaultVolume(),
-                playerVolumes,
+        return playerVolumes.resolve(
+                uuid, getDefaultVolume(),
                 com.huidu.musicboxplus.common.utils.AsyncTaskManager::runAsync,
-                u -> {
-                    try {
-                        return DatabaseLoader.getBase().getPlayerVolume(u);
-                    } catch (Exception e) {
-                        RuntimeDatabaseUtils.logFailure("load player volume", e);
-                        return null;
-                    }
-                },
-                null
-        );
+                u -> DatabaseLoader.getBase().getPlayerVolume(u),
+                e -> RuntimeDatabaseUtils.logFailure("load player volume", e));
     }
 
+    // JDK-only cache core. An immutable entry is also the load token: an explicit set always
+    // creates a new entry, even for the same numeric default. Pending/failed reads are never
+    // persistable; only a successful read (including no row) or an explicit set makes them so.
+    static final class DeferredVolumeCache {
+        private static final class Entry {
+            final Integer volume;
+            final boolean persistable;
+
+            Entry(int volume, boolean persistable) {
+                this.volume = volume;
+                this.persistable = persistable;
+            }
+        }
+
+        private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
+
+        Integer get(UUID uuid) {
+            Entry entry = entries.get(uuid);
+            return entry == null ? null : entry.volume;
+        }
+
+        int resolve(UUID uuid, int defaultVolume, BiConsumer<Runnable, Runnable> dispatcher,
+                    Function<UUID, Integer> reader, Consumer<Exception> onFailure) {
+            Integer cached = get(uuid);
+            if (cached != null) {
+                return cached;
+            }
+            Entry placeholder = new Entry(defaultVolume, false);
+            Entry existing = entries.putIfAbsent(uuid, placeholder);
+            if (existing != null) {
+                return existing.volume;
+            }
+            dispatcher.accept(() -> {
+                final Integer loaded;
+                try {
+                    loaded = reader.apply(uuid);
+                } catch (Exception e) {
+                    // Leave only this untrusted placeholder ineligible for persistence. There is
+                    // no separate failure flag that could arrive late and taint an explicit set.
+                    onFailure.accept(e);
+                    return;
+                }
+                entries.replace(uuid, placeholder,
+                        new Entry(loaded == null ? defaultVolume : loaded, true));
+            }, () -> {
+                // The read never ran; the placeholder must remain non-persistable.
+            });
+            return defaultVolume;
+        }
+
+        void put(UUID uuid, int volume) {
+            entries.put(uuid, new Entry(volume, true));
+        }
+
+        void putIfAbsent(UUID uuid, int volume) {
+            entries.putIfAbsent(uuid, new Entry(volume, true));
+        }
+
+        Integer getPersistable(UUID uuid) {
+            Entry entry = entries.get(uuid);
+            return entry != null && entry.persistable ? entry.volume : null;
+        }
+
+        boolean isPersistable(UUID uuid) {
+            return getPersistable(uuid) != null;
+        }
+
+        Map<UUID, Integer> snapshotForSave() {
+            Map<UUID, Integer> snapshot = new HashMap<>();
+            entries.forEach((uuid, entry) -> {
+                if (entry.persistable) {
+                    snapshot.put(uuid, entry.volume);
+                }
+            });
+            return snapshot;
+        }
+
+        void remove(UUID uuid) {
+            entries.remove(uuid);
+        }
+
+        void retainOnline(Set<UUID> onlineUuids) {
+            entries.keySet().removeIf(uuid -> !onlineUuids.contains(uuid));
+        }
+
+        int size() {
+            return entries.size();
+        }
+
+        void clear() {
+            entries.clear();
+        }
+    }
+
+    // Compatibility helper for existing map-based tests. Production uses token entries above;
+    // numeric map equality alone cannot distinguish set(default) from the original placeholder.
     // Race-safe deferred load: returns the cached volume if present, otherwise inserts defaultVolume
     // as a placeholder, dispatches an async DB load via asyncExecutor, and returns the placeholder.
     //
@@ -275,69 +382,72 @@ public class VolumeManager {
 
         return defaultVolume;
     }
-    
+
     public void setVolume(Player player, int volume) {
         setVolume(player.getUniqueId(), volume);
     }
-    
+
     public void setVolume(UUID uuid, int volume) {
-        int clamped = clampVolume(volume);
-        playerVolumes.put(uuid, clamped);
+        cacheExplicitVolume(uuid, clampVolume(volume));
+    }
+
+    void cacheExplicitVolume(UUID uuid, int volume) {
+        playerVolumes.put(uuid, volume);
         volumeVersion.incrementAndGet();
         dirty = true;
     }
-    
+
     public int increaseVolume(Player player) {
         int newVolume = increaseVolume(player.getUniqueId());
         return newVolume;
     }
-    
+
     public int increaseVolume(UUID uuid) {
         int current = getVolume(uuid);
         int newVolume = clampVolume(current + getVolumeStep());
         setVolume(uuid, newVolume);
         return newVolume;
     }
-    
+
     public int decreaseVolume(Player player) {
         int newVolume = decreaseVolume(player.getUniqueId());
         return newVolume;
     }
-    
+
     public int decreaseVolume(UUID uuid) {
         int current = getVolume(uuid);
         int newVolume = clampVolume(current - getVolumeStep());
         setVolume(uuid, newVolume);
         return newVolume;
     }
-    
+
     public int setVolumeByAmount(Player player, int amount) {
         int newVolume = setVolumeByAmount(player.getUniqueId(), amount);
         byte byteVolume = (byte) Math.max(0, Math.min(100, newVolume));
         return newVolume;
     }
-    
+
     public int setVolumeByAmount(UUID uuid, int amount) {
         int newVolume = clampVolume(amount);
         setVolume(uuid, newVolume);
         return newVolume;
     }
-    
+
     public int setVolumeByPercent(Player player, int percent) {
         int newVolume = setVolumeByPercent(player.getUniqueId(), percent);
         byte byteVolume = (byte) Math.max(0, Math.min(100, newVolume));
         return newVolume;
     }
-    
+
     public int setVolumeByPercent(UUID uuid, int percent) {
         int volume = (int) (getDefaultVolume() * (percent / 100.0));
         return setVolumeByAmount(uuid, volume);
     }
-    
+
     private int clampVolume(int volume) {
         return Math.max(getMinVolume(), Math.min(getMaxVolume(), volume));
     }
-    
+
     public void sendVolumeMessage(Player player) {
         int volume = getVolume(player);
         String bar = generateVolumeBar(volume);
@@ -345,7 +455,7 @@ public class VolumeManager {
                 .replace("{volume}", String.valueOf(volume))
                 .replace("{bar}", bar));
     }
-    
+
     private String generateVolumeBar(int volume) {
         int bars = volume / 10;
         StringBuilder sb = new StringBuilder();
@@ -360,11 +470,11 @@ public class VolumeManager {
         sb.append("<dark_gray>]");
         return StringUtils.t(sb.toString());
     }
-    
+
     public void resetVolume(Player player) {
         resetVolume(player.getUniqueId());
     }
-    
+
     public void resetVolume(UUID uuid) {
         playerVolumes.remove(uuid);
         final long snapshotVersion = volumeVersion.incrementAndGet();
@@ -383,7 +493,7 @@ public class VolumeManager {
             }
         });
     }
-    
+
     public void cleanupOfflinePlayers() {
         int beforeSize = playerVolumes.size();
         // Snapshot online UUIDs once instead of calling Bukkit.getPlayer(uuid) per entry,
@@ -395,31 +505,37 @@ public class VolumeManager {
         }
         // Flush any unsaved volumes for players we're about to evict, so we don't lose changes.
         if (dirty) {
-            for (Map.Entry<UUID, Integer> entry : new HashMap<>(playerVolumes).entrySet()) {
+            for (Map.Entry<UUID, Integer> entry : snapshotForSave().entrySet()) {
                 if (!onlineUuids.contains(entry.getKey())) {
-                    saveSinglePlayerVolume(entry.getKey(), entry.getValue());
+                    saveSinglePlayerVolume(entry.getKey());
                 }
             }
         }
-        playerVolumes.keySet().removeIf(uuid -> !onlineUuids.contains(uuid));
+        playerVolumes.retainOnline(onlineUuids);
         int afterSize = playerVolumes.size();
         if (beforeSize != afterSize) {
             MusicBox.getInstance().getLogger().fine("Cleaned up " + (beforeSize - afterSize) + " offline player volumes");
         }
     }
-    
+
     public static void cleanup(Player player) {
         if (instance != null) {
             UUID playerId = player.getUniqueId();
             Integer volume = instance.playerVolumes.get(playerId);
             if (volume != null && instance.dirty) {
-                instance.saveSinglePlayerVolume(playerId, volume);
+                instance.saveSinglePlayerVolume(playerId);
             }
             instance.playerVolumes.remove(playerId);
         }
     }
-    
-    private void saveSinglePlayerVolume(UUID playerId, int volume) {
+
+    private void saveSinglePlayerVolume(UUID playerId) {
+        // Read value and trust from the same immutable entry. A separate trust check could
+        // approve a newer explicit set while still submitting an older untrusted default.
+        Integer volume = playerVolumes.getPersistable(playerId);
+        if (volume == null) {
+            return;
+        }
         com.huidu.musicboxplus.common.utils.AsyncTaskManager.runAsync(() -> {
             try {
                 DatabaseLoader.getBase().savePlayerVolume(playerId, volume);
@@ -433,7 +549,7 @@ public class VolumeManager {
             }
         });
     }
-    
+
     public static void shutdown() {
         if (instance != null) {
             if (instance.autoSaveTask != null) {
@@ -447,27 +563,27 @@ public class VolumeManager {
             instance = null;
         }
     }
-    
+
     public static void reset() {
         shutdown();
     }
-    
+
     public static int getPlayerVolume(Player player) {
         return getInstance().getVolume(player);
     }
-    
+
     public static void setPlayerVolume(Player player, int volume) {
         getInstance().setVolume(player, volume);
     }
-    
+
     public void mutePlayer(Player player) {
         setVolume(player, 0);
     }
-    
+
     public void setMaxVolume(Player player) {
         setVolume(player, getMaxVolume());
     }
-    
+
     public static float getPlayerVolumePercent(Player player) {
         int volume = getPlayerVolume(player);
         int maxVolume = getInstance().getMaxVolume();

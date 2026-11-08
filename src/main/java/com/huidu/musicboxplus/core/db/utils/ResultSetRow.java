@@ -56,7 +56,7 @@ public class ResultSetRow {
         }
         return null;
     }
-    
+
     public Long getLong(String key) {
         Object value = this.result.get(key);
         if (value == null) {
@@ -74,7 +74,7 @@ public class ResultSetRow {
             return null;
         }
     }
-    
+
     public Double getDouble(String key) {
         Object value = this.result.get(key);
         if (value == null) {
@@ -92,7 +92,7 @@ public class ResultSetRow {
             return null;
         }
     }
-    
+
     public Boolean getBoolean(String key) {
         Object value = this.result.get(key);
         if (value == null) {
@@ -106,15 +106,15 @@ public class ResultSetRow {
         }
         return Boolean.parseBoolean(value.toString());
     }
-    
+
     public Object getObject(String key) {
         return this.result.get(key);
     }
-    
+
     public boolean hasKey(String key) {
         return this.result.containsKey(key);
     }
-    
+
     public boolean isNull(String key) {
         return this.result.get(key) == null;
     }

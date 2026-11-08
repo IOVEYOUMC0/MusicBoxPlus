@@ -126,7 +126,7 @@ class PlaybackClockRestartTest {
     }
 
     private static CompiledSong firstSong() throws Exception {
-        try (Stream<Path> stream = Files.list(NbsCorpus.BUNDLED)) {
+        try (Stream<Path> stream = Files.list(NbsCorpus.bundled())) {
             Path file = stream.filter(p -> p.toString().endsWith(".nbs")).sorted().findFirst().orElseThrow();
             return CompiledSong.compile(NbsReader.read(file));
         }

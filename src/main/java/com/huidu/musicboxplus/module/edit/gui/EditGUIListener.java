@@ -69,13 +69,13 @@ public class EditGUIListener implements Listener {
         }
 
         InventoryHolder holder = event.getInventory().getHolder();
-        
+
         if (holder == null) {
             return;
         }
 
         int slot = event.getRawSlot();
-        
+
         if (holder instanceof EditMenuGUI) {
             event.setCancelled(true);
             if (slot >= 0 && slot < event.getInventory().getSize()) {

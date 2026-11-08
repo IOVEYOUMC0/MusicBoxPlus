@@ -20,11 +20,24 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class JukeboxHopperListener implements Listener {
-    private static final Set<Location> PENDING_INSERTS = ConcurrentHashMap.newKeySet();
+    // Keep the five-second recovery for abandoned tasks, but carry an identity lease through every
+    // callback. A delayed old task can neither mutate inventories nor release its replacement.
+    private static final PendingInsertGate<Location> PENDING_INSERTS =
+            new PendingInsertGate<>(TimeUnit.SECONDS.toNanos(5), System::nanoTime);
+
+    /**
+     * Drops in-flight insert guards. Called when the module is (re)enabled.
+     *
+     * <p>Also invalidates callbacks queued by the previous session. Those callbacks may still
+     * return an already-removed disc, but cannot insert it or release a new session's lease.
+     * Abandoned guards additionally retain their five-second expiry recovery.
+     */
+    public static void resetPendingInserts() {
+        PENDING_INSERTS.reset();
+    }
 
     // ignoreCancelled: this handler performs the transfer itself through the jukebox API, so a
     // cancelled event must not reach it.
@@ -66,10 +79,12 @@ public class JukeboxHopperListener implements Listener {
                 InventoryHolder sourceOwner = source.getHolder();
                 Location sourceLocation = inventoryLocation(source);
                 Location destinationLocation = destJukebox.getLocation().clone();
-                if (!PENDING_INSERTS.add(destinationLocation)) {
+                PendingInsertGate.Token<Location> token = PENDING_INSERTS.acquire(destinationLocation);
+                if (token == null) {
                     return;
                 }
-                insertFromContainer(destJukebox, toInsert, source, sourceOwner, sourceLocation, destinationLocation);
+                insertFromContainer(destJukebox, toInsert, source, sourceOwner, sourceLocation,
+                        destinationLocation, token);
                 return;
             }
         }
@@ -106,10 +121,10 @@ public class JukeboxHopperListener implements Listener {
     // container first and put back if the insertion cannot go ahead, so neither side can end up
     // holding a copy.
     private void insertFromContainer(Jukebox jukebox, ItemStack disc, Inventory source, InventoryHolder sourceOwner,
-                                     Location sourceLocation,
-                                     Location destinationLocation) {
+                                     Location sourceLocation, Location destinationLocation,
+                                     PendingInsertGate.Token<Location> token) {
         if (sourceLocation == null || sourceLocation.getWorld() == null) {
-            PENDING_INSERTS.remove(destinationLocation);
+            PENDING_INSERTS.release(token);
             return;
         }
         // InventoryMoveItemEvent may run on the source container's region. Mutate that inventory
@@ -117,46 +132,83 @@ public class JukeboxHopperListener implements Listener {
         // Inventory#removeItem or Inventory#addItem.
         try {
             runOnInventoryOwner(sourceOwner, sourceLocation, () -> {
-                if (!source.removeItem(disc.clone()).isEmpty()) {
-                    PENDING_INSERTS.remove(destinationLocation);
-                    return;
-                }
                 try {
-                    com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(destinationLocation,
-                            () -> insertRemovedItem(jukebox, disc, source, sourceOwner, sourceLocation, destinationLocation));
+                    boolean[] removed = {false};
+                    if (!PENDING_INSERTS.runIfCurrent(token,
+                            () -> removed[0] = source.removeItem(disc.clone()).isEmpty()) || !removed[0]) {
+                        PENDING_INSERTS.release(token);
+                        return;
+                    }
+                    if (!MusicBox.getInstance().isEnabled()) {
+                        try {
+                            // region() otherwise silently skips a remote task during shutdown.
+                            returnItemToSourceNow(source, sourceLocation, disc);
+                        } finally {
+                            PENDING_INSERTS.release(token);
+                        }
+                        return;
+                    }
+                    // region() may execute inline during shutdown. If that callback throws after
+                    // placing/returning the disc, it owns restitution; do not refund a second copy.
+                    java.util.concurrent.atomic.AtomicBoolean destinationStarted =
+                            new java.util.concurrent.atomic.AtomicBoolean();
+                    try {
+                        com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(destinationLocation, () -> {
+                            destinationStarted.set(true);
+                            insertRemovedItem(jukebox, disc, source, sourceOwner, sourceLocation,
+                                    destinationLocation, token);
+                        });
+                    } catch (RuntimeException failure) {
+                        if (!destinationStarted.get()) {
+                            try {
+                                // Still on the source owner, so an immediate refund is safe.
+                                returnItemToSourceNow(source, sourceLocation, disc);
+                            } finally {
+                                PENDING_INSERTS.release(token);
+                            }
+                        }
+                        throw failure;
+                    }
                 } catch (RuntimeException failure) {
-                    returnItemToSourceNow(source, sourceLocation, disc);
-                    PENDING_INSERTS.remove(destinationLocation);
+                    PENDING_INSERTS.release(token);
+                    throw failure;
                 }
-            }, () -> PENDING_INSERTS.remove(destinationLocation));
+            }, () -> PENDING_INSERTS.release(token));
         } catch (RuntimeException failure) {
-            PENDING_INSERTS.remove(destinationLocation);
+            PENDING_INSERTS.release(token);
         }
     }
 
     private void insertRemovedItem(Jukebox jukebox, ItemStack disc, Inventory source, InventoryHolder sourceOwner,
-                                   Location sourceLocation,
-                                   Location destinationLocation) {
+                                   Location sourceLocation, Location destinationLocation,
+                                   PendingInsertGate.Token<Location> token) {
+        boolean[] inserted = {false};
         try {
-            Block block = jukebox.getBlock();
-            if (!(block.getState() instanceof Jukebox live)) {
-                returnItemToSource(source, sourceOwner, sourceLocation, disc, destinationLocation);
-                return;
-            }
-            ItemStack current = live.getRecord();
-            if (current != null && !current.getType().isAir()) {
-                returnItemToSource(source, sourceOwner, sourceLocation, disc, destinationLocation);
-                return;
-            }
-            MusicBoxSong song = MusicBoxSongManager.findByItem(disc).orElse(null);
-            if (song == null) {
-                returnItemToSource(source, sourceOwner, sourceLocation, disc, destinationLocation);
-                return;
-            }
-            JukeboxFactory.getJukebox(live).setJukebox(disc);
-            JukeboxPlayer.createNew(live);
+            PENDING_INSERTS.runIfCurrent(token, () -> {
+                Block block = jukebox.getBlock();
+                if (!(block.getState() instanceof Jukebox live)) {
+                    return;
+                }
+                ItemStack current = live.getRecord();
+                if (current != null && !current.getType().isAir()) {
+                    return;
+                }
+                MusicBoxSong song = MusicBoxSongManager.findByItem(disc).orElse(null);
+                if (song == null) {
+                    return;
+                }
+                JukeboxFactory.getJukebox(live).setJukebox(disc);
+                inserted[0] = true;
+                JukeboxPlayer.createNew(live);
+            });
         } finally {
-            PENDING_INSERTS.remove(destinationLocation);
+            if (inserted[0]) {
+                PENDING_INSERTS.release(token);
+            } else {
+                // Expiry/reset can invalidate a task AFTER source removal. It must still return
+                // the real disc, on the source owner; invalidating the lease is not cancellation.
+                returnItemToSource(source, sourceOwner, sourceLocation, disc, destinationLocation, token);
+            }
         }
     }
 
@@ -213,10 +265,49 @@ public class JukeboxHopperListener implements Listener {
     }
 
     private void returnItemToSource(Inventory source, InventoryHolder sourceOwner, Location sourceLocation,
-                                    ItemStack disc, Location fallbackLocation) {
-        runOnInventoryOwner(sourceOwner, sourceLocation, () -> returnItemToSourceNow(source, sourceLocation, disc),
-                () -> com.huidu.musicboxplus.common.utils.scheduler.Scheduler.region(fallbackLocation,
-                        () -> fallbackLocation.getWorld().dropItemNaturally(fallbackLocation, disc)));
+                                    ItemStack disc, Location fallbackLocation,
+                                    PendingInsertGate.Token<Location> token) {
+        java.util.concurrent.atomic.AtomicBoolean returnStarted = new java.util.concurrent.atomic.AtomicBoolean();
+        Runnable drop = () -> {
+            try {
+                com.huidu.musicboxplus.common.utils.scheduler.Scheduler.regionNow(fallbackLocation, () -> {
+                    try {
+                        fallbackLocation.getWorld().dropItemNaturally(fallbackLocation, disc);
+                    } finally {
+                        PENDING_INSERTS.release(token);
+                    }
+                });
+            } catch (RuntimeException failure) {
+                PENDING_INSERTS.release(token);
+                throw failure;
+            }
+        };
+        if (!MusicBox.getInstance().isEnabled()) {
+            // Already on the destination region; its inline fallback remains available even when
+            // scheduling a refund to a remote block owner would be silently skipped.
+            drop.run();
+            return;
+        }
+        try {
+            runOnInventoryOwner(sourceOwner, sourceLocation, () -> {
+                returnStarted.set(true);
+                try {
+                    returnItemToSourceNow(source, sourceLocation, disc);
+                } finally {
+                    PENDING_INSERTS.release(token);
+                }
+            }, () -> {
+                returnStarted.set(true);
+                drop.run();
+            });
+        } catch (RuntimeException failure) {
+            // Scheduling can reject without invoking either callback. We are still on the target
+            // region then; drop there rather than touching the remote source inventory or losing it.
+            if (!returnStarted.get()) {
+                drop.run();
+            }
+            throw failure;
+        }
     }
 
     private static void returnItemToSourceNow(Inventory source, Location sourceLocation, ItemStack disc) {

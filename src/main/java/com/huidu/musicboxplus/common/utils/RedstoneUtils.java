@@ -107,15 +107,15 @@ public final class RedstoneUtils {
                 }
                 return;
             }
-            case REPEATER: 
-            case ACACIA_BUTTON: 
-            case BIRCH_BUTTON: 
-            case DARK_OAK_BUTTON: 
-            case JUNGLE_BUTTON: 
-            case OAK_BUTTON: 
-            case SPRUCE_BUTTON: 
-            case STONE_BUTTON: 
-            case LEVER: 
+            case REPEATER:
+            case ACACIA_BUTTON:
+            case BIRCH_BUTTON:
+            case DARK_OAK_BUTTON:
+            case JUNGLE_BUTTON:
+            case OAK_BUTTON:
+            case SPRUCE_BUTTON:
+            case STONE_BUTTON:
+            case LEVER:
             case REDSTONE_TORCH: {
                 BlockFace face = VersionUtils.getRotation(block);
                 if (face == null) break;
@@ -123,7 +123,7 @@ public final class RedstoneUtils {
                 RedstoneUtils.handleDirectWireInput(x + face.getModX() * 2, y + face.getModY() * 2, z + face.getModZ() * 2, block, oldLevel, newLevel);
                 break;
             }
-            case POWERED_RAIL: 
+            case POWERED_RAIL:
             case ACTIVATOR_RAIL: {
                 return;
             }

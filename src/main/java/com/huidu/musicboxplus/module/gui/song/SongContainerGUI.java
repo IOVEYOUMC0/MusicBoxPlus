@@ -143,12 +143,12 @@ public class SongContainerGUI {
         }
         this.populateSongs(gui, layoutParser, mapping, page, params, guiType, skipElements);
     }
-    
-    private void populateSongs(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping, 
+
+    private void populateSongs(GUI gui, LayoutParser layoutParser, GUIConfigManager.ButtonMappingConfig mapping,
             int page, SongGUIParams params, String guiType, int skipElements) {
         this.renderSongSlots(gui, layoutParser, mapping, page, params, guiType, skipElements, false);
     }
-    
+
     // Re-renders the visible page, rebuilding one ItemStack per song slot (36 by default).
     //
     // Reviewed for caching the stacks and left as it is: a song's lore carries live state (playing,
