@@ -62,7 +62,7 @@ public final class SongInstruments {
     }
 
     /**
-     * The key {@code instrumentId}'s sample sits at: 45 for vanilla (and resource-pack) instruments,
+     * The key instrumentId's sample sits at: 45 for vanilla (and resource-pack) instruments,
      * or the key the file declared for a custom instrument.
      */
     public int sampleKey(int instrumentId) {
@@ -74,8 +74,8 @@ public final class SongInstruments {
     /**
      * Shifts a note key into the reference frame the instrument's sample was recorded in.
      *
-     * <p>Pitch is computed as though every sample sat at key 45, which is true for the vanilla
-     * instruments. A custom sample recorded at another key plays {@code 45 - sampleKey} semitones off
+     * Pitch is computed as though every sample sat at key 45, which is true for the vanilla
+     * instruments. A custom sample recorded at another key plays 45 - sampleKey semitones off
      * unless the note is moved by the opposite amount first. With this applied, a note's rendered
      * pitch is absolute instead of depending on the sample the file happened to use.
      */

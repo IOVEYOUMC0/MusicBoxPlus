@@ -522,11 +522,11 @@ public enum Lang {
     }
 
     /**
-     * Like {@link #toComponent} but parsed through the dynamic (small, self-evicting) MiniMessage
+     * Like toComponent but parsed through the dynamic (small, self-evicting) MiniMessage
      * cache.
      *
-     * <p>For strings that change every second -- the text-display clock is the case this exists for
-     * -- {@code processComponent} would miss its 1024-entry LRU once per second per display and
+     * For strings that change every second -- the text-display clock is the case this exists for
+     * -- processComponent would miss its 1024-entry LRU once per second per display and
      * evict the static GUI button names and lore that cache is there to keep.
      */
     public net.kyori.adventure.text.Component toDynamicComponent(String ... replacements) {

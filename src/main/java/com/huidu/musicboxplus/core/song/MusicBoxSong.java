@@ -72,7 +72,7 @@ public class MusicBoxSong implements com.huidu.musicboxplus.api.song.MusicBoxSon
         this.hash = relativeSongPath(songFile).hashCode();
         RawNbsSong song;
         try {
-            // 只读头部元数据（标题/长度/速度/作者），跳过音符解析，大幅加快曲库加载
+        // Read only the header (title/length/speed/author) and skip note parsing; library loading is much faster.
             song = NbsReader.readMetadata(this.file.toPath());
         } catch (IOException e) {
             throw new SongNullException("Song can't be loaded: " + e.getMessage());

@@ -46,8 +46,8 @@ public final class CompiledSong {
     // noteStart/noteEnd read from here; length is tickCount + 1 so the last tick has an end.
     private final int[] tickStart;
 
-    // instrument/key/panning/layerPanning 在 NBS 格式中均为 u8（0-255），用 byte 存储，
-    // getter 读取时 & 0xFF 还原无符号值。finePitch 是唯一的 i16 有符号字段，保留 short。
+    // instrument/key/panning/layerPanning are all u8 (0-255) in the NBS format, so they are
+    // stored as bytes and read back with & 0xFF. finePitch is the only i16 signed field and stays a short.
     private final byte[] instrument;
     private final byte[] key;
     private final byte[] velocity;

@@ -30,8 +30,8 @@ final class MusicEditInstrumentMenuRenderer {
             instrumentConfig,
             instrumentConfig.getButtonMapping().getOrDefault("instrument", 'I')
         );
-        int pageSize = Math.max(1, Math.min(instrumentsPerPage, instrumentSlots.size()));
-        boolean needPagination = totalInstruments > pageSize;
+        int pageSize = MusicEditInstrumentPages.pageSize(instrumentsPerPage, instrumentSlots.size());
+        boolean needPagination = MusicEditInstrumentPages.needsPagination(totalInstruments, pageSize);
 
         int noteInfoSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "note-info");
         if (noteInfoSlot >= 0 && selectedNote != null) {
@@ -49,7 +49,7 @@ final class MusicEditInstrumentMenuRenderer {
         }
 
         if (needPagination) {
-            renderPageButton(player, instrumentConfig, "prev-page", instrumentPageOffset, getTotalInstrumentPages(pageSize));
+            renderPageButton(player, instrumentConfig, "prev-page", instrumentPageOffset, MusicEditInstrumentPages.totalPages(totalInstruments, pageSize));
         }
 
         int playSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "play-preview");
@@ -62,7 +62,7 @@ final class MusicEditInstrumentMenuRenderer {
         }
 
         if (needPagination) {
-            renderPageButton(player, instrumentConfig, "next-page", instrumentPageOffset, getTotalInstrumentPages(pageSize));
+            renderPageButton(player, instrumentConfig, "next-page", instrumentPageOffset, MusicEditInstrumentPages.totalPages(totalInstruments, pageSize));
         }
 
         int backSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "back");
@@ -74,8 +74,10 @@ final class MusicEditInstrumentMenuRenderer {
             }
         }
 
-        int startIndex = needPagination ? instrumentPageOffset * pageSize : 0;
-        int endIndex = needPagination ? Math.min(startIndex + pageSize, totalInstruments) : totalInstruments;
+        MusicEditInstrumentPages.Page page =
+                MusicEditInstrumentPages.page(totalInstruments, pageSize, instrumentPageOffset);
+        int startIndex = page.startIndex();
+        int endIndex = page.endIndex();
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= instrumentSlots.size()) {
@@ -114,8 +116,8 @@ final class MusicEditInstrumentMenuRenderer {
             instrumentConfig,
             instrumentConfig.getButtonMapping().getOrDefault("instrument", 'I')
         );
-        int pageSize = Math.max(1, Math.min(instrumentsPerPage, instrumentSlots.size()));
-        boolean needPagination = instruments.length > pageSize;
+        int pageSize = MusicEditInstrumentPages.pageSize(instrumentsPerPage, instrumentSlots.size());
+        boolean needPagination = MusicEditInstrumentPages.needsPagination(instruments.length, pageSize);
 
         int backSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "back");
         if (backSlot < 0) {
@@ -128,12 +130,16 @@ final class MusicEditInstrumentMenuRenderer {
         }
 
         if (needPagination) {
-            renderPageButton(player, instrumentConfig, "prev-page", instrumentPageOffset, getTotalInstrumentPages(pageSize));
-            renderPageButton(player, instrumentConfig, "next-page", instrumentPageOffset, getTotalInstrumentPages(pageSize));
+            renderPageButton(player, instrumentConfig, "prev-page", instrumentPageOffset,
+                    MusicEditInstrumentPages.totalPages(instruments.length, pageSize));
+            renderPageButton(player, instrumentConfig, "next-page", instrumentPageOffset,
+                    MusicEditInstrumentPages.totalPages(instruments.length, pageSize));
         }
 
-        int startIndex = needPagination ? instrumentPageOffset * pageSize : 0;
-        int endIndex = needPagination ? Math.min(startIndex + pageSize, instruments.length) : instruments.length;
+        MusicEditInstrumentPages.Page page =
+                MusicEditInstrumentPages.page(instruments.length, pageSize, instrumentPageOffset);
+        int startIndex = page.startIndex();
+        int endIndex = page.endIndex();
         for (int i = startIndex; i < endIndex; i++) {
             int slotIndex = i - startIndex;
             if (slotIndex >= instrumentSlots.size()) {
@@ -159,14 +165,12 @@ final class MusicEditInstrumentMenuRenderer {
 
     }
 
-    static int getTotalInstrumentPages(int instrumentsPerPage) {
-        return (int) Math.ceil((double) MusicNote.NoteInstrument.getAvailableCount() / Math.max(1, instrumentsPerPage));
-    }
+
 
     static List<Integer> getPlayerInventorySlotsForInstrumentChar(InstrumentSelectConfig instrumentConfig, char c) {
         List<Integer> mappedSlots = new ArrayList<>();
         for (int layoutSlot : instrumentConfig.getSlotsForChar(c)) {
-            int playerSlot = mapInstrumentLayoutSlotToPlayerSlot(layoutSlot);
+            int playerSlot = MusicEditInstrumentPages.layoutSlotToPlayerSlot(layoutSlot);
             if (playerSlot >= 0) {
                 mappedSlots.add(playerSlot);
             }
@@ -175,7 +179,7 @@ final class MusicEditInstrumentMenuRenderer {
     }
 
     static int getPlayerInventorySlotForInstrumentButton(InstrumentSelectConfig instrumentConfig, String buttonType) {
-        return mapInstrumentLayoutSlotToPlayerSlot(instrumentConfig.getSlotForButton(buttonType));
+        return MusicEditInstrumentPages.layoutSlotToPlayerSlot(instrumentConfig.getSlotForButton(buttonType));
     }
 
     private static void renderPageButton(Player player, InstrumentSelectConfig instrumentConfig, String key, int pageOffset, int totalPages) {
@@ -195,18 +199,4 @@ final class MusicEditInstrumentMenuRenderer {
         player.getInventory().setItem(slot, button);
     }
 
-    private static int mapInstrumentLayoutSlotToPlayerSlot(int layoutSlot) {
-        if (layoutSlot < 0) {
-            return -1;
-        }
-        int row = layoutSlot / 9;
-        int col = layoutSlot % 9;
-        if (row >= 0 && row < 3) {
-            return 9 + row * 9 + col;
-        }
-        if (row == 3) {
-            return col;
-        }
-        return -1;
-    }
 }

@@ -129,9 +129,9 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
         if (musicBox == null || musicBox.isShuttingDown() || !musicBox.isEnabled()) {
             return;
         }
-        // 普通 Paper/Spigot 上所有实体调度最终都落在同一主线程，逐玩家调度纯属浪费
-        // （每 tick 每玩家一次队列投递 + 闭包分配）。直接收集玩家一次批量执行，
-        // Folia 上仍然按玩家逐实体调度到各自区域线程。
+        // On plain Paper/Spigot every entity dispatch lands on the same main thread, so scheduling
+        // per player is waste (one queue hop and closure per player per tick). Collect the players
+        // once and run them in one batch; on Folia this still schedules per entity to each region thread.
         if (!Scheduler.isFolia()) {
             if (!Bukkit.isPrimaryThread()) {
                 // Clock thread -> main thread, one dispatch for every listener. Routed through the
@@ -276,7 +276,7 @@ public abstract class AbstractEnginePlayer implements MusicBoxSongPlayer {
      * The live Player for a listener: the reference recorded when they were added, or the global
      * player table for a listener admitted by UUID only (offline at the time).
      *
-     * A recorded object can only go stale by the player leaving, and {@link Player#isOnline()} is
+     * A recorded object can only go stale by the player leaving, and isOnline() is
      * checked by every caller before anything is played, so the worst case is one skipped dispatch
      * until the next range scan drops them.
      */

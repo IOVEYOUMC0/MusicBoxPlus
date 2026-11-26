@@ -4,46 +4,876 @@
 # listed here are replaced, so this file can grow a screen at a time. A server owner can put their
 # own copy in the plugin data folder to override this one.
 #
-# Covered so far: every GUI title and the shared button set (names and lore). Screen-specific
-# sections (song items, playlist items, per-screen lore) still fall back to the Chinese defaults.
+# Covered: every window title, the shared button set, the music editor, the shop and
+# publish/confirm screens, the text-display editor, song and playlist items. Anything omitted keeps
+# the Chinese default, so this file can keep growing without breaking the base.
 
 # --- Titles ---
+gui:
+  song-list:
+    title: "<gold>Music</gold> <dark_gray>-</dark_gray> <yellow>{container}</yellow> <gray>({page}/{last_page})</gray>"
+  textplayer-songs:
+    title: "<gold>Text Player Songs</gold> <dark_gray>-</dark_gray> <yellow>{container}</yellow> <gray>({page}/{last_page})</gray>"
+  playlists:
+    title: "<gold>Playlists</gold> <dark_gray>-</dark_gray> <yellow>{playlist}</yellow> <gray>({page}/{last_page})</gray>"
+  playlist-editor:
+    title: "<gold>Edit Playlist</gold> <gray>({page}/{last_page})</gray>"
+  search-results:
+    title: "<gold>Search:</gold> <yellow>{query}</yellow> <gray>({page}/{last_page})</gray>"
+  recent-songs:
+    title: "<gold>Recently Played</gold> <gray>({page}/{last_page})</gray>"
+  sign-setup:
+    title: "<gold>Sign Settings</gold> <gray>({page}/{last_page})</gray>"
+  control-panel:
+    title: "<gold>Control Panel</gold> <dark_gray>-</dark_gray> <yellow>{song}</yellow>"
+    progress-bar:
+      lore:
+        - "<gray>Click to jump to this position</gray>"
 edit-menu:
   title: "<gold>Music Edit Menu</gold>"
+  buttons:
+    create:
+      name: "<green>Create Music</green>"
+      lore:
+        - "<gray>Start a new song</gray>"
+        - "<gray>Usage: /musicboxplus edit create <name></gray>"
+    select:
+      name: "<yellow>Edit Existing Music</yellow>"
+      lore:
+        - "<gray>Pick a song to edit</gray>"
+        - "<gray>Usage: /musicboxplus edit select <name></gray>"
+    delete:
+      name: "<red>Delete Music</red>"
+      lore:
+        - "<gray>Remove a song</gray>"
+        - "<gray>Usage: /musicboxplus edit delete <name></gray>"
+    rename:
+      name: "<yellow>Rename Music</yellow>"
+      lore:
+        - "<gray>Pick a song and enter a new name</gray>"
+        - "<gray>Usage: /musicboxplus edit rename <old> <new></gray>"
+    list:
+      name: "<aqua>Music List</aqua>"
+      lore:
+        - "<gray>Show every song</gray>"
+    import:
+      name: "<light_purple>Import Music File</light_purple>"
+      lore:
+        - "<gray>Import from an NBS or MIDI file</gray>"
+        - "<gray>Usage: /musicboxplus edit import <file></gray>"
+        - "<gray>Supports .nbs / .mid / .midi</gray>"
+        - "<gray>The file must be in the plugin folder</gray>"
+    export:
+      name: "<aqua>Export as NBS</aqua>"
+      lore:
+        - "<gray>Write the current song to an NBS file</gray>"
+    back:
+      name: "<red>Back</red>"
+      lore:
+        - "<gray>Click to go back</gray>"
 paste-preview:
   title: "<gold>Paste Preview: {count} notes</gold>"
+  buttons:
+    info:
+      name: "<yellow>Info</yellow>"
+      lore:
+        - "<gray>Confirm or cancel the paste below</gray>"
+    confirm:
+      name: "<green>Confirm Paste</green>"
+      lore:
+        - "<gray>Paste the notes from the clipboard</gray>"
+    cancel:
+      name: "<red>Cancel</red>"
+      lore:
+        - "<gray>Cancel this paste</gray>"
+clear-confirm:
+  buttons:
+    info:
+      name: "<yellow>Warning</yellow>"
+      lore:
+        - "<gray>This removes <red>{count}</red> <gray>notes</gray>"
+        - "<red>This cannot be undone!</red>"
+    confirm:
+      name: "<red>Confirm Clear</red>"
+      lore:
+        - "<gray>Click to remove every note</gray>"
+    cancel:
+      name: "<green>Cancel</green>"
+      lore:
+        - "<gray>Click to cancel</gray>"
 shop-container-purchase-confirm:
   title: "<gold>Buy Folder: {folder}</gold>"
+  buttons:
+    info:
+      name: "<yellow>{folder}</yellow>"
+      lore:
+        - "<gray>Buys every disc in this folder</gray>"
+        - "<gray>Count: </gray><yellow>{count}</yellow>"
+    price:
+      name: "<gold>Total: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>Your balance: </gray><yellow>{balance}</yellow>"
+    confirm:
+      name: "<green>Confirm Purchase</green>"
+      lore:
+        - "<gray>Click to pay and receive every disc</gray>"
+    no-money:
+      name: "<red>Not Enough Money</red>"
+      lore:
+        - "<gray>Still needed: </gray><yellow>{need}</yellow>"
+    back:
+      name: "<red>Back</red>"
+      lore:
+        - "<gray>Click to go back</gray>"
 volume-control:
   title: "<gold>Volume</gold>"
+  level-format: "<yellow>Volume: {volume}%</yellow>"
+  increase-text: "<green>Increase volume</green>"
+  decrease-text: "<red>Decrease volume</red>"
 music-editor:
   title: "<gold>Music Editor</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  buttons:
+    pitch-up:
+      name: "<green>Pitch Up</green>"
+      lore:
+        - "<gray>Visible range: </gray><yellow>{pitchRange}</yellow>"
+        - "<gray>Pitch offset: </gray><dark_gray>{pitchOffset}</dark_gray>"
+        - "<dark_gray>Move up to a higher range</dark_gray>"
+    pitch-down:
+      name: "<red>Pitch Down</red>"
+      lore:
+        - "<gray>Visible range: </gray><yellow>{pitchRange}</yellow>"
+        - "<gray>Pitch offset: </gray><dark_gray>{pitchOffset}</dark_gray>"
+        - "<dark_gray>Move down to a lower range</dark_gray>"
+    tick-left:
+      name: "<yellow>Bars Left</yellow>"
+      lore:
+        - "<gray>Visible bars: </gray><yellow>{tickRange}</yellow>"
+        - "<gray>Page: </gray><dark_gray>{tickOffset}</dark_gray>"
+        - "<dark_gray>Move the timeline earlier</dark_gray>"
+    tick-right:
+      name: "<blue>Bars Right</blue>"
+      lore:
+        - "<gray>Visible bars: </gray><yellow>{tickRange}</yellow>"
+        - "<gray>Page: </gray><dark_gray>{tickOffset}</dark_gray>"
+        - "<dark_gray>Move the timeline later</dark_gray>"
+    instrument:
+      name: "<aqua>Current Instrument</aqua>"
+      lore:
+        - "<gray>Current: </gray><white>{instrument}</white>"
+        - "<dark_gray>Click to choose the instrument for new notes</dark_gray>"
+    play:
+      name: "<green>Play</green>"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+    play-stop:
+      name: "<red>Stop Playback</red>"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+    save:
+      name: "<green>Save Music</green>"
+      lore:
+        - "<gray>Click to save your edits</gray>"
+        - "<dark_gray>Use this when auto-save failed</dark_gray>"
+    exit:
+      name: "<red>Exit Editor</red>"
+      lore:
+        - "<gray>Click to leave the editor</gray>"
+        - "<dark_gray>You will be asked if there are unsaved edits</dark_gray>"
+    empty:
+      name: "<dark_gray>Empty</dark_gray>"
+      lore:
+        - "<dark_gray>Toolbar placeholder</dark_gray>"
+    bpm-up:
+      name: "<green>BPM +5</green>"
+      lore:
+        - "<gray>Current BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Range: 20-300</gray>"
+    bpm-down:
+      name: "<red>BPM -5</red>"
+      lore:
+        - "<gray>Current BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Range: 20-300</gray>"
+    time-signature:
+      name: "<aqua>Time signature: </aqua><yellow>{timeSignature}</yellow>"
+      lore:
+        - "<dark_gray>Click to cycle the time signature</dark_gray>"
+    settings:
+      name: "<aqua>Editor Settings</aqua>"
+      lore:
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Time signature: </gray><yellow>{timeSignature}</yellow>"
+        - "<gray>Subdivision: </gray><yellow>{subdivision}</yellow>"
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>View: </gray><yellow>{pitchRange}</yellow> <dark_gray>/</dark_gray> <yellow>{tickRange}</yellow>"
+        - "<dark_gray>Click for settings, rename and publishing</dark_gray>"
+    clear-all:
+      name: "<red>Clear Notes</red>"
+      lore:
+        - "<dark_gray>Click to remove every note</dark_gray>"
+        - "<red>This cannot be undone!</red>"
+    undo:
+      name: "<yellow>Undo</yellow>"
+      lore:
+        - "<gray>Available: {canUndo}</gray>"
+        - "<dark_gray>Click to undo the last step</dark_gray>"
+    redo:
+      name: "<aqua>Redo</aqua>"
+      lore:
+        - "<gray>Available: {canRedo}</gray>"
+        - "<dark_gray>Click to redo the last step</dark_gray>"
+    copy:
+      name: "<green>Copy</green>"
+      lore:
+        - "<gray>Selected: </gray><yellow>{selectionCount}</yellow>"
+        - "<dark_gray>Shift+click to select an area first</dark_gray>"
+        - "<dark_gray>then click to copy the selected notes</dark_gray>"
+    paste:
+      name: "<gold>Paste</gold>"
+      lore:
+        - "<gray>Clipboard: </gray><yellow>{clipboardSize}</yellow> <gray>notes</gray>"
+        - "<dark_gray>Pastes near the centre of the current view</dark_gray>"
+    delete-selection:
+      name: "<red>Delete Selection</red>"
+      lore:
+        - "<gray>Selected: </gray><yellow>{selectionCount}</yellow>"
+        - "<dark_gray>Shift+click to select an area first</dark_gray>"
+        - "<dark_gray>Removes the currently selected notes</dark_gray>"
+    batch-instrument:
+      name: "<yellow>Change Instrument in Bulk</yellow>"
+      lore:
+        - "<gray>Selected: </gray><yellow>{selectionCount}</yellow>"
+        - "<gray>Current instrument: </gray><white>{instrument}</white>"
+        - "<dark_gray>Select an area, then apply the current instrument</dark_gray>"
+    cancel:
+      name: "<red>Cancel</red>"
+    empty-slot:
+      name: "<gray>Empty</gray>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<green>Left click </green><gray>adds a note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    empty-slot-selected:
+      name: "<aqua>★ </aqua><gray>Empty</gray> <aqua>(selected)</aqua>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Selected</aqua>"
+    playing-empty-slot:
+      name: "<green>Playing</green>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<green>★ Now playing</green>"
+    filled-note:
+      name: "<green>{note}</green>"
+      lore:
+        - "<gray>Instrument: </gray><white>{instrument}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Left click </aqua><gray>edit the instrument</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    filled-note-selected:
+      name: "<aqua>★ </aqua><green>{note}</green>"
+      lore:
+        - "<gray>Instrument: </gray><white>{instrument}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Selected</aqua>"
+        - "<aqua>Left click </aqua><gray>edit the instrument</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+    multi-instrument:
+      name: "<yellow>Multiple Instruments</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>Note: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<gray>Instruments:</gray>"
+        - "{instruments}"
+        - "<aqua>Left click </aqua><gray>edit them</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    multi-instrument-selected:
+      name: "<aqua>★ </aqua><yellow>Multiple Instruments</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>Note: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<gray>Instruments:</gray>"
+        - "{instruments}"
+        - "<aqua>Selected</aqua>"
+        - "<aqua>Left click </aqua><gray>edit the instruments</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+  # Note grid cells, which is what the editor actually draws in the top inventory.
+  gui:
+    empty-slot:
+      name: "<gray>Empty</gray>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<green>Left click </green><gray>adds a note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    empty-slot-selected:
+      name: "<aqua>★ </aqua><gray>Empty</gray> <aqua>(selected)</aqua>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Selected</aqua>"
+    playing-empty-slot:
+      name: "<green>Playing</green>"
+      lore:
+        - "<gray>Pitch: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<green>★ Now playing</green>"
+    filled-note:
+      name: "<green>{note}</green>"
+      lore:
+        - "<gray>Instrument: </gray><white>{instrument}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Left click </aqua><gray>edit the instrument</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    filled-note-selected:
+      name: "<aqua>★ </aqua><green>{note}</green>"
+      lore:
+        - "<gray>Instrument: </gray><white>{instrument}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<aqua>Selected</aqua>"
+        - "<aqua>Left click </aqua><gray>edit the instrument</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+    multi-instrument:
+      name: "<yellow>Multiple Instruments</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>Note: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<gray>Instruments:</gray>"
+        - "{instruments}"
+        - "<aqua>Left click </aqua><gray>edit them</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+        - "<aqua>Shift+click </aqua><gray>starts or extends a selection</gray>"
+    multi-instrument-selected:
+      name: "<aqua>★ </aqua><yellow>Multiple Instruments</yellow> <gray>({count})</gray>"
+      lore:
+        - "<gray>Note: </gray><white>{note}</white>"
+        - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+        - "<gray>Instruments:</gray>"
+        - "{instruments}"
+        - "<aqua>Selected</aqua>"
+        - "<aqua>Left click </aqua><gray>edit the instruments</gray>"
+        - "<red>Right click </red><gray>delete the note</gray>"
+  instrument-select:
+    buttons:
+      note-info:
+        name: "<yellow>Note</yellow>"
+        lore:
+          - "<gray>Note: </gray><white>{note}</white>"
+          - "<gray>Bar: </gray><yellow>{tick}</yellow>"
+          - "<gray>Instruments: </gray><yellow>{count}</yellow>"
+      prev-page:
+        name: "<yellow>Previous Page</yellow>"
+        lore:
+          - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+      play-preview:
+        name: "<green>Preview</green>"
+        lore:
+          - "<gray>Plays the column this note is on</gray>"
+      next-page:
+        name: "<yellow>Next Page</yellow>"
+        lore:
+          - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+      back:
+        name: "<red>Back</red>"
+        lore:
+          - "<gray>Return to edit mode</gray>"
 music-select:
   title: "<gold>Select Music to Edit</gold>"
+  buttons:
+    music-item:
+      name: "{modeColor}{name}"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Time signature: </gray><yellow>{timeSignature}</yellow>"
+        - ""
+        - "<yellow>Click to edit</yellow>"
+    prev-page:
+      name: "<yellow>Previous Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+    close:
+      name: "<red>Close</red>"
+      lore:
+        - "<gray>Close this screen</gray>"
+    create:
+      name: "<green>Create Music</green>"
+      lore:
+        - "<gray>Click to start a new song</gray>"
+    next-page:
+      name: "<yellow>Next Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
 settings-menu:
   title: "<gold>Music Settings</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  buttons:
+    bpm:
+      name: "<gold>BPM Settings</gold>"
+      lore:
+        - "<gray>Current BPM: </gray><yellow>{bpm}</yellow>"
+        - "<yellow>Click to adjust</yellow>"
+    subdivision:
+      name: "<red>Beat Subdivision</red>"
+      lore:
+        - "<gray>Current: </gray><yellow>{subdivision}</yellow>"
+        - "<yellow>Click to cycle</yellow>"
+    time-signature:
+      name: "<aqua>Time Signature</aqua>"
+      lore:
+        - "<gray>Current: </gray><yellow>{timeSignature}</yellow>"
+        - "<yellow>Click to cycle</yellow>"
+    name:
+      name: "<yellow>Song Name</yellow>"
+      lore:
+        - "<gray>Current: </gray><yellow>{name}</yellow>"
+        - "<yellow>Click to rename</yellow>"
+    clear:
+      name: "<red>Clear Notes</red>"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<red>Click to clear</red>"
+    save-close:
+      name: "<green>Save and Close</green>"
+      lore:
+        - "<gray>Save the song and leave the editor</gray>"
+    publish:
+      name: "<green>Publish / Manage</green> <dark_gray>-</dark_gray> {status}"
+      lore:
+        - "<gray>Current status: </gray>{status}"
+        - "<gray>Saves the song, then opens the publish list</gray>"
+        - "{action}"
+        - "<dark_gray>Requires musicboxplus.shopmusic</dark_gray>"
+    back:
+      name: "<red>Back to Editor</red>"
+      lore:
+        - "<gray>Return to the music editor</gray>"
 bpm-settings:
   title: "<gold>BPM Settings</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  step-button:
+    lore:
+      - "<gray>Click to adjust BPM</gray>"
+      - "<gray>Current: </gray><yellow>{current}</yellow>"
+      - "<gray>After: </gray><yellow>{after}</yellow>"
+  buttons:
+    current-bpm:
+      name: "<yellow>Current BPM: </yellow><green>{bpm}</green>"
+      lore:
+        - "<gray>Use the buttons above to change the tempo</gray>"
+    reset:
+      name: "<red>Reset to Default BPM</red>"
+      lore:
+        - "<gray>Restores the default from config.yml</gray>"
+    back:
+      name: "<red>Back to Settings</red>"
+      lore:
+        - "<gray>Return to the settings menu</gray>"
 publish-gui:
   title: "<gold>Publish Music</gold>"
+  buttons:
+    music-item:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Status: </gray>{status}"
+        - ""
+        - "{action}"
+        - "<dark_gray>Unpublished entries can still be managed</dark_gray>"
+    prev-page:
+      name: "<yellow>Previous Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+    close:
+      name: "<red>Close</red>"
+      lore:
+        - "<gray>Close this screen</gray>"
+    revenue:
+      name: "<green>Claim Revenue: </green><yellow>{amount}</yellow>"
+      lore:
+        - "<gray>Click to collect the pending revenue</gray>"
+    next-page:
+      name: "<yellow>Next Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
 publish-confirm:
   title: "<gold>Publish: {name}</gold>"
+  buttons:
+    info:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Time signature: </gray><yellow>{timeSignature}</yellow>"
+    price:
+      name: "<gold>Price: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>Allowed range: </gray><yellow>{minPrice}</yellow><gray> - </gray><yellow>{maxPrice}</yellow>"
+        - "<gray>Left click +10, right click -10</gray>"
+        - "<gray>Shift+click adjusts by 100</gray>"
+        - "<dark_gray>The starting price is clamped into the configured range</dark_gray>"
+    description:
+      name: "<aqua>Description</aqua>"
+      lore:
+        - "<gray>Current: </gray><white>{description}</white>"
+        - "<yellow>Click to edit the description</yellow>"
+        - "<dark_gray>Shown in the player music shop once published</dark_gray>"
+    tax-info:
+      name: "<red>Tax Information</red>"
+      lore:
+        - "<gray>Tax rate: </gray><yellow>{taxRate}%</yellow>"
+        - "<gray>Price: </gray><yellow>{price}</yellow>"
+        - "<gray>Expected revenue: </gray><green>{revenue}</green>"
+    confirm:
+      name: "<green>Confirm Publish</green>"
+      lore:
+        - "<gray>Click to list it in the player music shop</gray>"
+        - "<gray>If already published, the same listing is updated</gray>"
+    cancel:
+      name: "<red>Back</red>"
+      lore:
+        - "<gray>Return to the publish list</gray>"
 delete-confirm:
   title: "<red>Confirm Delete: {name}</red>"
+  buttons:
+    warning:
+      name: "<red>Delete </red><yellow>{name}</yellow><red>?</red>"
+      lore:
+        - "<gray>This cannot be undone</gray>"
+    confirm:
+      name: "<green>Confirm Delete</green>"
+      lore:
+        - "<gray>Click to delete</gray>"
+    cancel:
+      name: "<red>Cancel</red>"
+      lore:
+        - "<gray>Go back</gray>"
 purchase-confirm:
   title: "<gold>Purchase: {name}</gold>"
+  buttons:
+    info:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Author: </gray><yellow>{author}</yellow>"
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "<gray>Time signature: </gray><yellow>{timeSignature}</yellow>"
+        - "<gray>Sales: </gray><yellow>{sales}</yellow>"
+        - "<gray>Published: </gray><yellow>{publishedAt}</yellow>"
+    price:
+      name: "{priceColor}Price: <yellow>{price}</yellow>"
+      lore:
+        - "<gray>Your balance: </gray>{balanceColor}{balance}"
+    confirm:
+      name: "<green>Confirm Purchase</green>"
+      lore:
+        - "<gray>Click to pay and copy this song to your library</gray>"
+    no-money:
+      name: "<red>Not Enough Money</red>"
+      lore:
+        - "<gray>Still needed: </gray><yellow>{need}</yellow>"
+    back:
+      name: "<red>Back</red>"
+      lore:
+        - "<gray>Return to the player music shop</gray>"
 manage-published:
   title: "<gold>Manage: {name}</gold>"
+  buttons:
+    info:
+      name: "<yellow>Info</yellow>"
+      lore:
+        - "<gray>Author: </gray><yellow>{author}</yellow>"
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - ""
+        - "<gray>Published: </gray><yellow>{publishedAt}</yellow>"
+        - "<gray>Updated: </gray><yellow>{updatedAt}</yellow>"
+    price:
+      name: "<gold>Price: </gold><yellow>{price}</yellow>"
+      lore:
+        - "<gray>Sales: </gray><yellow>{sales}</yellow>"
+        - "<gray>Revenue: </gray><green>{revenue}</green>"
+        - ""
+        - "<yellow>Click to change the price</yellow>"
+    stats:
+      name: "<aqua>Sales Statistics</aqua>"
+      lore:
+        - "<gray>Total sales: </gray><yellow>{sales}</yellow>"
+        - "<gray>Total revenue: </gray><green>{revenue}</green>"
+        - "<gray>Status: {status}</gray>"
+    update:
+      name: "<yellow>Sync Update</yellow>"
+      lore:
+        - "<gray>Push the latest version from the editor</gray>"
+        - "<yellow>Click to sync</yellow>"
+    toggle-unpublish:
+      name: "<red>Unpublish</red>"
+      lore:
+        - "<gray>Players cannot buy it once unpublished</gray>"
+        - "<yellow>Click to unpublish</yellow>"
+    toggle-republish:
+      name: "<green>Republish</green>"
+      lore:
+        - "<gray>Players can buy it again once republished</gray>"
+        - "<yellow>Click to republish</yellow>"
+    delete:
+      name: "<red>Delete Listing</red>"
+      lore:
+        - "<gray>Deleting cannot be undone</gray>"
+        - "<red>Shift+click to delete</red>"
+    back:
+      name: "<red>Back</red>"
+      lore:
+        - "<gray>Click to go back</gray>"
 publish-review:
   title: "<gold>Publish Review</gold>"
+  buttons:
+    review-item:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Author: </gray><yellow>{author}</yellow>"
+        - "<gray>Price: </gray><yellow>{price}</yellow>"
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - ""
+        - "<green>Left click: approve</green>"
+        - "<red>Right click: reject</red>"
+    prev-page:
+      name: "<yellow>Previous Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+    next-page:
+      name: "<yellow>Next Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+    close:
+      name: "<red>Close</red>"
+      lore:
+        - "<gray>Close this screen</gray>"
+    refresh:
+      name: "<aqua>Refresh</aqua>"
+      lore:
+        - "<gray>Reload the pending submissions</gray>"
 text-player-edit:
   title: "<gold>Text Player</gold> <dark_gray>-</dark_gray> <yellow>{name}</yellow>"
+  buttons:
+    info:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Current song: </gray><white>{song}</white>"
+        - "<gray>Range: </gray><white>{range}</white>"
+        - "<gray>Right-click the floating text to open the control panel</gray>"
+        - "<gray>Sneak-right-click to open this menu</gray>"
+    toggle-name:
+      name: "<yellow>Name: {status}</yellow>"
+      lore:
+        - "<gray>Click to toggle the name</gray>"
+    toggle-song:
+      name: "<yellow>Song: {status}</yellow>"
+      lore:
+        - "<gray>Click to toggle the song</gray>"
+    toggle-progress:
+      name: "<yellow>Progress: {status}</yellow>"
+      lore:
+        - "<gray>Click to toggle the progress</gray>"
+    toggle-time:
+      name: "<yellow>Time: {status}</yellow>"
+      lore:
+        - "<gray>Click to toggle the time</gray>"
+    choose-song:
+      name: "<green>Choose Song</green>"
+      lore:
+        - "<gray>Open the song picker</gray>"
+    choose-playlist:
+      name: "<green>Choose Playlist</green>"
+      lore:
+        - "<gray>Pick one of your saved playlists</gray>"
+        - "<gray>The whole list plays in order (use the loop button)</gray>"
+    control:
+      name: "<gold>Control Panel</gold>"
+      lore:
+        - "<gray>Open playback controls</gray>"
+    move-to-me:
+      name: "<green>Move To Me</green>"
+      lore:
+        - "<gray>Move the floating text to your position</gray>"
+    adjust-y:
+      name: "<yellow>Adjust Y</yellow>"
+      lore:
+        - "<gray>Left click: Y -</gray>"
+        - "<gray>Right click: Y +</gray>"
+        - "<gray>Shift: {multiplier}x step</gray>"
+    adjust-x:
+      name: "<yellow>Adjust X</yellow>"
+      lore:
+        - "<gray>Left click: X -</gray>"
+        - "<gray>Right click: X +</gray>"
+        - "<gray>Shift: {multiplier}x step</gray>"
+    adjust-z:
+      name: "<yellow>Adjust Z</yellow>"
+      lore:
+        - "<gray>Left click: Z -</gray>"
+        - "<gray>Right click: Z +</gray>"
+        - "<gray>Shift: {multiplier}x step</gray>"
+    close:
+      name: "<red>Close</red>"
+      lore:
+        - "<gray>Close this menu</gray>"
+    delete:
+      name: "<red>Delete</red>"
+      lore:
+        - "<gray>Delete this text player</gray>"
+    range-up:
+      name: "<green>Increase Range</green> <gray>(now {range})</gray>"
+      lore:
+        - "<gray>Left click: increase the range</gray>"
+        - "<gray>Right click: enter an exact value</gray>"
+    range-down:
+      name: "<red>Decrease Range</red> <gray>(now {range})</gray>"
+      lore:
+        - "<gray>Left click: decrease the range</gray>"
+        - "<gray>Right click: enter an exact value</gray>"
+    toggle-billboard:
+      name: "<yellow>Fixed Facing: {status}</yellow>"
+      lore:
+        - "<gray>When on, the text keeps a fixed facing instead of turning to the player</gray>"
+        - "<gray>Click to toggle</gray>"
+    set-facing:
+      name: "<aqua>Set Facing</aqua>"
+      lore:
+        - "<gray>Left click: fix the facing to face you</gray>"
+        - "<gray>Right click: reset to the default facing</gray>"
+    toggle-double-sided:
+      name: "<yellow>Double Sided: {status}</yellow>"
+      lore:
+        - "<gray>Shows the same text on the back while the facing is fixed</gray>"
+        - "<gray>Click to toggle</gray>"
+    toggle-public-edit:
+      name: "<yellow>Allow Editing Without Permission: {status}</yellow>"
+      lore:
+        - "<gray>When on, players without the permission can edit appearance and song</gray>"
+        - "<gray>(moving, range, facing and deleting stay admin-only)</gray>"
+    edit-display:
+      name: "<aqua>Edit Display</aqua>"
+      lore:
+        - "<gray>Edit the lines shown on the floating text</gray>"
 player-shop:
   title: "<gold>Player Music Shop</gold>"
+  buttons:
+    music-item:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>Author: </gray><yellow>{author}</yellow>"
+        - "<gray>Notes: </gray><yellow>{notes}</yellow>"
+        - "<gray>BPM: </gray><yellow>{bpm}</yellow>"
+        - "{description}"
+        - "<gray>Price: </gray><yellow>{price}</yellow>"
+        - "<gray>Sales: </gray><yellow>{sales}</yellow>"
+        - ""
+        - "{action}"
+    prev-page:
+      name: "<yellow>Previous Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
+    close:
+      name: "<red>Close</red>"
+      lore:
+        - "<gray>Close this screen</gray>"
+    search:
+      name: "<aqua>Search</aqua>"
+      lore:
+        - "<gray>Current search: </gray>{query}"
+        - "<yellow>Click to enter a keyword</yellow>"
+    my-music:
+      name: "<green>My Publications</green>"
+      lore:
+        - "<gray>Manage the music you published and its revenue</gray>"
+    next-page:
+      name: "<yellow>Next Page</yellow>"
+      lore:
+        - "<gray>Page </gray><yellow>{page}</yellow><gray> / </gray><yellow>{totalPages}</yellow>"
 search:
   title: "<gold>Search</gold>"
 exit-confirm:
   title: "<red>Unsaved Changes</red>"
+  buttons:
+    info:
+      name: "<yellow>{name}</yellow>"
+      lore:
+        - "<gray>This song has unsaved changes</gray>"
+        - "<gray>Choose how to leave</gray>"
+    save:
+      name: "<green>Save and Exit</green>"
+      lore:
+        - "<gray>Save your changes, then close the editor</gray>"
+    discard:
+      name: "<red>Discard Changes</red>"
+      lore:
+        - "<gray>Close the editor without saving</gray>"
+    cancel:
+      name: "<gray>Cancel</gray>"
+      lore:
+        - "<gray>Return to the editor</gray>"
+
+# --- Song and playlist items ---
+song-item:
+  name-format: "<gold>{song}</gold>"
+  lore-format:
+    - "<gold>Length</gold><dark_gray>: </dark_gray><yellow>{length}</yellow>"
+    - "<gold>Author</gold><dark_gray>: </dark_gray><yellow>{author}</yellow>"
+    - "<gold>Original author</gold><dark_gray>: </dark_gray><yellow>{original_author}</yellow>"
+  aliases-format: "<gray>Aliases: </gray><yellow>{aliases}</yellow>"
+  tags-format: "<gray>Tags: </gray><aqua>{tags}</aqua>"
+  shop-lore:
+    - "<gray>Click to buy this disc</gray>"
+    - "<gray>Price: </gray><yellow>{price}</yellow>"
+  get-lore:
+    - "<gray>Click to get this disc</gray>"
+  search-lore:
+    - "<gray>Click to play this song</gray>"
+  recent-lore:
+    - "<gray>Click to play</gray>"
+  container-play-all-lore:
+    - "<yellow>Right-click to play all</yellow>"
+  container-buy-all-lore:
+    - "<yellow>Right-click to buy every disc in this folder</yellow>"
+    - "<gray>Total </gray><yellow>{count}</yellow><gray> discs</gray>"
+    - "<gray>Total price: </gray><yellow>{price}</yellow>"
+playlist-item:
+  name-format: "<gold>{playlist}</gold>"
+  lore-format:
+    - "<gold>Songs: </gold><yellow>{count}</yellow>"
+  item-lore:
+    - "<gray>Click to play</gray>"
+    - "<gray>Right-click to remove</gray>"
+  list-lore:
+    - "<gray>Click to open</gray>"
+    - "<gray>Right-click to edit</gray>"
+  add-song-lore:
+    - "<yellow>Click to add to the playlist</yellow>"
+  add-song-exists-lore:
+    - "<gray>Already in the playlist</gray>"
+  add-container-lore:
+    - "<yellow>Right-click to add the whole folder</yellow>"
+  default-lore:
+    - "<gray>Default playlist</gray>"
+    - "<gray>Contains every available song</gray>"
+
+# --- Small status word sets ---
+toggle-status:
+  enabled: "<green>Enabled</green>"
+  disabled: "<red>Disabled</red>"
+playback-status:
+  playing: "<green>Playing</green>"
+  paused: "<yellow>Paused</yellow>"
+recent-songs:
+  name: "<gold>Recently Played</gold>"
+  lore:
+    - "<gray>Show the songs played most recently</gray>"
 
 # --- Shared buttons ---
 buttons:

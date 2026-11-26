@@ -267,7 +267,7 @@ final class ImportApiHandler implements HttpHandler {
 
     /**
      * The multipart boundary from a Content-Type header, or null when it is absent, empty, or longer
-     * than {@link #MAX_BOUNDARY_LENGTH}.
+     * than MAX_BOUNDARY_LENGTH.
      */
     static String extractMultipartBoundary(String contentType) {
         if (contentType == null) {

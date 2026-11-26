@@ -33,7 +33,7 @@ public class MidiImporter {
     /**
      * Bounds the file before the parser sees it.
      *
-     * <p>{@code maxImportFileBytes} used to be enforced only by {@link MusicFileImporter}, i.e. only
+     * maxImportFileBytes used to be enforced only by MusicFileImporter, i.e. only
      * on the web/editor path; the auto-conversion path called the parser directly, so the cap did not
      * apply there. The MIDI parser also materialises every event into a list, so an unbounded file is
      * an unbounded allocation.

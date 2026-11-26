@@ -1,6 +1,7 @@
 package com.huidu.musicboxplus.module.edit;
 
 import com.huidu.musicboxplus.MusicBox;
+import com.huidu.musicboxplus.common.utils.LogLocale;
 import com.huidu.musicboxplus.common.config.GUIConfigManager;
 import com.huidu.musicboxplus.common.lang.Lang;
 import com.huidu.musicboxplus.common.utils.ItemUtils;
@@ -26,7 +27,7 @@ import com.huidu.musicboxplus.common.config.HotbarButtonConfig;
 import com.huidu.musicboxplus.common.config.InstrumentSelectConfig;
 import com.huidu.musicboxplus.common.config.MusicEditorConfig;
 
-public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
+public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host, MusicEditNoteEditor.Host, MusicEditHotbarRenderer.Host, MusicEditInstrumentPicker.Host, MusicEditSessionCloser.Host {
 
     public static void cleanupSession(UUID playerUUID) {
         MusicEditTextInputManager.cleanupSession(playerUUID);
@@ -73,8 +74,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     private int tickOffset = 0;
     private boolean isPlaying = false;
     // volatile: written by main-thread edit handlers, read by the async auto-save timer.
-    private volatile boolean hasUnsavedChanges = false;
-    private volatile long changeVersion = 0;
+    private final MusicEditDirtyState dirtyState = new MusicEditDirtyState();
     private boolean openingSubGUI = false;
     private final List<MbTask> scheduledTaskIds = Collections.synchronizedList(new ArrayList<>());
     private MusicNote.NoteInstrument currentInstrument = MusicNote.NoteInstrument.HARP;
@@ -86,6 +86,11 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     private final Set<Integer> playbackChangedSlots = new HashSet<>();
     private final MusicEditLayout layout = new MusicEditLayout();
     private final MusicEditPlayback playback = new MusicEditPlayback(this);
+    private MusicEditHotbarActions hotbarActions;
+    private final MusicEditNoteEditor noteEditor = new MusicEditNoteEditor(this);
+    private final MusicEditHotbarRenderer hotbarRenderer = new MusicEditHotbarRenderer(this);
+    private final MusicEditInstrumentPicker instrumentPicker = new MusicEditInstrumentPicker(this);
+    private final MusicEditSessionCloser sessionCloser = new MusicEditSessionCloser(this);
     private final EditHistory editHistory = new EditHistory();
     private int currentPlayTick = -1;
     private Mode currentMode = Mode.EDIT;
@@ -185,6 +190,16 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
 
     private void parseLayout() {
         layout.parse(config);
+        // Rebuilt with the layout: both the renderer and the click handler read this table, so a
+        // config reload cannot leave them disagreeing about which character is which button.
+        this.hotbarActions = MusicEditHotbarActions.create(config.getButtonMapping());
+        java.util.List<Character> duplicates = hotbarActions.duplicateChars(config.getButtonMapping());
+        if (!duplicates.isEmpty()) {
+            MusicBox.getInstance().getLogger().warning(LogLocale.text(MusicBox.getInstance(),
+                    "gui-config.yml maps more than one editor button to the same character: " + duplicates
+                            + "; only the first one can be clicked.",
+                    "gui-config.yml 中多个编辑按钮映射到相同字符: " + duplicates + "；只有第一个能被点击。"));
+        }
     }
 
     public void open() {
@@ -213,8 +228,8 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
         stopAutoSaveTask();
         long interval = getAutoSaveInterval();
         autoSaveTask = Scheduler.asyncTimer(() -> Scheduler.entity(player, () -> {
-            if (sessionGuard.canEdit() && hasUnsavedChanges) {
-                long version = changeVersion;
+            if (sessionGuard.canEdit() && dirtyState.isDirty()) {
+                long version = dirtyState.version();
                 // Keep dirty until completion, including while an exit prompt is being opened.
                 saveForEditingSession(success -> {
                     if (success) {
@@ -260,126 +275,79 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
             return;
         }
 
-        HotbarButtonConfig playConfig = isPlaying ? config.getButton("play-stop") : config.getButton("play");
-        HotbarButtonConfig emptyConfig = config.getButton("empty");
-
-        if (layout.lineCount() == 0) {
-            return;
-        }
-
-        clearPlayerInventoryEditorArea();
-
-        for (int row = 6; row < layout.lineCount() && row < 10; row++) {
-            String line = layout.line(row);
-            for (int col = 0; col < line.length() && col < 9; col++) {
-                char c = line.charAt(col);
-                int layoutSlot = row * 9 + col;
-                int playerSlot = layoutSlotToPlayerSlot(layoutSlot);
-
-                if (playerSlot < 0 || playerSlot >= 36) continue;
-
-                HotbarButtonConfig btnConfig = null;
-                String[] replacements = null;
-
-                if (c == config.getButtonMapping().getOrDefault("pitch-up", 'U')) {
-                    btnConfig = config.getButton("pitch-up");
-                    replacements = editorStatusReplacements();
-                } else if (c == config.getButtonMapping().getOrDefault("pitch-down", 'D')) {
-                    btnConfig = config.getButton("pitch-down");
-                    replacements = editorStatusReplacements();
-                } else if (c == config.getButtonMapping().getOrDefault("tick-left", 'L')) {
-                    btnConfig = config.getButton("tick-left");
-                    replacements = editorStatusReplacements();
-                } else if (c == config.getButtonMapping().getOrDefault("tick-right", 'R')) {
-                    btnConfig = config.getButton("tick-right");
-                    replacements = editorStatusReplacements();
-                } else if (c == config.getButtonMapping().getOrDefault("instrument", 'I')) {
-                    btnConfig = config.getButton("instrument");
-                    replacements = new String[]{"{instrument}", currentInstrument.getDisplayName()};
-                } else if (c == config.getButtonMapping().getOrDefault("play", 'P')) {
-                    btnConfig = playConfig;
-                    replacements = new String[]{"{notes}", String.valueOf(music.getNoteCount())};
-                } else if (c == config.getButtonMapping().getOrDefault("save", 'S')) {
-                    btnConfig = config.getButton("save");
-                } else if (c == config.getButtonMapping().getOrDefault("exit", 'H')) {
-                    btnConfig = config.getButton("exit");
-                } else if (c == config.getButtonMapping().getOrDefault("bpm-up", 'B')) {
-                    btnConfig = config.getButton("bpm-up");
-                    replacements = new String[]{"{bpm}", String.valueOf(music.getBpm())};
-                } else if (c == config.getButtonMapping().getOrDefault("bpm-down", 'T')) {
-                    btnConfig = config.getButton("bpm-down");
-                    replacements = new String[]{"{bpm}", String.valueOf(music.getBpm())};
-                } else if (c == config.getButtonMapping().getOrDefault("time-signature", 'M')) {
-                    btnConfig = config.getButton("time-signature");
-                    replacements = new String[]{"{timeSignature}", music.getTimeSignature().toString()};
-                } else if (c == config.getButtonMapping().getOrDefault("settings", 'G')) {
-                    btnConfig = config.getButton("settings");
-                    replacements = editorStatusReplacements();
-                } else if (c == config.getButtonMapping().getOrDefault("clear-all", 'C')) {
-                    btnConfig = config.getButton("clear-all");
-                } else if (c == config.getButtonMapping().getOrDefault("undo", 'Y')) {
-                    btnConfig = config.getButton("undo");
-                    replacements = new String[]{"{canUndo}", (editHistory.canUndo() ? Lang.EDIT_AVAILABLE : Lang.EDIT_UNAVAILABLE).toString()};
-                } else if (c == config.getButtonMapping().getOrDefault("redo", 'Z')) {
-                    btnConfig = config.getButton("redo");
-                    replacements = new String[]{"{canRedo}", (editHistory.canRedo() ? Lang.EDIT_AVAILABLE : Lang.EDIT_UNAVAILABLE).toString()};
-                } else if (c == config.getButtonMapping().getOrDefault("copy", 'Q')) {
-                    btnConfig = config.getButton("copy");
-                    replacements = new String[]{"{selectionCount}", String.valueOf(getSelectedNotes().size())};
-                } else if (c == config.getButtonMapping().getOrDefault("paste", 'J')) {
-                    btnConfig = config.getButton("paste");
-                    replacements = new String[]{"{clipboardSize}", String.valueOf(clipboardCoordinator.getClipboardSize())};
-                } else if (c == config.getButtonMapping().getOrDefault("delete-selection", 'K')) {
-                    btnConfig = config.getButton("delete-selection");
-                    replacements = new String[]{"{selectionCount}", String.valueOf(getSelectedNotes().size())};
-                } else if (c == config.getButtonMapping().getOrDefault("batch-instrument", 'W')) {
-                    btnConfig = config.getButton("batch-instrument");
-                    replacements = new String[]{"{selectionCount}", String.valueOf(getSelectedNotes().size()), "{instrument}", currentInstrument.getDisplayName()};
-                } else if (c == config.getEmptyChar()) {
-                    btnConfig = emptyConfig;
-                }
-
-                if (btnConfig != null) {
-                    setPlayerInventoryItem(playerSlot, btnConfig, replacements);
-                }
-            }
-        }
-
+        hotbarRenderer.render();
     }
 
     private String[] editorStatusReplacements() {
-        return new String[]{
-                "{pitchOffset}", String.valueOf(pitchOffset),
-                "{pitchRange}", getCurrentPitchRange(),
-                "{tickOffset}", String.valueOf(tickOffset),
-                "{tickRange}", getCurrentTickRange(),
-                "{bpm}", String.valueOf(music.getBpm()),
-                "{timeSignature}", music.getTimeSignature().toString(),
-                "{subdivision}", String.valueOf(music.getBeatSubdivision()),
-                "{notes}", String.valueOf(music.getNoteCount())
-        };
+        return MusicEditStatus.replacements(
+                pitchOffset, calculateEditRows(), maxPitch,
+                tickOffset, calculateEditColumns(),
+                music.getBpm(), music.getTimeSignature().toString(),
+                music.getBeatSubdivision(), music.getNoteCount());
     }
 
     private String getCurrentPitchRange() {
-        int rows = calculateEditRows();
-        int startPitch = Math.max(0, pitchOffset);
-        int endPitch = Math.min(maxPitch, startPitch + rows - 1);
-        return MusicNote.getNoteName(startPitch) + " - " + MusicNote.getNoteName(endPitch);
+        return MusicEditStatus.pitchRange(pitchOffset, calculateEditRows(), maxPitch);
     }
 
     private String getCurrentTickRange() {
-        int columns = calculateEditColumns();
-        int startTick = tickOffset * columns;
-        int endTick = startTick + columns - 1;
-        return startTick + " - " + endTick;
+        return MusicEditStatus.tickRange(tickOffset, calculateEditColumns());
+    }
+    // --- MusicEditHotbarRenderer.Host: the toolbar as one render pass sees it -----------------
+
+    @Override
+    public com.huidu.musicboxplus.common.config.MusicEditorConfig editorConfig() {
+        return config;
     }
 
-    private void clearPlayerInventoryEditorArea() {
-        for (int slot = 0; slot < 36; slot++) {
-            if (!isEmptyItem(player.getInventory().getItem(slot))) {
-                player.getInventory().setItem(slot, null);
-            }
-        }
+    @Override
+    public MusicEditLayout editLayout() {
+        return layout;
+    }
+
+    @Override
+    public MusicEditHotbarActions hotbarActions() {
+        return hotbarActions;
+    }
+
+    @Override
+    public boolean playbackActive() {
+        return isPlaying;
+    }
+
+    @Override
+    public String[] statusReplacements() {
+        return editorStatusReplacements();
+    }
+
+    @Override
+    public int clipboardSize() {
+        return clipboardCoordinator.getClipboardSize();
+    }
+
+    @Override
+    public boolean canUndo() {
+        return editHistory.canUndo();
+    }
+
+    @Override
+    public boolean canRedo() {
+        return editHistory.canRedo();
+    }
+
+    @Override
+    public int selectionCount() {
+        return getSelectedNotes().size();
+    }
+
+    @Override
+    public void paintButton(int playerSlot, com.huidu.musicboxplus.common.config.HotbarButtonConfig button, String[] replacements) {
+        setPlayerInventoryItem(playerSlot, button, replacements);
+    }
+
+    @Override
+    public boolean slotBlank(ItemStack item) {
+        return isEmptyItem(item);
     }
 
     private void giveInstrumentSelectItems() {
@@ -492,6 +460,9 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
 
         int editCols = calculateEditColumns();
         int editRows = calculateEditRows();
+        // Resolved once for this pass: the selection anchors cannot move while it runs, and the
+        // per-cell test used to re-scan the edit-area list for all three slots on every cell.
+        MusicEditSelectionManager.Rect selectionRect = selectionManager.selectionRect(layout.editAreaSlots(), editCols);
 
         boolean needsFullUpdate = (changedSlots == null || changedSlots.isEmpty());
 
@@ -511,7 +482,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
                 MusicNote note = music.getNote(pitch, tick);
                 boolean isCurrentPlayingTick = isHighlightedTick(tick);
                 boolean isCurrentPlayingNote = isHighlightedNote(note, pitch, tick);
-                boolean isSelected = isSlotInSelection(slot);
+                boolean isSelected = MusicEditSelectionManager.isIndexInSelection(i, editCols, selectionRect);
                 ItemStack item = noteRenderer.createEditAreaItem(note, pitch, tick, isCurrentPlayingTick, isCurrentPlayingNote, isSelected);
                 setInventoryItemIfChanged(inventory, slot, item);
             }
@@ -543,7 +514,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
                 MusicNote note = music.getNote(pitch, tick);
                 boolean isCurrentPlayingTick = isHighlightedTick(tick);
                 boolean isCurrentPlayingNote = isHighlightedNote(note, pitch, tick);
-                boolean isSelected = isSlotInSelection(slot);
+                boolean isSelected = MusicEditSelectionManager.isIndexInSelection(index, editCols, selectionRect);
                 ItemStack item = noteRenderer.createEditAreaItem(note, pitch, tick, isCurrentPlayingTick, isCurrentPlayingNote, isSelected);
                 setInventoryItemIfChanged(inventory, slot, item);
             }
@@ -628,85 +599,99 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
             return;
         }
 
-        char c = getCharAtInventorySlot(slot);
-
-        if (c == config.getButtonMapping().getOrDefault("pitch-up", 'U')) {
-            if (pitchOffset < maxPitch - calculateEditRows() + 1) {
-                pitchOffset++;
+        MusicEditHotbarActions.Action action = hotbarActions.actionFor(getCharAtInventorySlot(slot));
+        if (action == null) {
+            return;
+        }
+        switch (action) {
+            case PITCH_UP -> {
+                if (pitchOffset < maxPitch - calculateEditRows() + 1) {
+                    pitchOffset++;
+                    scheduleEditorViewRender();
+                }
+            }
+            case PITCH_DOWN -> {
+                if (pitchOffset > 0) {
+                    pitchOffset--;
+                    scheduleEditorViewRender();
+                }
+            }
+            case TICK_LEFT -> {
+                if (tickOffset > 0) {
+                    tickOffset--;
+                    scheduleEditorViewRender();
+                }
+            }
+            case TICK_RIGHT -> {
+                tickOffset++;
                 scheduleEditorViewRender();
             }
-        } else if (c == config.getButtonMapping().getOrDefault("pitch-down", 'D')) {
-            if (pitchOffset > 0) {
-                pitchOffset--;
-                scheduleEditorViewRender();
+            case INSTRUMENT -> {
+                currentMode = Mode.CURRENT_INSTRUMENT_SELECT;
+                instrumentPageOffset = 0;
+                givePlayerInventoryItems();
             }
-        } else if (c == config.getButtonMapping().getOrDefault("tick-left", 'L')) {
-            if (tickOffset > 0) {
-                tickOffset--;
-                scheduleEditorViewRender();
+            case PLAY -> {
+                if (isPlaying) {
+                    stopMusic();
+                } else {
+                    playMusic();
+                }
+                givePlayerInventoryItems();
             }
-        } else if (c == config.getButtonMapping().getOrDefault("tick-right", 'R')) {
-            tickOffset++;
-            scheduleEditorViewRender();
-        } else if (c == config.getButtonMapping().getOrDefault("instrument", 'I')) {
-            currentMode = Mode.CURRENT_INSTRUMENT_SELECT;
-            instrumentPageOffset = 0;
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("play", 'P')) {
-            if (isPlaying) {
-                stopMusic();
-            } else {
-                playMusic();
-            }
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("save", 'S')) {
-            saveMusic();
-        } else if (c == config.getButtonMapping().getOrDefault("exit", 'H')) {
+            case SAVE -> saveMusic();
             // Same path as closing the window: with unsaved edits (or while playing) this opens the
-            // save/discard/cancel prompt instead of silently dropping the changes. close() was
-            // meant for the confirmed paths only -- it clears the unsaved marker on the way out.
-            handleExternalCloseRequest();
-        } else if (c == config.getButtonMapping().getOrDefault("bpm-up", 'B')) {
-            if (isRightClick) {
-                decreaseBpm();
-            } else {
-                increaseBpm();
+            // save/discard/cancel prompt instead of silently dropping the changes. close() was meant
+            // for the confirmed paths only -- it clears the unsaved marker on the way out.
+            case EXIT -> handleExternalCloseRequest();
+            case BPM_UP -> {
+                if (isRightClick) {
+                    decreaseBpm();
+                } else {
+                    increaseBpm();
+                }
+                givePlayerInventoryItems();
             }
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("bpm-down", 'T')) {
-            if (isRightClick) {
-                increaseBpm();
-            } else {
-                decreaseBpm();
+            case BPM_DOWN -> {
+                if (isRightClick) {
+                    increaseBpm();
+                } else {
+                    decreaseBpm();
+                }
+                givePlayerInventoryItems();
             }
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("time-signature", 'M')) {
-            cycleTimeSignature();
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("settings", 'G')) {
-            closeEditorInventoryForSubGui();
-            openSettingsMenu();
-        } else if (c == config.getButtonMapping().getOrDefault("clear-all", 'C')) {
-            clearAllNotes();
-            givePlayerInventoryItems();
-            updateInventory();
-        } else if (c == config.getButtonMapping().getOrDefault("undo", 'Y')) {
-            undo();
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("redo", 'Z')) {
-            redo();
-            givePlayerInventoryItems();
-        } else if (c == config.getButtonMapping().getOrDefault("copy", 'Q')) {
-            copySelection();
-        } else if (c == config.getButtonMapping().getOrDefault("paste", 'J')) {
-            int centerPitch = pitchOffset + calculateEditRows() / 2;
-            int centerTick = tickOffset * calculateEditColumns() + calculateEditColumns() / 2;
-            pasteToPosition(centerPitch, centerTick);
-        } else if (c == config.getButtonMapping().getOrDefault("batch-instrument", 'W')) {
-            batchChangeInstrument();
-        } else if (c == config.getButtonMapping().getOrDefault("delete-selection", 'K')) {
-            deleteSelection();
-            givePlayerInventoryItems();
+            case TIME_SIGNATURE -> {
+                cycleTimeSignature();
+                givePlayerInventoryItems();
+            }
+            case SETTINGS -> {
+                closeEditorInventoryForSubGui();
+                openSettingsMenu();
+            }
+            case CLEAR_ALL -> {
+                clearAllNotes();
+                givePlayerInventoryItems();
+                updateInventory();
+            }
+            case UNDO -> {
+                undo();
+                givePlayerInventoryItems();
+            }
+            case REDO -> {
+                redo();
+                givePlayerInventoryItems();
+            }
+            case COPY -> copySelection();
+            case PASTE -> {
+                int centerPitch = pitchOffset + calculateEditRows() / 2;
+                int centerTick = tickOffset * calculateEditColumns() + calculateEditColumns() / 2;
+                pasteToPosition(centerPitch, centerTick);
+            }
+            case BATCH_INSTRUMENT -> batchChangeInstrument();
+            case DELETE_SELECTION -> {
+                deleteSelection();
+                givePlayerInventoryItems();
+            }
         }
     }
 
@@ -715,70 +700,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
         if (index == null) {
             return;
         }
-
-        int editCols = calculateEditColumns();
-        int localRow = index / editCols;
-        int localCol = index % editCols;
-
-        int pitch = pitchOffset + localRow;
-        int tick = localCol + tickOffset * editCols;
-
-        if (pitch > maxPitch) {
-            return;
-        }
-
-        MusicNote note = music.getNote(pitch, tick);
-        boolean isExtendedOctave = pitch > getDefaultMaxPitch();
-        boolean canEditExtendedOctave = maxPitch > getDefaultMaxPitch();
-
-        if (isShiftClick) {
-            handleNoteSelection(slot, note, pitch, tick);
-            return;
-        }
-
-        if (selectionManager.isInSelectionMode()) {
-            clearSelection();
-            return;
-        }
-
-        if (isRightClick) {
-            if (note != null) {
-                editHistory.pushAction(EditAction.removeNote(note));
-                music.removeNote(note);
-                markUnsavedChanges();
-                // Only this cell changed: adding or removing a note does not alter how any other
-                // cell renders (the playing-tick highlight depends on the tick, not on the note).
-                // Passing the slot takes the incremental path in updateInventory, instead of
-                // rebuilding all 54 edit-area items for one changed icon.
-                updateInventory(java.util.Collections.singleton(slot));
-            }
-        } else {
-            if (isExtendedOctave && !canEditExtendedOctave) {
-                MessageUtils.send(player, Lang.EXTENDED_OCTAVE_DISABLED);
-                MessageUtils.send(player, Lang.EXTENDED_OCTAVE_RANGE, "{note}", MusicNote.getNoteName(pitch));
-                MessageUtils.send(player, Lang.EXTENDED_OCTAVE_CONFIG);
-                return;
-            }
-
-            if (note == null) {
-                note = new MusicNote(pitch, tick);
-                note.addInstrument(currentInstrument);
-                music.addNote(note);
-                editHistory.pushAction(EditAction.addNote(note));
-                markUnsavedChanges();
-                // Incremental, for the same reason as the removal above.
-                updateInventory(java.util.Collections.singleton(slot));
-                playNoteSound(pitch, currentInstrument);
-            } else {
-                if (note.getPitch() > getDefaultMaxPitch() && !canEditExtendedOctave) {
-                    MessageUtils.send(player, Lang.EDIT_NOTE_EXTENDED_OCTAVE_ONLY_DELETE);
-                    return;
-                }
-                selectedNote = note;
-                currentMode = Mode.INSTRUMENT_SELECT;
-                givePlayerInventoryItems();
-            }
-        }
+        noteEditor.click(slot, index, isRightClick, isShiftClick);
     }
 
     private void handleNoteSelection(int slot, MusicNote note, int pitch, int tick) {
@@ -787,81 +709,11 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     }
 
     private void handleInstrumentSelectClick(int slot) {
-        InstrumentSelectConfig instrumentConfig = GUIConfigManager.getInstance().getInstrumentSelectConfig();
-        MusicNote.NoteInstrument[] instruments = MusicNote.NoteInstrument.getAvailableValues();
-        int totalInstruments = instruments.length;
-        List<Integer> instrumentSlots = getPlayerInventorySlotsForInstrumentChar(
-                instrumentConfig,
-                instrumentConfig.getButtonMapping().getOrDefault("instrument", 'I')
-        );
-        int instrumentsPerPage = Math.max(1, Math.min(getInstrumentsPerPage(), instrumentSlots.size()));
-        boolean needPagination = totalInstruments > instrumentsPerPage;
-
-        int prevSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "prev-page");
-        int nextSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "next-page");
-        int playSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "play-preview");
-        int backSlot = getPlayerInventorySlotForInstrumentButton(instrumentConfig, "back");
-
-        if (needPagination && slot == prevSlot) {
-            if (instrumentPageOffset > 0) {
-                instrumentPageOffset--;
-                givePlayerInventoryItems();
-            }
-            return;
-        }
-
-        if (needPagination && slot == nextSlot) {
-            if (instrumentPageOffset < getTotalInstrumentPages(instrumentsPerPage) - 1) {
-                instrumentPageOffset++;
-                givePlayerInventoryItems();
-            }
-            return;
-        }
-
-        if (slot == playSlot) {
-            if (selectedNote != null) {
-                if (isPlaying) {
-                    stopMusic();
-                }
-                previewColumn(selectedNote.getPitch(), selectedNote.getTick());
-            }
-            return;
-        }
-
-        if (slot == backSlot) {
-            currentMode = Mode.EDIT;
-            selectedNote = null;
-            instrumentPageOffset = 0;
-            givePlayerInventoryItems();
-            updateInventory();
-            return;
-        }
-
-        int instrumentIndex = instrumentSlots.indexOf(slot);
-        if (instrumentIndex >= 0 && selectedNote != null) {
-            int startIndex = needPagination ? instrumentPageOffset * instrumentsPerPage : 0;
-            int actualIndex = startIndex + instrumentIndex;
-
-            if (actualIndex < instruments.length) {
-                MusicNote.NoteInstrument instrument = instruments[actualIndex];
-                if (selectedNote.getInstruments().contains(instrument)) {
-                    selectedNote.removeInstrument(instrument);
-                } else {
-                    selectedNote.addInstrument(instrument);
-                }
-                markUnsavedChanges();
-                // flashPreviewHighlight renders the grid itself (its immediate onUpdate), so the
-                // explicit updateInventory() that used to follow this was a second identical
-                // 54-slot rebuild for the same click.
-                flashPreviewHighlight(selectedNote.getPitch(), selectedNote.getTick());
-                playNoteSound(selectedNote.getPitch(), instrument);
-                givePlayerInventoryItems();
-            }
-        }
+        instrumentPicker.click(slot);
     }
-
     private int getTotalInstrumentPages(int instrumentsPerPage) {
-        return MusicEditInstrumentMenuRenderer.getTotalInstrumentPages(instrumentsPerPage);
+        return MusicEditInstrumentPages.totalPages(
+                MusicNote.NoteInstrument.getAvailableCount(), instrumentsPerPage);
     }
 
     private List<Integer> getPlayerInventorySlotsForInstrumentChar(InstrumentSelectConfig instrumentConfig, char c) {
@@ -1025,27 +877,15 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
                 });
     }
 
-    // The edit-area slots in one tick's column. Mirrors the localRow/localCol/tick derivation in
-    // updateInventory, including the pitch and row bounds it applies.
+    // The edit-area slots in one tick's column, from the grid arithmetic that owns that mapping.
     private Set<Integer> slotsInPreviewColumn(int tick) {
-        Set<Integer> slots = new HashSet<>();
-        int editCols = calculateEditColumns();
-        int editRows = calculateEditRows();
-        for (int i = 0; i < layout.editAreaSlots().size(); i++) {
-            int localRow = i / editCols;
-            if (localRow >= editRows) {
-                continue;
-            }
-            int localCol = i % editCols;
-            if (localCol + tickOffset * editCols != tick) {
-                continue;
-            }
-            if (localRow + pitchOffset > maxPitch) {
-                continue;
-            }
-            slots.add(layout.editAreaSlots().get(i));
-        }
-        return slots;
+        return MusicEditGrid.columnSlots(layout.editAreaSlots(), tick,
+                calculateEditColumns(), calculateEditRows(), pitchOffset, tickOffset, maxPitch);
+    }
+
+    @Override
+    public void flashCell(int pitch, int tick) {
+        flashPreviewHighlight(pitch, tick);
     }
 
     private void previewColumn(int pitch, int tick) {
@@ -1305,20 +1145,11 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     }
 
     private void finishClose() {
-        // Check at execution time on the owner region, not before enqueueing a close/restore.
-        Scheduler.entityNow(player, () -> {
-            if (!sessionGuard.beginClose()) return;
-            retireSession();
-            player.closeInventory();
-            // A synchronous close event may admit another GUI. Never restore its inventory.
-            if (MusicEditListener.isCurrentSession(player.getUniqueId(), this)) {
-                PlayerInventoryState.restoreAndRemove(player);
-                MusicEditListener.exitEditMode(player.getUniqueId(), music.getUniqueId(), this);
-            }
-        });
+        sessionCloser.finishClose();
     }
 
-    void retireSession() {
+    @Override
+    public void retireSession() {
         sessionGuard.invalidate();
         stopAutoSaveTask();
         cancelQueuedEditorRender();
@@ -1330,15 +1161,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     }
 
     void abortFailedOpen() {
-        Scheduler.entityNow(player, () -> {
-            if (!MusicEditListener.isCurrentSession(player.getUniqueId(), this)) return;
-            retireSession();
-            player.closeInventory();
-            if (MusicEditListener.isCurrentSession(player.getUniqueId(), this)) {
-                PlayerInventoryState.restoreAndRemove(player);
-                MusicEditListener.exitEditMode(player.getUniqueId(), music.getUniqueId(), this);
-            }
-        });
+        sessionCloser.abortFailedOpen();
     }
 
     Runnable queuedExternalCloseRequest() {
@@ -1349,7 +1172,7 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     public void handleExternalCloseRequest() {
         closeCoordinator.handleExternalCloseRequest(
                 openingSubGUI,
-                hasUnsavedChanges,
+                dirtyState.isDirty(),
                 isPlaying,
                 this::close,
                 this::closeAndSave,
@@ -1372,30 +1195,26 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     }
 
     public boolean hasUnsavedChanges() {
-        return hasUnsavedChanges;
+        return dirtyState.isDirty();
     }
 
     public long markUnsavedChanges() {
-        changeVersion++;
-        hasUnsavedChanges = true;
-        return changeVersion;
+        return dirtyState.markChanged();
     }
 
     public void clearUnsavedChangesIfVersion(long version) {
-        if (changeVersion == version) {
-            hasUnsavedChanges = false;
-        }
+        dirtyState.clearIfUnchangedSince(version);
     }
 
     private void restoreUnsavedChangesIfVersion(long version) {
-        if (changeVersion == version) {
-            hasUnsavedChanges = true;
-        }
+        dirtyState.restoreIfUnchangedSince(version);
     }
 
     private void clearUnsavedChanges() {
-        changeVersion++;
-        hasUnsavedChanges = false;
+        // Unconditional: this path discards the edits, so there is nothing to compare against. The
+        // version still advances so a completion from before the discard cannot clear a later edit.
+        dirtyState.markChanged();
+        dirtyState.clear();
     }
 
     public boolean isOpeningSubGUI() {
@@ -1631,5 +1450,150 @@ public class MusicEditGUI implements InventoryHolder, MusicEditPlayback.Host {
     @Override
     public Inventory getInventory() {
         return inventory;
+    }
+
+    // --- MusicEditNoteEditor.Host: the song grid as one click sees it -------------------------
+    //
+    // Names differ from the window's own public API on purpose: `clearSelection`, `markUnsavedChanges`
+    // and `playNoteSound` already exist here with their own contracts, and overloading them to mean
+    // "do it for the click handler" would make two callers of the same name behave differently.
+
+    @Override
+    public int pitchOffset() {
+        return pitchOffset;
+    }
+
+    @Override
+    public int maxPitch() {
+        return maxPitch;
+    }
+
+    @Override
+    public int defaultMaxPitch() {
+        return getDefaultMaxPitch();
+    }
+
+    @Override
+    public MusicNote.NoteInstrument currentInstrument() {
+        return currentInstrument;
+    }
+
+    @Override
+    public void selectNote(MusicNote note) {
+        this.selectedNote = note;
+    }
+
+    @Override
+    public void enterInstrumentSelectMode() {
+        this.currentMode = Mode.INSTRUMENT_SELECT;
+    }
+
+    @Override
+    public void beginOrExpandSelection(int slot) {
+        selectionManager.beginOrExpandSelection(slot);
+    }
+
+    @Override
+    public void pushEditAction(EditAction action) {
+        editHistory.pushAction(action);
+    }
+
+    @Override
+    public void markEdited() {
+        markUnsavedChanges();
+    }
+
+    @Override
+    public boolean selectionActive() {
+        return selectionManager.isInSelectionMode();
+    }
+
+    @Override
+    public void dropSelection() {
+        clearSelection();
+    }
+
+    @Override
+    public void previewNote(int pitch, MusicNote.NoteInstrument instrument) {
+        playNoteSound(pitch, instrument);
+    }
+
+    // --- MusicEditInstrumentPicker.Host: the picker as one click sees it ----------------------
+
+    @Override
+    public MusicNote selectedNote() {
+        return selectedNote;
+    }
+
+    @Override
+    public int instrumentPageOffset() {
+        return instrumentPageOffset;
+    }
+
+    @Override
+    public void instrumentPageOffset(int offset) {
+        this.instrumentPageOffset = offset;
+    }
+
+    @Override
+    public int instrumentsPerPage() {
+        return getInstrumentsPerPage();
+    }
+
+    @Override
+    public void stopPlayback() {
+        stopMusic();
+    }
+
+    @Override
+    public void previewNoteColumn(int pitch, int tick) {
+        previewColumn(pitch, tick);
+    }
+
+    @Override
+    public void enterEditMode() {
+        this.currentMode = Mode.EDIT;
+    }
+
+    @Override
+    public void clearSelectedNote() {
+        this.selectedNote = null;
+    }
+
+    @Override
+    public void paintHotbar() {
+        givePlayerInventoryItems();
+    }
+
+    @Override
+    public void refreshGrid() {
+        updateInventory();
+    }
+
+    // --- MusicEditSessionCloser.Host: ending a session as the closer sees it ------------------
+
+    @Override
+    public boolean beginClose() {
+        return sessionGuard.beginClose();
+    }
+
+    @Override
+    public boolean isCurrentSession() {
+        return MusicEditListener.isCurrentSession(player.getUniqueId(), this);
+    }
+
+    @Override
+    public void closeInventory() {
+        player.closeInventory();
+    }
+
+    @Override
+    public void restoreInventory() {
+        PlayerInventoryState.restoreAndRemove(player);
+    }
+
+    @Override
+    public void exitEditMode() {
+        MusicEditListener.exitEditMode(player.getUniqueId(), music.getUniqueId(), this);
     }
 }

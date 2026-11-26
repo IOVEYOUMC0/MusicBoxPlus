@@ -21,9 +21,9 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * {@code /musicboxplus export <player|uuid>}: writes every song a player owns as an .nbs file.
+ * /musicboxplus export <player|uuid>: writes every song a player owns as an .nbs file.
  *
- * <p>Player-made music only exists inside the database. Without an export path, a player who wants
+ * Player-made music only exists inside the database. Without an export path, a player who wants
  * their work back -- or a server that has to migrate to another machine -- depends on hand-copying
  * SQLite files. The conversion already existed for the editor's export button; this only exposes it
  * to operators in bulk.

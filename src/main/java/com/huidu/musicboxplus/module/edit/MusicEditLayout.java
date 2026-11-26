@@ -11,13 +11,13 @@ import java.util.Map;
  * The editor window's layout: which slots form the edit area, and how a layout slot maps onto the
  * player's own inventory.
  *
- * <p>Split out of {@code MusicEditGUI}, which carried the parse, the derived column/row counts, the
+ * Split out of MusicEditGUI, which carried the parse, the derived column/row counts, the
  * slot translations and the character lookup alongside playback, rendering and session handling.
  * This part is pure data and arithmetic: no Bukkit calls, no player state, so it is also the one
  * piece of the editor that can be reasoned about without a running server.
  *
- * <p>Layout rows 0..5 are the top inventory, row 9 is the player's hotbar and rows 6..8 are the
- * player's main inventory; {@link #layoutSlotToPlayerSlot} is the only place that mapping lives.
+ * Layout rows 0..5 are the top inventory, row 9 is the player's hotbar and rows 6..8 are the
+ * player's main inventory; layoutSlotToPlayerSlot is the only place that mapping lives.
  */
 final class MusicEditLayout {
 

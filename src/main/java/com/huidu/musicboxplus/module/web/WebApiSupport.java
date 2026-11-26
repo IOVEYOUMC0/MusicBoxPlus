@@ -143,7 +143,7 @@ final class WebApiSupport {
     /**
      * Logs a server-side failure in full.
      *
-     * <p>Callers answer the client with a plain message instead of {@code e.getMessage()}: the
+     * Callers answer the client with a plain message instead of e.getMessage(): the
      * exception text used to be echoed into the HTTP response, which reaches anyone who can open the
      * editor and leaks driver/stack/internal-path details.
      */

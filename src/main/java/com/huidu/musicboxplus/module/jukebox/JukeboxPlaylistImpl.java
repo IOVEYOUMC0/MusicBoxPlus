@@ -230,7 +230,7 @@ class JukeboxPlaylistImpl implements IPlayList {
         if (inv == null) {
             return Collections.emptyList();
         }
-        // 一次扫描拿到有序歌曲列表，避免 getByIndex 每次调用都重扫整个容器
+        // One scan yields the ordered song list, so getByIndex does not rescan the container per call.
         List<ChestIndex> songs = this.getOrderedSongs(inv);
         List<MusicBoxSong> list = new ArrayList<>(Math.min(count, songs.size()));
         int end = Math.min(count, songs.size());

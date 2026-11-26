@@ -22,7 +22,7 @@ public final class NoteParticleColor {
     }
 
     /**
-     * The x-offset a NOTE particle needs for note {@code step}, in [0, 1].
+     * The x-offset a NOTE particle needs for note step, in [0, 1].
      *
      * Out-of-range steps wrap rather than being clamped, matching the palette: step 25 is the same
      * colour as step 0, and step -1 is the last colour of the turn below.

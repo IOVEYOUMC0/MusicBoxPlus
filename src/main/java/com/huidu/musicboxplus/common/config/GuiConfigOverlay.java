@@ -6,15 +6,14 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import java.util.Locale;
 
 /**
- * Applies a per-language overlay on top of {@code gui-config.yml}.
+ * Applies a per-language overlay on top of gui-config.yml.
  *
- * <p>The shipped GUI config is written in Chinese, so an English server showed Chinese titles and
- * button names no matter what {@code language} was set to: only the message files were localized.
- * An overlay file ({@code gui-config_en.yml}, {@code gui-config_zh_cn.yml}, ...) now replaces just
- * the strings it defines; everything it omits keeps the base value, so translations can land a
- * screen at a time instead of all at once.
+ * The shipped GUI config is written in Chinese, so an English server showed Chinese titles and button
+ * names no matter what language was set to: only the message files were localized. An overlay file
+ * (gui-config_en.yml, gui-config_zh_cn.yml, ...) now replaces just the strings it defines; everything
+ * it omits keeps the base value, so translations can land a screen at a time instead of all at once.
  *
- * <p>Lists are replaced wholesale rather than merged element by element: a translated lore block is
+ * Lists are replaced wholesale rather than merged element by element: a translated lore block is
  * written as a whole list, and mixing English and Chinese lines of the same hover text would be
  * worse than either.
  */
@@ -22,7 +21,7 @@ final class GuiConfigOverlay {
 
     /**
      * Language code to overlay file suffix. Chinese variants all read the simplified file, matching
-     * how {@code LanguageConfig} picks its message file.
+     * how LanguageConfig picks its message file.
      */
     static String languageSuffix(String configuredLanguage) {
         if (configuredLanguage == null) {
@@ -57,7 +56,7 @@ final class GuiConfigOverlay {
     /**
      * Copies every key the overlay defines into the base config, recursing into sections.
      *
-     * <p>{@code base.set} writes into the top-level config even for a nested path, so scalar
+     * base.set writes into the top-level config even for a nested path, so scalar
      * overrides and whole-list replacements both need no special casing.
      */
     static void merge(YamlConfiguration base, ConfigurationSection overlay) {

@@ -16,13 +16,13 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * {@code /musicboxplus backup}: zip the data folder (config, language files, songs, and the SQLite
- * database) into {@code backups/} and prune old archives.
+ * /musicboxplus backup: zip the data folder (config, language files, songs, and the SQLite
+ * database) into backups/ and prune old archives.
  *
- * <p>This exists because the only copy of a player's library is the live data folder. Until now the
+ * This exists because the only copy of a player's library is the live data folder. Until now the
  * recovery path for a bad edit or a failed upgrade was "restore the server backup, if there is one".
  *
- * <p>The zip is built off the server thread: walking a large songs tree and compressing it is
+ * The zip is built off the server thread: walking a large songs tree and compressing it is
  * seconds of I/O, and on Folia blocking a region thread for that long stalls every player in it.
  */
 public class BackupExecutor implements SubCommand {

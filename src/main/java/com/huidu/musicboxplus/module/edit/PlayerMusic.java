@@ -271,7 +271,7 @@ public class PlayerMusic implements com.huidu.musicboxplus.core.song.PlayerMusic
     /**
      * Folds every note under the model's own lock, without copying the list.
      *
-     * <p>Same view as {@link #getNotes()} for a caller that only reads, but for a song with 10k-100k
+     * Same view as getNotes() for a caller that only reads, but for a song with 10k-100k
      * notes the copy is a fresh array of that many references per call, and the save path calls this
      * once per editor action. Every mutator is synchronized on this instance, so iterating here sees
      * a consistent list without the copy.

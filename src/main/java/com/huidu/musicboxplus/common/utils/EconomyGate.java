@@ -3,9 +3,9 @@ package com.huidu.musicboxplus.common.utils;
 /**
  * Purchase decision table for the Vault economy, kept free of Bukkit so it can be unit tested.
  *
- * <p>The important distinction is between the two ways money can be absent. A server that turns the
- * economy off is in {@link Mode#FREE}: discs are deliberately free. A server that turns the economy
- * ON but has no Vault provider registered is in {@link Mode#UNAVAILABLE}: nobody can be charged, so
+ * The important distinction is between the two ways money can be absent. A server that turns the
+ * economy off is in FREE: discs are deliberately free. A server that turns the economy
+ * ON but has no Vault provider registered is in UNAVAILABLE: nobody can be charged, so
  * a purchase must be refused rather than silently treated as free. Folding the two together is what
  * let a priced published song be handed out for nothing while the author still accrued revenue.
  */

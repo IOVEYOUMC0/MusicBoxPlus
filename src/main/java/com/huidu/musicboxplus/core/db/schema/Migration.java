@@ -5,17 +5,17 @@ import java.util.List;
 /**
  * One ordered, re-runnable schema change.
  *
- * <p>Version 1 is the baseline: the full creation script that {@code AbstractBase} already runs is
- * idempotent, so both a fresh database and one created before this class existed reach version 1
- * without any migration. Everything after that is an explicit entry here.
+ * Version 1 is the baseline: the full creation script that AbstractBase already runs is idempotent,
+ * so both a fresh database and one created before this class existed reach version 1 without any
+ * migration. Everything after that is an explicit entry here.
  *
- * <p>Statements must be <b>safe to re-run</b>. MySQL commits DDL implicitly, so a migration that
- * fails halfway leaves earlier statements applied while the version row still points at the old
- * version; the next startup runs the whole migration again. Write {@code CREATE TABLE IF NOT
- * EXISTS}, and check before adding a column/index, instead of assuming a single clean run.
+ * Statements must be safe to re-run. MySQL commits DDL implicitly, so a migration that fails halfway
+ * leaves earlier statements applied while the version row still points at the old version; the next
+ * startup runs the whole migration again. Write CREATE TABLE IF NOT EXISTS, and check before adding a
+ * column or index, instead of assuming a single clean run.
  *
- * <p>Two backends ship the plugin, and their DDL differs (column types, index syntax), so each
- * migration carries both statement lists instead of guessing a common dialect.
+ * Two backends ship the plugin, and their DDL differs (column types, index syntax), so each migration
+ * carries both statement lists instead of guessing a common dialect.
  */
 public record Migration(int version, String description,
                         List<String> sqliteStatements, List<String> mysqlStatements) {

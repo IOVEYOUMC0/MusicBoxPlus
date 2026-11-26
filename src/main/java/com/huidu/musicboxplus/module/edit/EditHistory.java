@@ -116,7 +116,7 @@ public class EditHistory {
         retainedBytes = 0;
     }
 
-    /** Estimated retained size of the actions still on the stack. See {@link #estimateBytes}. */
+    /** Estimated retained size of the actions still on the stack. See estimateBytes. */
     long getRetainedBytes() {
         return retainedBytes;
     }

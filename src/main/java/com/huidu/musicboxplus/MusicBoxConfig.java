@@ -115,7 +115,7 @@ public static MusicBoxConfig parseConfig(InputStream yamlStream) {
     /**
      * Reports keys in the user's config.yml that the bundled default does not contain.
      *
-     * <p>{@link #parseConfig} runs with {@code skipMissingProperties(true)}, so a misspelled key is
+     * parseConfig runs with skipMissingProperties(true), so a misspelled key is
      * silently ignored: an admin edits the file, restarts, sees no change and no line in the log
      * explaining why. This only warns -- it never rejects or rewrites the file.
      */

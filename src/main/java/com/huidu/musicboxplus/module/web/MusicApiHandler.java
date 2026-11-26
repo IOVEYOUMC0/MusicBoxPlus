@@ -174,7 +174,7 @@ final class MusicApiHandler implements HttpHandler {
     /**
      * Applies the request's fields to the working copy the manager handed over.
      *
-     * <p>Notes are only replaced when the request carries them, which is what keeps a title/BPM-only
+     * Notes are only replaced when the request carries them, which is what keeps a title/BPM-only
      * save from re-sending (and re-inserting) the whole note table.
      */
     private void applyJsonUpdate(JsonObject json, PlayerMusic working) {

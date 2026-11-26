@@ -274,7 +274,8 @@ implements PositionPlayer {
         }
         this.musicBoxModel = new MusicBoxSongPlayerModel(this, list, this::runNextSong);
         this.musicBoxModel.setPlaybackSpeedMultiplier(speedMultiplier);
-        // 倍速必须推送到播放游标（cursor.setSpeed），否则 GUI 显示倍速已调整而实际播放速度不变
+        // The speed must be pushed into the playback cursor, or the GUI shows the new speed while
+        // playback keeps running at the old one.
         this.setPlaybackSpeed(speedMultiplier);
         this.musicBoxModel.setOwnerPlayer(this);
         this.rangePlayerModel = new RangePlayerModel(this.musicBoxModel);
@@ -491,7 +492,7 @@ implements PositionPlayer {
 
     public void setStoredPlaybackSpeedMultiplier(float playbackSpeedMultiplier) {
         this.musicBoxModel.setPlaybackSpeedMultiplier(playbackSpeedMultiplier);
-        // 同步推送到播放游标，让倍速调整立即生效
+        // Push it into the cursor so the speed change takes effect immediately.
         this.setPlaybackSpeed(playbackSpeedMultiplier);
     }
 

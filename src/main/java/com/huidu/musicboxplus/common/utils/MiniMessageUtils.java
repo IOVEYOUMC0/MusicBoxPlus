@@ -135,11 +135,11 @@ public final class MiniMessageUtils {
     }
 
     /**
-     * Same as {@link #processComponent}, but memoized in the small dynamic cache.
+     * Same as processComponent, but memoized in the small dynamic cache.
      *
      * For callers whose strings carry a value that changes on every render (a tick number, a
      * countdown, a percentage): they never hit the shared cache, so putting them there only evicts
-     * the static strings it is sized for. See {@link #DYNAMIC_COMPONENT_CACHE}.
+     * the static strings it is sized for. See DYNAMIC_COMPONENT_CACHE.
      */
     public static Component processDynamicComponent(String input) {
         if (input == null || input.isEmpty()) {
@@ -197,7 +197,7 @@ public final class MiniMessageUtils {
         return result;
     }
 
-    /** {@link #processDynamicComponent} for a lore block. */
+    /** processDynamicComponent for a lore block. */
     public static List<Component> processDynamicComponents(List<String> inputs) {
         if (inputs == null || inputs.isEmpty()) {
             return new ArrayList<>();

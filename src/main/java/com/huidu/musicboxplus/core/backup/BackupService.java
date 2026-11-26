@@ -33,7 +33,7 @@ import java.util.zip.ZipOutputStream;
 /**
  * Builds a zip of the user-owned parts of the plugin data folder.
  *
- * <p>Pure JDK and static on purpose: the backup contract must be testable without a running
+ * Pure JDK and static on purpose: the backup contract must be testable without a running
  * server, and none of its inputs come from the plugin singleton.
  */
 public final class BackupService {
@@ -51,9 +51,8 @@ public final class BackupService {
     }
 
     /**
-     * Creates one archive and applies the retention limit.
-     *
-     * @param keep number of archives to retain, or a non-positive value to disable pruning
+     * Creates one archive and applies the retention limit. keep is the number of archives to retain,
+     * or a non-positive value to disable pruning.
      */
     public static BackupResult create(
             File dataFolder, File backupDir, boolean mysqlBackend, int keep) throws IOException {

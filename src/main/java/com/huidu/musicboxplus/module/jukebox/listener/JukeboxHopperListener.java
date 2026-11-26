@@ -31,7 +31,7 @@ public class JukeboxHopperListener implements Listener {
     /**
      * Drops in-flight insert guards. Called when the module is (re)enabled.
      *
-     * <p>Also invalidates callbacks queued by the previous session. Those callbacks may still
+     * Also invalidates callbacks queued by the previous session. Those callbacks may still
      * return an already-removed disc, but cannot insert it or release a new session's lease.
      * Abandoned guards additionally retain their five-second expiry recovery.
      */

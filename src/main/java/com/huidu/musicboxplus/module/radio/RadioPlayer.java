@@ -106,7 +106,7 @@ implements PlayerSongPlayer {
 
 
     public void playTick(@NotNull Player player, int tick) {
-        // 进度条更新由 model.nextTick 内部节流（每 20 tick 一次），不再在此处重复
+        // Progress updates are throttled inside model.nextTick (once per 20 ticks); do not repeat it here.
         this.model.nextTick(this.cachedSongLength, tick);
 
         CompiledSong compiled = this.compiledSong;

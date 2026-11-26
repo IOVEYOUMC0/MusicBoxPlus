@@ -222,10 +222,10 @@ implements ExpiringCacheCleaner {
     /**
      * True when the file has no issue this class can repair.
      *
-     * <p>The only unambiguous repair is tab indentation (see {@link #repairConfigLine}), so that is
+     * The only unambiguous repair is tab indentation (see repairConfigLine), so that is
      * the only thing checked here. The key-value check that used to sit next to it could never fire:
-     * {@code line.split(":", 2)} returns exactly two elements for any line containing a colon, so its
-     * {@code length != 2} guard was dead -- a malformed mapping only surfaced later as a SnakeYAML
+     * line.split(":", 2) returns exactly two elements for any line containing a colon, so its
+     * length != 2 guard was dead -- a malformed mapping only surfaced later as a SnakeYAML
      * parse failure, where this pipeline cannot repair it either.
      */
     public boolean validateConfigFormat(File configFile) {

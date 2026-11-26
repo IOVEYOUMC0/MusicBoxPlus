@@ -351,12 +351,12 @@ public class PlayerMusicManager {
     /**
      * True when this instance has no record of committing exactly these notes.
      *
-     * <p>The comparison is a SHA-256 content digest, not {@code Objects.hash}/{@code hashCode}. A
+     * The comparison is a SHA-256 content digest, not Objects.hash/hashCode. A
      * 32-bit fold of (pitch, tick, instruments) collides easily enough to be reachable by ordinary
      * edits -- pitch 45/tick 0 and pitch 44/tick 31 fold to the same int -- and a false match drops a
      * real save, which is exactly the failure direction that must never happen here.
      *
-     * <p>The record is per process: after a restart the first save of each song rewrites its notes in
+     * The record is per process: after a restart the first save of each song rewrites its notes in
      * full. On a database shared by several servers, a metadata-only save leaves whatever another
      * server wrote in the note table alone.
      */
@@ -513,14 +513,14 @@ public class PlayerMusicManager {
     /**
      * Forgets a song that was never handed to the player.
      *
-     * <p>Used by the purchase flow: the copy is created and cached before its write is attempted, so
-     * a failed or refunded purchase has to withdraw it from the in-memory library as well. {@link
-     * #deleteMusicAsync} cannot do that job, because it returns early when the database is not
+     * Used by the purchase flow: the copy is created and cached before its write is attempted, so
+     * a failed or refunded purchase has to withdraw it from the in-memory library as well.
+     * deleteMusicAsync cannot do that job, because it returns early when the database is not
      * initialised -- which is exactly the failure that leaves the copy behind. A copy that stays
      * cached is visible in the buyer's library, editable, and is flushed to the database by the
      * shutdown save of the pending queue, i.e. a refunded purchase would become a free song.
      *
-     * <p>This deliberately does not touch the database: if a row was written by an earlier attempt,
+     * This deliberately does not touch the database: if a row was written by an earlier attempt,
      * the caller is expected to also request a delete.
      */
     public void discardUnsavedMusic(UUID musicId) {
@@ -632,27 +632,25 @@ public class PlayerMusicManager {
     }
 
     /**
-     * Applies {@code mutation} to the live song and persists the result, all under the manager
-     * monitor.
+     * Applies the mutation to the live song and persists the result, all under the manager monitor.
      *
-     * <p>This is the write path for callers outside the in-game editor (the web editor and its
-     * import endpoint). Routing them through here instead of {@code synchronized (music)} around
-     * {@link #saveMusicSync} fixes two things at once:
+     * This is the write path for callers outside the in-game editor (the web editor and its import
+     * endpoint). Routing them through here instead of locking the song around saveMusicSync fixes two
+     * things at once.
      *
-     * <ul>
-     *   <li><b>Lock order.</b> Rename, delete and create take the manager monitor and then the
-     *       song's; the web write path took them the other way round, which is an ABBA deadlock
-     *       waiting for two concurrent requests (a PUT and a rename).
-     *   <li><b>Lost updates and rollback.</b> The mutation sees the song as it is when the lock was
-     *       acquired, and a failed save restores the in-memory object exactly, so memory and
-     *       database cannot disagree. Previously each caller snapshotted before the lock and rolled
-     *       back with its own copy, which could undo somebody else's successful write.
-     * </ul>
+     * Lock order: rename, delete and create take the manager monitor and then the song's, while the
+     * web write path took them the other way round -- an ABBA deadlock waiting for two concurrent
+     * requests (a PUT and a rename).
      *
-     * <p>The mutation may throw to reject the request; it only ever touches the working copy, so the
-     * live song is untouched when that happens.
+     * Lost updates and rollback: the mutation sees the song as it is when the lock was acquired, and a
+     * failed save restores the in-memory object exactly, so memory and database cannot disagree.
+     * Previously each caller snapshotted before the lock and rolled back with its own copy, which
+     * could undo somebody else's successful write.
      *
-     * @return true when the change was committed; false when the song is gone or the write failed
+     * The mutation may throw to reject the request; it only ever touches the working copy, so the live
+     * song is untouched when that happens.
+     *
+     * Returns true when the change was committed, false when the song is gone or the write failed.
      */
     public boolean updateMusicSync(UUID musicId, UnaryOperator<PlayerMusic> mutation) {
         if (musicId == null || mutation == null) {
@@ -741,9 +739,9 @@ public class PlayerMusicManager {
     /**
      * Removes a song that was cached but never written, without touching the database.
      *
-     * <p>{@link #saveMusicSync} caches before it writes, so a failed write left the song visible in
+     * saveMusicSync caches before it writes, so a failed write left the song visible in
      * the player's library with no row behind it. Callers that create a song and then fail to persist
-     * it use this instead of {@link #deleteMusic} (which would also run the published-listing
+     * it use this instead of deleteMusic (which would also run the published-listing
      * cleanup for a song that never existed there).
      */
     public void discardUnsavedMusic(PlayerMusic music) {
@@ -813,7 +811,7 @@ public class PlayerMusicManager {
     /**
      * Number of player-created songs held in memory, for diagnostics. This is the loaded set, not a
      * database count: a fresh start that failed to load shows 0 even when rows exist, which is
-     * exactly the distinction {@code /musicboxplus doctor} needs to expose.
+     * exactly the distinction /musicboxplus doctor needs to expose.
      */
     public int getLoadedMusicCount() {
         return musicByIdCache.size();

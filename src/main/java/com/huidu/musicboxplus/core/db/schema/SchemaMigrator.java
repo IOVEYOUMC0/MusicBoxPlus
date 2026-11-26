@@ -10,24 +10,20 @@ import java.util.List;
 import java.util.function.UnaryOperator;
 
 /**
- * Brings an existing database up to {@link Migrations#latestVersion()}.
+ * Brings an existing database up to latestVersion().
  *
- * <p>Before this class the plugin only ran {@code CREATE TABLE IF NOT EXISTS}, which can add a
- * missing table but can never change one. Any column addition or type change would have silently
- * produced a database the code no longer understood. The version row fixes that: it records what
- * has already been applied so each change runs exactly once.
+ * Before this class the plugin only ran CREATE TABLE IF NOT EXISTS, which can add a missing table but
+ * can never change one. Any column addition or type change would have silently produced a database
+ * the code no longer understood. The version row fixes that: it records what has already been applied
+ * so each change runs exactly once.
  *
- * <p>Two properties matter more than elegance here:
+ * Two properties matter more than elegance here. First, a database ahead of the plugin is an error,
+ * not something to "fix": someone downgraded the jar, and running older code against a newer schema
+ * corrupts data quietly, so startup aborts with a message naming both versions. Second, the version
+ * only advances after every statement of a migration succeeded, so a failed migration retries on the
+ * next start rather than being skipped.
  *
- * <ul>
- *   <li><b>A database ahead of the plugin is an error, not something to "fix".</b> Someone
- *       downgraded the jar; running older code against a newer schema corrupts data quietly, so
- *       startup aborts with a message naming both versions.
- *   <li><b>The version only advances after every statement of a migration succeeded.</b> A failed
- *       migration therefore retries on the next start rather than being skipped.
- * </ul>
- *
- * <p>The JDBC work is isolated behind {@link Database} so the state machine can be tested without a
+ * The JDBC work is isolated behind Database so the state machine can be tested without a
  * driver (sqlite-jdbc is provided by the server at runtime, not by the test classpath).
  */
 public final class SchemaMigrator {
@@ -44,7 +40,7 @@ public final class SchemaMigrator {
     }
 
     /**
-     * Storage seam. {@code RuntimeException} is allowed through for driver-level failures; the
+     * Storage seam. RuntimeException is allowed through for driver-level failures; the
      * public entry point wraps everything into an unchecked exception carrying the version.
      */
     interface Database {
@@ -69,8 +65,8 @@ public final class SchemaMigrator {
     }
 
     /**
-     * @param currentVersionHint used only when the version table is empty and the caller already
-     *                           knows the database is not new; 0 is safe for every other case
+     * Runs the pending migrations. currentVersionHint is used only when the version table is empty and
+     * the caller already knows the database is not new; 0 is safe for every other case.
      */
     static Result run(Database database, boolean mysql, int currentVersionHint, List<Migration> migrations) {
         Migrations.validate(migrations);

@@ -115,7 +115,7 @@ public final class FaceUtils {
     }
 
     public static BlockFace getRelativeFace(Location from, Location to) {
-        // 直接用坐标整数相减，避免无意义的 Vector 分配
+        // Subtract the coordinate integers directly; allocating a Vector just to subtract is waste.
         int dx = from.getBlockX() - to.getBlockX();
         int dz = from.getBlockZ() - to.getBlockZ();
 

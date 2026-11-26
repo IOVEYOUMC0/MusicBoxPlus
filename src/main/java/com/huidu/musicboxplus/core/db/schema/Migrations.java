@@ -6,15 +6,15 @@ import java.util.List;
 /**
  * The ordered migration registry.
  *
- * <p>Append new migrations; never edit or reorder a shipped one, because databases in the field
+ * Append new migrations; never edit or reorder a shipped one, because databases in the field
  * have already run it and the version row is the only record of that. The version numbers are
- * required to be contiguous starting at {@link Migration#BASELINE_VERSION} + 1: a gap would be
+ * required to be contiguous starting at BASELINE_VERSION + 1: a gap would be
  * silently skipped forever, and this is the one place where a typo cannot be caught later.
  */
 public final class Migrations {
 
     /**
-     * Nothing yet. Version 1 is the baseline produced by {@code db/*.sql}; the first real change to
+     * Nothing yet. Version 1 is the baseline produced by db/*.sql; the first real change to
      * the table layout gets version 2 and is appended here.
      */
     private static final List<Migration> ALL = List.of();

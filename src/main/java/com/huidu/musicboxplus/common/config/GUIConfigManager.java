@@ -187,9 +187,9 @@ public class GUIConfigManager {
     /**
      * Overlays the translation matching the configured language, if one exists.
      *
-     * <p>Precedence: a file in the plugin data folder wins, so an owner can correct or extend a
+     * Precedence: a file in the plugin data folder wins, so an owner can correct or extend a
      * translation without waiting for a release; otherwise the bundled overlay is used, but only for
-     * a non-Chinese language, because the shipped {@code gui-config.yml} is already Chinese and an
+     * a non-Chinese language, because the shipped gui-config.yml is already Chinese and an
      * overlay would otherwise overwrite an owner's own Chinese edits.
      */
     private void applyLanguageOverlay() {

@@ -18,14 +18,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * {@code /musicboxplus doctor}: read-only snapshot of the state an operator needs to answer
+ * /musicboxplus doctor: read-only snapshot of the state an operator needs to answer
  * "why is it behaving like that" without reading logs or guessing.
  *
- * <p>Everything it prints is either a live measurement (database round trip, library size) or a
+ * Everything it prints is either a live measurement (database round trip, library size) or a
  * configuration fact (module flags, schema version). It never writes, never reloads and never
  * repairs: a diagnostic that changes state is not a diagnostic.
  *
- * <p>The database probe runs off the tick thread; on Folia a region thread blocked on JDBC stalls
+ * The database probe runs off the tick thread; on Folia a region thread blocked on JDBC stalls
  * every player in that region.
  */
 public class DoctorExecutor implements SubCommand {

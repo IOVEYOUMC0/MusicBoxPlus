@@ -249,8 +249,8 @@ public abstract class AbstractBase {
     }
 
     /**
-     * Pumps every row of an open ResultSet into {@code consumer}, building one ResultSetRow at a
-     * time. See {@link #streamQuery} for why the streaming form exists; this is its testable core.
+     * Pumps every row of an open ResultSet into consumer, building one ResultSetRow at a
+     * time. See streamQuery for why the streaming form exists; this is its testable core.
      */
     static void forEachRow(ResultSet set, RowConsumer consumer) throws SQLException {
         List<String> columns = getColumns(set);
@@ -377,12 +377,12 @@ public abstract class AbstractBase {
      * Flushes SQLite's write-ahead log into the main database file so a plain file copy is a
      * complete snapshot.
      *
-     * <p>A copy of {@code data.db} without this can miss every write still sitting in
-     * {@code data.db-wal}; restoring such a file silently loses recent edits. MySQL has no
+     * A copy of data.db without this can miss every write still sitting in
+     * data.db-wal; restoring such a file silently loses recent edits. MySQL has no
      * equivalent file to copy (its backup needs a dump), so this is a no-op there.
      *
-     * @return true when the checkpoint succeeded, false when the database is not SQLite or the
-     *         checkpoint failed. Callers must not claim a consistent database copy on false.
+     * Returns true when the checkpoint succeeded, false when the database is not SQLite or the
+     * checkpoint failed. Callers must not claim a consistent database copy on false.
      */
     public boolean checkpointForBackup() {
         if (isMySQL()) {
@@ -416,7 +416,7 @@ public abstract class AbstractBase {
     }
 
     /**
-     * Version recorded by {@link com.huidu.musicboxplus.core.db.schema.SchemaMigrator}, or 0 when
+     * Version recorded by com.huidu.musicboxplus.core.db.schema.SchemaMigrator, or 0 when
      * the table is missing or unreadable. Read-only; migrations themselves run during startup.
      */
     public int getSchemaVersion() {
@@ -475,18 +475,18 @@ public abstract class AbstractBase {
         }
     }
 
-    /** Receives one row at a time from {@link #streamQuery}. */
+    /** Receives one row at a time from streamQuery. */
     @FunctionalInterface
     public interface RowConsumer {
         void accept(ResultSetRow row);
     }
 
     /**
-     * Runs a query and hands each row to {@code consumer} while the driver's ResultSet is still
+     * Runs a query and hands each row to consumer while the driver's ResultSet is still
      * open, instead of collecting every row into a List first.
      *
      * Use this for tables that hold one row per note/event rather than one row per record.
-     * {@link #extractSet} keeps every ResultSetRow alive until the query returns, and a row costs a
+     * extractSet keeps every ResultSetRow alive until the query returns, and a row costs a
      * ResultSetRow, an unmodifiable LinkedHashMap and a builder's two ArrayLists -- roughly 300 B
      * for a four-column table. `player_music_notes` is 4 columns and holds every note of every
      * player song, so a library with 500k notes needed ~150 MB of heap just to be read, before the
@@ -803,7 +803,7 @@ public abstract class AbstractBase {
     /**
      * Replaces the protected-sign list in one transaction.
      *
-     * <p>Throws when the write failed. Every caller already wraps this in a try/catch and treats
+     * Throws when the write failed. Every caller already wraps this in a try/catch and treats
      * "returned normally" as "committed"; logging the error here and returning made those handlers
      * dead code and reported a failed save as a successful one.
      */
@@ -890,7 +890,7 @@ public abstract class AbstractBase {
     /**
      * The player's recent-song hashes, newest last.
      *
-     * <p>A read failure is thrown, not turned into an empty list: the caller clears its in-memory
+     * A read failure is thrown, not turned into an empty list: the caller clears its in-memory
      * list and marks it loaded when this returns empty, and the next shutdown save would then write
      * that empty list back, turning a transient read error into a lost history.
      */
@@ -984,7 +984,7 @@ public abstract class AbstractBase {
     /**
      * Writes every entry in one transaction.
      *
-     * <p>Throws when the batch failed; {@code VolumeManager} keeps the map dirty and retries on the
+     * Throws when the batch failed; VolumeManager keeps the map dirty and retries on the
      * next sweep only because the failure is observable here.
      */
     public void savePlayerVolumesBatch(Map<UUID, Integer> volumes) {
@@ -1108,7 +1108,7 @@ public abstract class AbstractBase {
         return this.query(query, args);
     }
 
-    /** Public counterpart of {@link #streamQuery} for callers outside this package. */
+    /** Public counterpart of streamQuery for callers outside this package. */
     public void executeStreamQuery(String query, RowConsumer consumer, Object... args) {
         this.streamQuery(query, consumer, args);
     }

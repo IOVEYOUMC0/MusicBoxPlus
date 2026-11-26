@@ -12,12 +12,12 @@ import java.util.Set;
 /**
  * The editor's playback clock: advances the song tick by tick and tells the view what changed.
  *
- * <p>Split out of {@code MusicEditGUI}, which mixed the timing/advancement rules with rendering and
+ * Split out of MusicEditGUI, which mixed the timing/advancement rules with rendering and
  * click handling. Those rules are the part with the subtle invariants -- a tick may catch up several
  * song ticks per server tick, the page has to follow the notes, and finishing must not be confused
  * with stopping -- so they read better on their own.
  *
- * <p>All view interaction goes through {@link Host}; this class never touches an inventory directly.
+ * All view interaction goes through Host; this class never touches an inventory directly.
  */
 final class MusicEditPlayback {
 

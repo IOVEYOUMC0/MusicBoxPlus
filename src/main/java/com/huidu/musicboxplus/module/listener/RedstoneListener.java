@@ -42,7 +42,7 @@ public class RedstoneListener implements Listener {
     @EventHandler(ignoreCancelled = true)
     public void onRedstoneCB(SourcedBlockRedstoneEvent e) {
         Block block = e.getBlock();
-        // 先用便宜的 getType() 预筛，只有告示牌/唱片机才分配 BlockState 快照
+        // Pre-filter with the cheap getType(); only signs and jukeboxes allocate a BlockState snapshot.
         Material type = block.getType();
         if (type == Material.JUKEBOX && MusicBox.getInstance().isJukeboxModuleEnabled()) {
             Jukebox box = (Jukebox) block.getState();
